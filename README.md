@@ -57,7 +57,9 @@ A versatile, customizable macro pad built on the ESP32 platform, featuring gestu
 3. Configure your hardware connections in `config.json`
 
 4. Upload the code to your ESP32
-
+```
+pio run --target upload && pio run --target uploadfs
+```
 5. is not so easy...need more test for pin configuration
 
 ## 📝 Configuration
