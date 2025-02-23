@@ -30,7 +30,7 @@ ConfigurationManager configManager;
 GestureRead gestureSensor; // Definizione effettiva (deve rimanere UNICA)
 GestureAnalyze gestureAnalyzer(gestureSensor);
 SpecialAction specialAction;
-BLEController bleController("esp32-Macropad"); // prendere nome dal config in qualche modo...uguale per wifi e bluethoot
+BLEController bleController("Macropad_esp32"); // prendere nome dal config in qualche modo...uguale per wifi e bluethoot
 // modificare blecontroller.start??
 MacroManager macroManager(nullptr, nullptr);
 Keypad *keypad;

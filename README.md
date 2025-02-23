@@ -65,7 +65,7 @@ A versatile, customizable macro pad built on the ESP32 platform, featuring gestu
 1. Power on your MacroPad
 2. Connect to the WiFi AP "ESP32_MacroPad" (default password: "my_cat_name123")
 3. Navigate to `http://192.168.4.1` in your web browser
-4. Insert your SSID and password and save ,it reboot in sta+ap mode, 
+4. Insert your SSID and password and save ,it reboot in sta+ap mode, (use only 2ghz band) 
 
 5. reconnect to the ap to read the new ip assigned by your router from the AP ,reconnect to your router go to new ip
 
@@ -87,9 +87,15 @@ This project was developed with assistance from various AI models including GPT-
 - BLE pairing sometimes requires forget from pc/smartphone
 - See [TODO.md](TODO.md) for planned improvements
 
+## Tested Board
+
+* lolin32_lite
+
+
+
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please feel free to submit a Pull Request. or add a tested Board
 
 
 ## Motivation

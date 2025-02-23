@@ -2,8 +2,8 @@
   "wifi": {
     "ap_ssid": "ESP32_MacroPad",
     "ap_password": "my_cat_name123",
-    "router_ssid": "FASTWEB-2",
-    "router_password": "***REMOVED***"
+    "router_ssid": "ROUTER_SSID",
+    "router_password": "SSID_Password"
   },
   "system": {
     "ap_autostart": false,
@@ -12,7 +12,7 @@
     "serial_enabled": true,
     "BleMacAdd": 0,
     "combo_timeout": 100,
-    "BleName": "ESP32MacroPad-di-enrico"
+    "BleName": "Macropad_esp32"
   },
   "keypad": {
     "rows": 3,

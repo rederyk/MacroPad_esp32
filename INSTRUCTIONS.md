@@ -7,6 +7,12 @@ This document provides a comprehensive guide on how to set up and use the ESP32 
 
 ## Setup
 
+* write hardware setup instruction (WIP)
+
+
+
+
+
 ### Prerequisites
 
 *   ESP32 development board
@@ -33,8 +39,8 @@ The `config.json` file is used to configure the MacroPad. It includes settings f
 ```json
 {
   "wifi": {
-    "ap_ssid": "ESP32-Configuration",
-    "ap_password": "123456789",
+    "ap_ssid": "ESP32_MacroPad",
+    "ap_password": "my_cat_name123",
     "router_ssid": "ROUTER_SSID",
     "router_password": "SSID_PASSWORD"
   }
@@ -56,7 +62,7 @@ The `config.json` file is used to configure the MacroPad. It includes settings f
     "enable_BLE": true,
     "serial_enabled": true,
     "BleMacAdd":0,
-    "BleName":"ESP32MacroPad-di-enrico"
+    "BleName":"Macropad_esp32" // attualmente harcoded
   }
 }
 ```
@@ -69,6 +75,8 @@ The `config.json` file is used to configure the MacroPad. It includes settings f
 *   `BleName`: name of the device
 
 ### Keypad Configuration
+
+* the deafult config is for lolin32_lite
 
 ```json
 {
