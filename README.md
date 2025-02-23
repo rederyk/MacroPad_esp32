@@ -66,14 +66,16 @@ A versatile, customizable macro pad built on the ESP32 platform, featuring gestu
 2. Connect to the WiFi AP "ESP32_MacroPad" (default password: "my_cat_name123")
 3. Navigate to `http://192.168.4.1` in your web browser
 4. Insert your SSID and password and save ,it reboot in sta+ap mode, (use only 2ghz band) 
-
 5. reconnect to the ap to read the new ip assigned by your router from the AP ,reconnect to your router go to new ip
-
 6. you can set a new password for the ap and disable ap_autostart in advanced setting page .. set new password for the AP is important because if the esp dont find your router or password is incorrect, it open the ap with your ssiid and password in clear so..use your cat-name....
 
 in any case change also the ap password.
 
-5. on the combo page you can add or edit all combinations and what they do or send ,
+7. on the combo page you can add or edit all combinations and what they do or send ,
+8. press 1+2+3 and encoder button to toggle and reboot in BLE or WIFI mode or set your combo insted of preset 
+ "1+2+3,BUTTON": ["TOGGLE_BLE_WIFI"],
+
+
 
 Detailed setup instructions can be found in [INSTRUCTIONS.md](INSTRUCTIONS.md)
 
