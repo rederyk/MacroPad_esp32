@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Configurazione Combo Visuale - Tastiera Virtuale Migliorata</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+  <style>
+    .keypad {
+      display: grid;
+      gap: 5px;
+      margin-bottom: 10px;
+    }
+    .key {
+      background-color: #f0f0f0;
+      border: 1px solid #ccc;
+      text-align: center;
+      padding: 15px;
+      cursor: pointer;
+      user-select: none;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .key:hover {
+      background-color: #e0e0e0;
+    }
+    /* Layout per i tasti speciali sotto il keypad */
+    .special-keys {
+      margin-top: 10px;
+    }
+    .special-keys .row > div {
+      padding: 0 5px;
+    }
+    .vk-container {
+      margin-bottom: 20px;
+    }
+    .vk-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-bottom: 5px;
+    }
+    .vk-key {
+      padding: 8px;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      cursor: pointer;
+      border-radius: 3px;
+      min-width: 40px;
+      text-align: center;
+    }
+    .vk-key.wide {
+      min-width: 80px;
+    }
+    .vk-key.extra-wide {
+      min-width: 120px;
+    }
+    .vk-key:hover {
+      background-color: #e0e0e0;
+    }
+    .toggle-active {
+      background-color: #007bff !important;
+      color: #fff;
+    }
+    .combo-btn {
+      min-width: 100px;
+    }
+  </style>
+</head>
+<body class="container mt-5">
+  <h1 class="text-center mb-4">Configurazione Combo Visuale</h1>
+
+  <!-- Sezione Keypad e formazione combo -->
+  <div class="row">
+    <div class="col-md-6">
+      <h3>Keypad Visuale</h3>
+      <div id="keypad" class="keypad"></div>
+      <!-- Tasti speciali (CW, BUTTON, CWW) sotto il keypad -->
+      <div class="special-keys">
+        <div class="row">
+          <div class="col text-start">
+            <button class="btn btn-secondary" id="btnCW">CW</button>
+          </div>
+          <div class="col text-center">
+            <button class="btn btn-secondary" id="btnBUTTON">BUTTON</button>
+          </div>
+          <div class="col text-end">
+            <button class="btn btn-secondary" id="btnCWW">CWW</button>
+          </div>
+        </div>
+      </div>
+      <button id="clearCombo" class="btn btn-warning mb-3 w-100 mt-2">Pulisci Combo</button>
+      <div class="mb-3">
+        <strong>Combo Selezionata:</strong>
+        <span id="currentCombo" class="ms-2"></span>
+      </div>
+    </div>
+
+    <!-- Sezione comando -->
+    <div class="col-md-6">
+      <h3>Comando da Eseguire</h3>
+      <div class="mb-3">
+        <input type="text" id="commandInput" class="form-control" placeholder="Inserisci comando" />
+      </div>
+      <div class="mb-3">
+        <select id="systemActions" class="form-select">
+          <option value="">-- Seleziona Azione di Sistema --</option>
+        </select>
+      </div>
+      <div>
+        <strong>Comando Finale:</strong>
+        <span id="finalCommand" class="ms-2"></span>
+      </div>
+    </div>
+  </div>
+
+  <hr />
+
+  <!-- Tastiera Virtuale Migliorata -->
+  <h3>Tastiera Virtuale</h3>
+  <div id="virtualKeyboard" class="vk-container"></div>
+
+  <hr />
+
+  <!-- Combo Esistenti -->
+  <h3>Combo Esistenti</h3>
+  <div id="comboList" class="mb-3"></div>
+  <button id="saveCombo" class="btn btn-primary w-100">Salva Combo</button>
+
+  <div id="status" class="mt-3 text-center"></div>
+
+  <script>
+    let advancedConfig = {};
+    let combinations = {};
+    let currentCombo = "";
+    let currentCommand = "";
+    // Stati per gestione tasti speciali e normali
+    let shiftActive = false;
+    let shiftLock = false;
+    let capsLock = false;
+    let specialKeyAdded = false; // indica se è stato aggiunto un tasto speciale
+
+    // Mappatura per i tasti con Shift attivo
+    const shiftMapping = {
+      '1': '!', '2': '@', '3': '#', '4': '$', '5': '%',
+      '6': '^', '7': '&', '8': '*', '9': '(', '0': ')',
+      '-': '_',
+      '=': '+',
+      '[': '{',
+      ']': '}',
+      ';': ':',
+      "'": '"',
+      ',': '<',
+      '.': '>',
+      '/': '?',
+      '\\': '|',
+      '`': '~'
+    };
+
+    // Lista predefinita di systemActions
+    const systemActionsList = [
+      "CALIBRATE_SENSOR",
+      "RESET_ALL",
+      "MEM_INFO",
+      "HOP_BLE_DEVICE",
+      "TOGGLE_BLE_WIFI",
+      "EXECUTE_GESTURE",
+    ];
+
+    async function loadConfigs() {
+      try {
+        const advRes = await fetch('/advanced.json');
+        if (!advRes.ok) throw new Error('Errore nel caricamento di advanced.json');
+        advancedConfig = await advRes.json();
+        drawKeypad();
+      } catch(e) {
+        document.getElementById('status').innerHTML = '⚠️ Errore caricamento advanced.json';
+      }
+
+      try {
+        const combRes = await fetch('/combinations.json');
+        if (!combRes.ok) throw new Error('Errore nel caricamento di combinations.json');
+        combinations = await combRes.json();
+        populateComboList();
+      } catch(e) {
+        document.getElementById('status').innerHTML = '⚠️ Errore caricamento combinations.json';
+      }
+
+      populateSystemActions();
+      drawVirtualKeyboard();
+    }
+
+    function drawKeypad() {
+      const keypadDiv = document.getElementById('keypad');
+      keypadDiv.innerHTML = '';
+      const keypad = advancedConfig.keypad;
+      if (!keypad) return;
+      keypadDiv.style.gridTemplateColumns = `repeat(${keypad.cols}, 1fr)`;
+      for (let r = 0; r < keypad.rows; r++) {
+        for (let c = 0; c < keypad.cols; c++) {
+          const keyVal = keypad.keys[r][c];
+          const keyButton = document.createElement('div');
+          keyButton.className = 'key';
+          keyButton.innerText = keyVal;
+          keyButton.addEventListener('click', () => {
+            appendToCombo(keyVal);
+          });
+          keypadDiv.appendChild(keyButton);
+        }
+      }
+    }
+
+    // Aggiunge un tasto "normale" alla combo. Se è già stato aggiunto un tasto speciale,
+    // lo rimuove per permettere di continuare la formazione della combo.
+    function appendToCombo(key) {
+      if (specialKeyAdded) {
+        // Rimuove la parte speciale (dopo la virgola) per consentire ulteriori aggiunte
+        const parts = currentCombo.split(',');
+        currentCombo = parts[0];
+        specialKeyAdded = false;
+      }
+      currentCombo += (currentCombo ? '+' : '') + key;
+      document.getElementById('currentCombo').innerText = currentCombo;
+      updateFinalCommand();
+    }
+
+    // Aggiunge un tasto speciale alla combo utilizzando la virgola come separatore.
+    // Se un tasto speciale è già stato aggiunto, viene sostituito.
+    function appendSpecialKeyToCombo(key) {
+      if (!currentCombo) {
+        // Se non ci sono altri tasti, si aggiunge direttamente
+        currentCombo = key;
+      } else {
+        if (specialKeyAdded) {
+          // Sostituisci l'ultimo tasto speciale
+          const parts = currentCombo.split(',');
+          currentCombo = parts[0] + ',' + key;
+        } else {
+          currentCombo += ',' + key;
+          specialKeyAdded = true;
+        }
+      }
+      document.getElementById('currentCombo').innerText = currentCombo;
+      updateFinalCommand();
+    }
+
+    // Event listeners per i tasti speciali
+    document.getElementById('btnCW').addEventListener('click', () => appendSpecialKeyToCombo('CW'));
+    document.getElementById('btnCWW').addEventListener('click', () => appendSpecialKeyToCombo('CWW'));
+    document.getElementById('btnBUTTON').addEventListener('click', () => appendSpecialKeyToCombo('BUTTON'));
+
+    function populateSystemActions() {
+      const select = document.getElementById('systemActions');
+      systemActionsList.forEach(action => {
+        const option = document.createElement('option');
+        option.value = action;
+        option.innerText = action;
+        select.appendChild(option);
+      });
+      select.addEventListener('change', () => {
+        if(select.value) {
+          document.getElementById('commandInput').value = select.value;
+          updateFinalCommand();
+        }
+      });
+    }
+
+    // Disegna la tastiera virtuale migliorata
+    function drawVirtualKeyboard() {
+      const vkDiv = document.getElementById('virtualKeyboard');
+      vkDiv.innerHTML = '';
+
+      // RIGA: Tasti modificatori separati (solo Shift, rinominato in vkShiftMod)
+      const modRow = document.createElement('div');
+      modRow.className = 'vk-row';
+      const shiftBtn = document.createElement('button');
+      shiftBtn.className = 'vk-key btn btn-light';
+      shiftBtn.id = 'vkShiftMod';
+      shiftBtn.innerText = 'Shift';
+      shiftBtn.addEventListener('click', () => {
+        if (!shiftActive) {
+          shiftActive = true;
+          shiftLock = false;
+        } else if (shiftActive && !shiftLock) {
+          shiftLock = true;
+        } else {
+          shiftActive = false;
+          shiftLock = false;
+        }
+        shiftBtn.classList.toggle('toggle-active', shiftActive);
+        updateVirtualKeyboardKeys();
+      });
+      modRow.appendChild(shiftBtn);
+      vkDiv.appendChild(modRow);
+
+      // RIGA: Altri tasti modificatori (CTRL, ALT, SUPER)
+      const toggleRow = document.createElement('div');
+      toggleRow.className = 'vk-row';
+      const otherToggles = [
+        { label: 'CTRL', id: 'vkCtrl' },
+        { label: 'ALT', id: 'vkAlt' },
+        { label: 'SUPER', id: 'vkSuper' },
+        { label: 'SHIFT', id: 'vkShift' }
+      ];
+      otherToggles.forEach(item => {
+        const btn = document.createElement('button');
+        btn.className = 'vk-key btn btn-light';
+        btn.id = item.id;
+        btn.innerText = item.label;
+        btn.addEventListener('click', () => {
+          appendToCommand(item.label + '+');
+        });
+        toggleRow.appendChild(btn);
+      });
+      vkDiv.appendChild(toggleRow);
+
+      // RIGA: Tasti funzione e di controllo
+      const funcRow = document.createElement('div');
+      funcRow.className = 'vk-row';
+      const funcKeys = ['Esc', 'Tab', 'Backspace', 'Enter'];
+      funcKeys.forEach(k => {
+        const btn = document.createElement('button');
+        btn.className = 'vk-key btn btn-light ' + ((k === 'Backspace' || k === 'Enter') ? 'wide' : '');
+        btn.innerText = k;
+        btn.addEventListener('click', () => appendToCommand('[' + k + ']'));
+        funcRow.appendChild(btn);
+      });
+      vkDiv.appendChild(funcRow);
+
+      // RIGA: Tasti alfanumerici e simboli
+      const alnumRow = document.createElement('div');
+      alnumRow.className = 'vk-row';
+      const alnumKeys = [
+        'q','w','e','r','t','y','u','i','o','p',
+        'a','s','d','f','g','h','j','k','l',
+        'z','x','c','v','b','n','m',
+        '1','2','3','4','5','6','7','8','9','0',
+        '-','=','[',']',';',"'",
+        ',','.','/','`'
+      ];
+      alnumKeys.forEach(k => {
+        const btn = document.createElement('button');
+        btn.className = 'vk-key btn btn-light';
+        btn.dataset.base = k;
+        btn.innerText = getDisplayValue(k);
+        btn.addEventListener('click', () => {
+          appendToCommand(getDisplayValue(k));
+          // Se lo shift è attivo senza lock, lo disattiva dopo la pressione
+          if (shiftActive && !shiftLock) {
+            shiftActive = false;
+            document.getElementById('vkShiftMod').classList.remove('toggle-active');
+            updateVirtualKeyboardKeys();
+          }
+        });
+        alnumRow.appendChild(btn);
+      });
+      vkDiv.appendChild(alnumRow);
+
+      // RIGA: Barra spaziatrice e frecce
+      const extraRow = document.createElement('div');
+      extraRow.className = 'vk-row';
+      const spaceBtn = document.createElement('button');
+      spaceBtn.className = 'vk-key btn btn-light extra-wide';
+      spaceBtn.innerText = 'Spazio';
+      spaceBtn.addEventListener('click', () => appendToCommand(' '));
+      extraRow.appendChild(spaceBtn);
+
+      const arrowKeys = ['←','↑','↓','→'];
+      arrowKeys.forEach(arrow => {
+        const btn = document.createElement('button');
+        btn.className = 'vk-key btn btn-light';
+        btn.innerText = arrow;
+        btn.addEventListener('click', () => appendToCommand('['+arrow+']'));
+        extraRow.appendChild(btn);
+      });
+      vkDiv.appendChild(extraRow);
+
+      // RIGA: Tasti multimediali
+      const mediaRow = document.createElement('div');
+      mediaRow.className = 'vk-row';
+      const mediaKeys = ["VOL_UP", "VOL_DOWN", "FAST_VOL_UP", "FAST_VOL_DOWN", "NEXT_PLAYLIST", "PREV_PLAYLIST"];
+      mediaKeys.forEach(k => {
+        const btn = document.createElement('button');
+        btn.className = 'vk-key btn btn-light';
+        btn.innerText = k;
+        btn.addEventListener('click', () => appendToCommand(k));
+        mediaRow.appendChild(btn);
+      });
+      vkDiv.appendChild(mediaRow);
+    }
+
+    function getDisplayValue(key) {
+      if (/[a-z]/i.test(key)) {
+        if ((capsLock && !shiftActive) || (!capsLock && shiftActive)) {
+          return key.toUpperCase();
+        } else {
+          return key.toLowerCase();
+        }
+      } else if (shiftActive && shiftMapping[key]) {
+        return shiftMapping[key];
+      }
+      return key;
+    }
+
+    function updateVirtualKeyboardKeys() {
+      const vkKeys = document.querySelectorAll('.vk-key');
+      vkKeys.forEach(btn => {
+        if (btn.dataset.base) {
+          btn.innerText = getDisplayValue(btn.dataset.base);
+        }
+      });
+    }
+
+    function appendToCommand(text) {
+      const input = document.getElementById('commandInput');
+      input.value += text;
+      updateFinalCommand();
+    }
+
+    function updateFinalCommand() {
+      let cmd = document.getElementById('commandInput').value.trim();
+      if(cmd && !cmd.startsWith('S_B:')) {
+        cmd = 'S_B:' + cmd;
+      }
+      currentCommand = cmd;
+      document.getElementById('finalCommand').innerText = currentCombo + ' -> ' + currentCommand;
+    }
+
+    document.getElementById('clearCombo').addEventListener('click', () => {
+      currentCombo = '';
+      specialKeyAdded = false;
+      document.getElementById('currentCombo').innerText = currentCombo;
+      updateFinalCommand();
+    });
+
+    function populateComboList() {
+      const listDiv = document.getElementById('comboList');
+      listDiv.innerHTML = '';
+      for (const combo in combinations) {
+        const action = combinations[combo][0] || '';
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-outline-primary m-1 combo-btn';
+        btn.innerText = combo + " -> " + action;
+        btn.addEventListener('click', () => {
+          currentCombo = combo;
+          // Verifica se la combo contiene un tasto speciale (separato da virgola)
+          specialKeyAdded = combo.includes(',');
+          document.getElementById('currentCombo').innerText = currentCombo;
+          document.getElementById('commandInput').value = action;
+          updateFinalCommand();
+        });
+        listDiv.appendChild(btn);
+      }
+    }
+
+    document.getElementById('saveCombo').addEventListener('click', async () => {
+      if(!currentCombo || !currentCommand) {
+        document.getElementById('status').innerHTML = '❌ Compila la combo e il comando prima di salvare.';
+        return;
+      }
+      combinations[currentCombo] = [currentCommand];
+      try {
+        const response = await fetch('/combinations.json', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(combinations)
+        });
+        const message = await response.text();
+        document.getElementById('status').innerHTML = '✅ ' + message;
+        populateComboList();
+        // Ripulisce i campi per un flusso più user-friendly
+        currentCombo = '';
+        specialKeyAdded = false;
+        currentCommand = '';
+        document.getElementById('currentCombo').innerText = '';
+        document.getElementById('commandInput').value = '';
+        updateFinalCommand();
+      } catch (e) {
+        document.getElementById('status').innerHTML = '❌ Errore durante il salvataggio.';
+      }
+    });
+
+    document.getElementById('commandInput').addEventListener('input', () => {
+      updateFinalCommand();
+    });
+
+    loadConfigs();
+  </script>
+</body>
+</html>
