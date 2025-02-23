@@ -23,6 +23,14 @@ The following improvements have been identified in the code:
 *  per il comando da eseguire.(la value della key del json).disporre un menu sottostsnte con tutte le systemAction disponibili,e una tastiera virtuale, con la possibilita di formare tutti i comandi inviabili dal bluethoot con la flag S_B: in automatico ,  non ti soffermare tanto sui nomi dei comandi bluethoot e delle systemaction le inseriremo 
 corrette dopo la logica
 
+* il mouse non usa x e y esempio..
+```
+    "1+4,CW": ["MOUSE_MOVE_0_5_0_0"],
+    "1+4,CCW": ["MOUSE_MOVE_0_-5_0_0"],
+    "4+7,CW": ["MOUSE_MOVE_-5_0_0_0"],
+    "4+7,CCW": ["MOUSE_MOVE_5_0_0_0"],
+    NON VA....
+```
 * BATTERY USAGE... 
 
 * comuqnue va...

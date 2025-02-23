@@ -7,7 +7,6 @@
 #include <Logger.h>
 #include <BLEController.h>
 
-
 extern WIFIManager wifiManager;
 extern BLEController bleController;
 
@@ -270,22 +269,6 @@ void MacroManager::update()
 {
     unsigned long currentTime = millis();
 
-    //    // Se il rilascio della rotazione è in sospeso e combo_delay+1 è trascorso
-    //    // Ce sicuramente un modo migliore
-    //    if (rotationReleaseTime != 0 && (currentTime - rotationReleaseTime >= combo_delay + 1))
-    //    {
-    //        lastAction.clear();
-    //        rotationReleaseTime = 0;
-    //        releaseAction(lastExecutedAction);
-    //        lastExecutedAction.clear();
-    //    }
-    //    // Se non ci sono chiavi attive e nessuna azione attuale, rilascia eventuali azioni pendenti
-    //    if (activeKeysMask == 0 && lastAction.empty() && !lastExecutedAction.empty())
-    //    {
-    //        releaseAction(lastExecutedAction);
-    //        lastExecutedAction.clear();
-    //    }
-    //
     // Controlla se il combo_delay è scaduto e se c'è una combinazione in sospeso
     if (!pendingCombination.empty() && (currentTime - lastCombinationTime >= combo_delay))
     {
@@ -322,9 +305,8 @@ void MacroManager::update()
         }
     }
 
-    // Se il rilascio della rotazione è in sospeso e combo_delay+1 è trascorso
-    // Ce sicuramente un modo migliore
-    if (rotationReleaseTime != 0 && (currentTime - rotationReleaseTime >= combo_delay + 1))
+    // Se il rilascio della rotazione è in sospeso e combo_delay è trascorso
+    if (rotationReleaseTime != 0 && (currentTime - rotationReleaseTime >= combo_delay))
     {
         lastAction.clear();
         rotationReleaseTime = 0;
