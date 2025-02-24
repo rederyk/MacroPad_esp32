@@ -203,18 +203,15 @@ Device actions are actions that are performed by the MacroPad itself. These acti
 
 Bluetooth actions are actions that are sent to a connected Bluetooth device. These actions are prefixed with `S_B:`.
 
-* TODO rimuoverlo o spostarlo ai comandi di sistema, oppure chissenefrega....
 
 ### Syntax
 
 ```
 S_B:<action1>+<action2>,<action3>
 ```
-
-*   Actions are separated by `+`.
-*   Multiple actions can be combined into a single command.
-*   Commands are separated by `,`.
-
+* 
+* sorry + and , need more attention , try empirical method
+* 
 ### Available Actions
 
 *   **Keyboard Keys:**
