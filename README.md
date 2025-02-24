@@ -1,121 +1,143 @@
-# ESP32 MacroPad
 
-A versatile, customizable macro pad built on the ESP32 platform, featuring gesture recognition, programmable key combinations, and WIFI BLE connectivity.
+# ESP32 MacroPad 
 
-## 🌟 Features
+A versatile, customizable macro pad built on the ESP32 platform, featuring gesture recognition, programmable key combinations, and WiFi/BLE connectivity.
 
-- **Gesture Recognition**
-  - Record and execute custom gestures using ADXL345 accelerometer
+## 🌟 Features 
+ 
+- **Gesture Recognition** 
+  - Record and execute custom gestures using the ADXL345 accelerometer
+
   - Intuitive gesture learning system
+
   - Real-time gesture detection
-
-- **Advanced Input Options**
+ 
+- **Advanced Input Options** 
   - Programmable key combinations
+
   - Rotary encoder support
-  - Multi-trigger macros (keys +keys, encoder)
 
-- **Wireless Connectivity**
+  - Multiple trigger macros (combining keys and rotary encoder)
+ 
+- **Wireless Connectivity** 
   - Bluetooth Low Energy (BLE) for macro transmission
-  - WiFi configuration interface
-  - Supports both AP and Station modes
 
-- **Easy Configuration**
+  - WiFi configuration interface
+
+  - Supports both AP and Station modes
+ 
+- **Easy Configuration** 
   - Web-based configuration interface
+
   - No serial connection required
+
   - Real-time logging and debugging
+
   - Persistent settings storage
 
-## 🚀 Getting Started
+## 🚀 Getting Started 
 
-### Prerequisites
+### Prerequisites 
 
-- ESP32 development board (only tested on lolin32_lite)
+- ESP32 development board (tested on lolin32_lite)
+
 - ADXL345 accelerometer
+
 - Mechanical switches/keypad
+
 - Rotary encoder (optional)
-- Basic soldering equipment and some diode
+
+- Basic soldering equipment and some diodes
+
 - Arduino IDE or PlatformIO
 
-### Dependencies
+### Dependencies 
 
-```
+
+```diff
 - ArduinoJson
 - ESPAsyncWebServer
 - LittleFS
 - BleCombo
 ```
 
-### Installation
+### Installation 
+ 
+1. **Clone the repository:** 
 
-1. Clone this repository:
-   ```bash
-   git clone 
-   ```
-
-2. Install required libraries through Arduino Library Manager or PlatformIO
-
-3. Configure your hardware connections in `config.json`
-
-4. Upload the code to your ESP32
+```bash
+git clone <repository_url>
 ```
+ 
+2. **Install the required libraries**  using the Arduino Library Manager or PlatformIO.
+ 
+3. **Configure your hardware connections**  in the `config.json` file.
+ 
+4. **Upload the code**  to your ESP32:
+
+```bash
 pio run --target upload && pio run --target uploadfs
 ```
-5. is not so easy...need more test for pin configuration
+ 
+5. **Note:**  The process is not entirely straightforward – further testing may be required for proper pin configuration.
 
-## 📝 Configuration
+## 📝 Configuration 
 
-1. Power on your MacroPad
-2. Connect to the WiFi AP "ESP32_MacroPad" (default password: "my_cat_name123")
-3. Navigate to `http://192.168.4.1` in your web browser
-4. Insert your SSID and password and save ,it reboot in sta+ap mode, (use only 2ghz band) 
-5. reconnect to the ap to read the new ip assigned by your router from the AP ,reconnect to your router go to new ip
-6. you can set a new password for the ap and disable ap_autostart in advanced setting page .. set new password for the AP is important because if the esp dont find your router or password is incorrect, it open the ap with your ssiid and password in clear so..use your cat-name....
+1. Power on your MacroPad.
+ 
+2. Connect to the WiFi AP **"ESP32_MacroPad"**  (default password: `my_cat_name123`).
+ 
+3. Open your web browser and navigate to `http://192.168.4.1`.
 
-in any case change also the ap password.
+4. Enter your SSID and password, then save the configuration. The device will reboot in STA+AP mode (using only the 2.4 GHz band).
 
-7. on the combo page you can add or edit all combinations and what they do or send ,
-8. press 1+2+3 and encoder button to toggle and reboot in BLE or WIFI mode or set your combo insted of preset 
- "1+2+3,BUTTON": ["TOGGLE_BLE_WIFI"],
+5. Reconnect to the AP to retrieve the new IP address assigned by your router, then connect to your router and access the new IP.
+ 
+6. On the advanced settings page, you can set a new password for the AP and disable `ap_autostart`. Changing the AP password is important because if the ESP32 cannot connect to your router (or if the password is incorrect), it will open the AP with your SSID and password visible in plain text.
 
+7. On the Combo page, you can add or edit key combinations and define their functions or outputs.
+ 
+8. Press keys **1** , **2** , **3**  together along with the encoder button to toggle and reboot between BLE and WiFi modes, or set your own combination instead of the preset: 
+  - `"1+2+3, BUTTON": ["TOGGLE_BLE_WIFI"]`
+Detailed setup instructions can be found in [INSTRUCTIONS.md](https://chatgpt.com/c/INSTRUCTIONS.md) .
+## 🤖 AI Development Note 
 
+This project was developed with assistance from various AI models including GPT-4, Claude, and others. While this approach enabled rapid development, the code may contain unconventional patterns or require further optimization.
 
-Detailed setup instructions can be found in [INSTRUCTIONS.md](INSTRUCTIONS.md)
+## 🐛 Known Issues 
 
-## 🤖 AI Development Note
+- Gesture recognition may require calibration for optimal performance.
 
-This project was developed with assistance from various AI models including GPT-4, Claude, and others. While this approach allowed for rapid development, the code may contain unconventional patterns or require optimization.
+- BLE pairing sometimes requires that the device be "forgotten" on your PC or smartphone.
+ 
+- See [TODO.md](https://chatgpt.com/c/TODO.md)  for planned improvements.
 
-## 🐛 Known Issues
+## Tested Board 
 
-- Gesture recognition may require calibration for optimal performance
-- BLE pairing sometimes requires forget from pc/smartphone
-- See [TODO.md](TODO.md) for planned improvements
+- lolin32_lite
 
-## Tested Board
+## 🤝 Contributing 
 
-* lolin32_lite
+Contributions are welcome! Please feel free to submit a pull request or add support for another tested board.
 
+## Motivation 
 
+This project was born out of the desire for a custom numpad capable of performing specific functions tailored to the user's needs. Existing numpads lacked the flexibility and customization options required, which led to the creation of this DIY solution.
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request. or add a tested Board
-
-
-## Motivation
-
-This project was born out of a desire for a custom numpad that could perform specific functions tailored to the user's needs. Existing numpads lacked the desired flexibility and customization options, leading to the creation of this DIY solution.
-
-## Disclaimer
+## Disclaimer 
 
 Due to the development process, the code may contain errors, inefficiencies, and unconventional solutions. Use this code at your own risk.
 
-## ✨ Acknowledgments
+## ✨ Acknowledgments 
 
-- Thanks to the ESP32 and Arduino communities
-- All the AI assistants that helped shape this project
-- The cats who provided moral support and occasional keyboard testing
+- Thanks to the ESP32 and Arduino communities.
+
+- Thanks to all the AI assistants that helped shape this project.
+
+- Special thanks to the cats who provided moral support and occasional keyboard testing.
 
 
 ---
+
+
 Made with ❤️ and 🤖 (and 🐱)
