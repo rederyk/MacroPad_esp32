@@ -18,11 +18,6 @@ The following improvements have been identified in the code:
 
 * Se cambi nome e resta un device abbinato con il nome vecchio causa un riavvio , bisogna riabbinare il device da capo ,.....forse e un problema solo del mio pc
 
-* Crea una nuova pagina html molto pcarina per impostare le combo in modo visivo e  guidato, la pagina deve Leggere advanced.json  e combination.json repire la mappa del keypad row col e tasti da advanced.json per disegnare un keypad in css/js,  da usare come interfaccia per combiantion.json cosi da poter formare e selzionare la combo (key del json),
-
-*  per il comando da eseguire.(la value della key del json).disporre un menu sottostsnte con tutte le systemAction disponibili,e una tastiera virtuale, con la possibilita di formare tutti i comandi inviabili dal bluethoot con la flag S_B: in automatico ,  non ti soffermare tanto sui nomi dei comandi bluethoot e delle systemaction le inseriremo 
-corrette dopo la logica
-
 * il mouse non usa x e y esempio..
 ```
     "1+4,CW": ["MOUSE_MOVE_0_5_0_0"],
