@@ -108,7 +108,7 @@ This project was developed with assistance from various AI models including GPT-
 
 - Gesture recognition may require calibration for optimal performance.
 
-- BLE pairing sometimes requires that the device be "forgotten" on your PC or smartphone.
+- Multiple MAC address changes of BLE sometimes requires that the device be "forgotten" on your PC or smartphone.
  
 - See [TODO.md](https://chatgpt.com/c/TODO.md)  for planned improvements.
 
