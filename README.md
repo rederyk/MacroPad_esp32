@@ -116,7 +116,7 @@ Detailed setup instructions can be found in [INSTRUCTIONS.md](INSTRUCTIONS.md) .
 
 ## 🤖 AI Development Note 
 
-This project was developed with assistance from various AI models including GPT-4, Claude, and others. While this approach enabled rapid development, the code may contain unconventional patterns or require further optimization.
+This project was developed with assistance from various AI models including GPT-4, Claude,Deepseek,Gemini,qwen-coder. While this approach enabled rapid development, the code may contain unconventional patterns or require further optimization.
 
 ## 🐛 Known Issues 
 
