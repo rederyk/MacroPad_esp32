@@ -244,32 +244,45 @@ S_B:<action1>+<action2>,<action3>
 
 The MacroPad supports gesture recognition. To train a gesture, use the `TRAIN_GESTURE` action. To execute a gesture, use the `EXECUTE_GESTURE` action.
 
-### Gesture Training and Execution 
 
-The MacroPad features an intuitive gesture recognition system that allows you to train and execute custom gestures with ease. Here’s how you can set it up:
- 
-1. **Assigning a Gesture Combo:** 
-While any key combination can be used for gesture commands, we recommend using the **BUTTON**  on its own for both training and execution. Consistency is key—use the same combo for training and executing gestures, but change it whenever you want to register a new gesture.
- 
-2. **Training a Gesture:**  
-  - **Setup:**  In the **Combinations**  page, assign the `TRAIN_GESTURE` action to the **BUTTON** .
- 
-  - **Recording:**  Press and hold the **BUTTON** , then perform the desired movement. When you release the button, you have a 5-second window to select a numeric key on the keypad. During this short period, the keypad functions solely as a numeric input device.
- 
-  - **Assigning an ID:**  For example, if you press **1** , the gesture is registered as **G_ID:0**  (the keypad input minus one).
- 
-  - **Repeat:**  To train multiple gestures, repeat the process 3 to 7 times for each distinct movement you want to register. Each gesture will be associated with a unique ID (e.g., **G_ID:1** , **G_ID:2** , etc.) that you can later use in the Combinations page.
- 
-3. **Executing a Gesture:**  
-  - Once your gestures are trained, you can switch the action assigned to the **BUTTON**  from `TRAIN_GESTURE` to `EXECUTE_GESTURE` in the Combinations page.
- 
-  - To test a gesture, press and hold the **BUTTON**  and perform the movement. The system will compare the input against all trained gestures using the KNN algorithm and display the matching scores on the webserver’s systemAction page.
+## Gesture Training and Execution 
 
-  - This page shows the gesture executed, the score for each registered gesture, and highlights the closest match—the gesture that will be triggered.
- 
-4. **Using the Web Interface:** 
-The webserver provides a systemAction page that logs keypad activity and guides you through the gesture training process. Use it to verify that the gestures are correctly recognized without sending actual Bluetooth signals until you’re ready to finalize your configuration.
+The ESP32 MacroPad supports custom gesture recognition. Follow these steps to train and execute your gestures:
 
-By following these steps, you can efficiently train and execute gestures, ensuring that each unique movement is properly captured and mapped to the desired action. This flexibility allows you to customize your MacroPad experience to perfectly suit your workflow.
+### 1. Initial Cleanup 
+ 
+- **Remove Pre-Registered Gestures:** 
+The device comes preloaded with three test gestures. Before training your own, use the Web UI to delete these test gestures to avoid conflicts.
+
+### 2. Training a New Gesture 
+ 
+- **Set the Training Button:** 
+It is best to dedicate the **BUTTON**  for both training and executing gestures. Update your `config.json` accordingly (e.g., `"BUTTON": ["TRAIN_GESTURE"]`).
+ 
+- **Training Process:**  
+  1. **Training an ID:**  Press and hold the BUTTON and Execute the desired movement while holding the button.
+  
+  2. **Assign a Gesture ID:**  Once you release the button, you have a 5-second window during which the keypad serves as a numeric input. Press a number (e.g., `1` assigns the gesture as `G_ID:0`). Repeat the movement 3–7 times assigning same id to ensure reliable recognition.
+  3. 
+  4. Repeat this for any ID you want record
+
+### 3. Converting Gestures to Binary 
+Before moving on to gesture execution, press the **Convert JSON to Binary**  button on the Web UI. This action reads your updated `gesture.json` file and converts it into a binary file that the device uses for real-time gesture matching.
+
+### 4.Backup or Sharing Gestures Across Devices 
+ 
+- **Using the Gesture Features Page:** 
+The Web UI includes a **Manage Gesture Features**  page where you can copy and paste your custom gestures. This allows you to easily transfer your gesture configurations to multiple devices.
+ 
+- **Reconversion Step:** 
+After importing gestures on a new device, remember to convert the JSON configuration to binary again using the UI.
+
+### 5. Executing Trained Gestures 
+ 
+- **Switch to Execution Mode:** 
+Reconfigure the BUTTON to trigger `EXECUTE_GESTURE` (e.g., `"BUTTON": ["EXECUTE_GESTURE"]`).
+ 
+- **Test and Verify:** 
+Hold the BUTTON and perform your gesture. The log panel on the System Actions page will display the executed gesture along with KNN feature scores, indicating which registered gesture was the closest match.
 
 
