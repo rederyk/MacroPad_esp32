@@ -100,6 +100,20 @@ pio run --target upload && pio run --target uploadfs
 8. Press keys **1** , **2** , **3**  together along with the encoder button to toggle and reboot between BLE and WiFi modes, or set your own combination instead of the preset: 
   - `"1+2+3, BUTTON": ["TOGGLE_BLE_WIFI"]`
 Detailed setup instructions can be found in [INSTRUCTIONS.md](INSTRUCTIONS.md) .
+
+### Gesture Training & Execution 🤖🖐️ 
+ 
+- **Train Your Gestures:** 
+Assign the `TRAIN_GESTURE` action to the **BUTTON** . Hold the button while performing a movement, then release and press a numeric key (e.g., **1**  → registers as **G_ID:0** ). Repeat to record multiple gestures.
+ 
+- **Execute Gestures:** 
+Switch the **BUTTON**  action to `EXECUTE_GESTURE`, then perform the gesture. The web interface’s systemAction page displays real-time matching scores, showing which gesture was recognized.
+ 
+- **Customize Freely:** 
+Any key combo works, but using the BUTTON alone is recommended for consistency. Easily verify and fine-tune your gestures via the webserver logs.
+
+Detailed setup instructions can be found in [INSTRUCTIONS.md](INSTRUCTIONS.md) .
+
 ## 🤖 AI Development Note 
 
 This project was developed with assistance from various AI models including GPT-4, Claude, and others. While this approach enabled rapid development, the code may contain unconventional patterns or require further optimization.
