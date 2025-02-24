@@ -99,7 +99,7 @@ pio run --target upload && pio run --target uploadfs
  
 8. Press keys **1** , **2** , **3**  together along with the encoder button to toggle and reboot between BLE and WiFi modes, or set your own combination instead of the preset: 
   - `"1+2+3, BUTTON": ["TOGGLE_BLE_WIFI"]`
-Detailed setup instructions can be found in [INSTRUCTIONS.md](https://chatgpt.com/c/INSTRUCTIONS.md) .
+Detailed setup instructions can be found in [INSTRUCTIONS.md](INSTRUCTIONS.md) .
 ## 🤖 AI Development Note 
 
 This project was developed with assistance from various AI models including GPT-4, Claude, and others. While this approach enabled rapid development, the code may contain unconventional patterns or require further optimization.
@@ -110,7 +110,7 @@ This project was developed with assistance from various AI models including GPT-
 
 - Multiple MAC address changes of BLE sometimes requires that the device be "forgotten" on your PC or smartphone.
  
-- See [TODO.md](https://chatgpt.com/c/TODO.md)  for planned improvements.
+- See [TODO.md](TODO.md)  for planned improvements.
 
 ## Tested Board 
 
