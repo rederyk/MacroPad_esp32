@@ -14,8 +14,8 @@
 #include "inputDevice.h"
 #include "gestureRead.h"
 #include "gestureAnalyze.h"
-#include "WIFIManager.h"   // Include the WIFIManager header
-#include "specialAction.h" // Include the WIFIManager header
+#include "WIFIManager.h" 
+#include "specialAction.h" 
 
 WIFIManager wifiManager; // Create an instance of WIFIManager
 
