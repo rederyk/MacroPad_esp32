@@ -15,8 +15,14 @@ This document provides a comprehensive guide on how to set up and use the ESP32 
 
 ### Prerequisites
 
-*   ESP32 development board
-*   Platformio IDE 
+*   ESP32 development board (lolin32_lite)
+*   some diode , switch and keycaps
+*   Platformio IDE
+* Rotary Encoder (no capacitor needed)
+* ADXL345 
+* Battery lipo (LOLIN32 have built-in charger) 
+* Wiring and solder or your pcb
+* some enclosure (stl file soon)
 
 ### Installation
 
@@ -27,7 +33,7 @@ This document provides a comprehensive guide on how to set up and use the ESP32 
     ```
 2.  Open the project in Platformio IDE.
 3.  Wait the Install of required libraries.
-4.  Configure the `config.json` file.
+4.  Configure the `config.json` file. th current pin config is for lolin32_lite
 5.  Upload the code to the ESP32 board.
 
 ## Configuration
@@ -76,7 +82,7 @@ The `config.json` file is used to configure the MacroPad. It includes settings f
 
 ### Keypad Configuration
 
-* the deafult config is for lolin32_lite
+* the deafult config is for lolin32_lite with 9 key, need more test for other boards and layout
 
 ```json
 {
@@ -142,7 +148,7 @@ The `config.json` file is used to configure the MacroPad. It includes settings f
 *   `threshold`: Threshold for gesture detection.
 *   `axisMap`: Axis mapping for the accelerometer.
 
-### Combinations Configuration
+### Combinations Configuration 
 
 ```json
 {
@@ -183,6 +189,7 @@ The `config.json` file is used to configure the MacroPad. It includes settings f
 
 *   Key combinations are mapped to actions.
 *   Actions can be device actions or Bluetooth actions.
+*   there is a "bug" in macromanager we need to map combo in order like 1+9 , 
 
 ## Device Actions
 
@@ -261,7 +268,7 @@ It is best to dedicate the **BUTTON**  for both training and executing gestures.
   
   2. **Assign a Gesture ID:**  Once you release the button, you have a 5-second window during which the keypad serves as a numeric input. Press a number (e.g., `1` assigns the gesture as `G_ID:0`). Repeat the movement 3–7 times assigning same id to ensure reliable recognition.
   3. 
-  4. Repeat this for any ID you want record
+  4. Repeat this for any Gesture ID you want record
 
 ### 3. Converting Gestures to Binary 
 Before moving on to gesture execution, press the **Convert JSON to Binary**  button on the Web UI. This action reads your updated `gesture.json` file and converts it into a binary file that the device uses for real-time gesture matching.
