@@ -12,7 +12,7 @@ private:
     
 public:
     CombinationManager();
-    bool loadCombinations();
+    bool loadCombinations(int setNumber = 0);
     JsonObject getCombinations();
 };
 

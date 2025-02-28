@@ -84,7 +84,7 @@ void setup()
 
     logger.setSerialEnabled(serialEnabled);
     // Load combinations
-    if (!comboManager.loadCombinations())
+    if (!comboManager.loadCombinations(configManager.getSystemConfig().BleMacAdd))
     {
         logger.log("Failed to load combinations");
     }
