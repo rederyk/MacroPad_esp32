@@ -27,7 +27,6 @@ bool ConfigurationManager::loadConfig() {
     filter["keypad"] = true;
     filter["encoder"] = true;
     filter["accelerometer"] = true;
-    filter["combinations"] = true;
     filter["system"] = true;
 
     // Increase buffer size and add error handling
@@ -128,34 +127,6 @@ bool ConfigurationManager::loadConfig() {
         if (accelerometerConfig.containsKey("axisMap")) this->accelerometerConfig.axisMap = accelerometerConfig["axisMap"].as<const char*>();
     }
 
-    // Load combinations if they exist
-    Logger::getInstance().log("Loaded macros:");
-    if (doc.containsKey("combinations")) {
-        this->combinations = doc["combinations"];
-        if (!this->combinations.isNull() && this->combinations.is<JsonObject>()) {
-            JsonObject combos = this->combinations.as<JsonObject>();
-            for (JsonPair combo : combos) {
-                const char* key = combo.key().c_str();
-                JsonVariant value = combo.value();
-
-                String logMessage = "  " + String(key) + ": ";
-
-                if (value.is<JsonArray>()) {
-                    for (JsonVariant action : value.as<JsonArray>()) {
-                        if (action.is<const char*>()) {
-                            logMessage += String(action.as<const char*>()) + " ";
-                        }
-                    }
-                }
-                Logger::getInstance().log(logMessage);
-            }
-        } else {
-            Logger::getInstance().log("  No valid macros found");
-        }
-    } else {
-        Logger::getInstance().log("  No macros section found");
-    }
-
     configFile.close();
     LittleFS.end();
     return true;
@@ -171,10 +142,6 @@ const EncoderConfig& ConfigurationManager::getEncoderConfig() const {
 
 const AccelerometerConfig& ConfigurationManager::getAccelerometerConfig() const {
     return accelerometerConfig;
-}
-
-JsonVariant ConfigurationManager::getCombinations() const {
-    return combinations;
 }
 
 const WifiConfig& ConfigurationManager::getWifiConfig() const {

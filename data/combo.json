@@ -1,0 +1,38 @@
+{
+  "combinations": {
+    "1": ["S_B:TAB"],
+    "2": ["S_B:Up_arrow"],
+    "3": ["S_B:SUPER"],
+    "4": ["S_B:Left_arrow"],
+    "5": ["S_B:RETURN"],
+    "6": ["S_B:Right_arrow"],
+    "7": ["S_B:BACKSPACE"],
+    "8": ["S_B:Down_arrow"],
+    "9": ["S_B:HOME"],
+    "1+3": ["S_B:SUPER+TAB"],
+    "1+5": ["S_B:SUPER+t"],
+    "2+5": ["S_B:SUPER+w"],
+    "3+5": ["S_B:SUPER+c"],
+    "4+5": ["S_B:CTRL+SUPER,Left_arrow"],
+    "5+6": ["S_B:CTRL+SUPER,Right_arrow"],
+
+    "CW": ["S_B:MOUSE_MOVE_0_0_1_0"],
+    "CCW": ["S_B:MOUSE_MOVE_0_0_-1_0"],
+    "BUTTON": ["EXECUTE_GESTURE"],
+    "G_ID:1": ["S_B:CTRL+SUPER,Left_arrow"],
+    "G_ID:2": ["S_B:SUPER+q"],
+    "G_ID:0": ["S_B:CTRL+SUPER,Right_arrow"],
+    "G_ID:3": ["S_B:SUPER+l"],
+    "1,CW": ["S_B:VOL_UP"],
+    "1,CCW": ["S_B:VOL_DOWN"],
+    "1+9": ["MEM_INFO"],
+    "1+2,CW": ["S_B:MOUSE_MOVE_0_0_5_0"],
+    "1+2,CCW": ["S_B:MOUSE_MOVE_0_0_-5_0"],
+    "2+3,CW": ["S_B:NEXT_PLAYLIST"],
+    "2+3,CCW": ["S_B:PREV_PLAYLIST"],
+    "1+5+9": ["CALIBRATE_SENSOR"],
+    "1+2+3,BUTTON": ["TOGGLE_BLE_WIFI"],
+    "1+4+7,BUTTON": ["HOP_BLE_DEVICE"],
+    "7+8+9,BUTTON": ["RESET_ALL"]
+  }
+}

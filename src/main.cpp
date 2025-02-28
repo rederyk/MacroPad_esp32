@@ -7,6 +7,7 @@
 #include <ArduinoJson.h>
 #include "Logger.h"
 #include "configManager.h"
+#include "combinationManager.h"
 #include "keypad.h"
 #include "rotaryEncoder.h"
 #include "BLEController.h"
@@ -14,8 +15,8 @@
 #include "inputDevice.h"
 #include "gestureRead.h"
 #include "gestureAnalyze.h"
-#include "WIFIManager.h" 
-#include "specialAction.h" 
+#include "WIFIManager.h"
+#include "specialAction.h"
 
 WIFIManager wifiManager; // Create an instance of WIFIManager
 
@@ -27,6 +28,7 @@ struct TimedEvent
 };
 
 ConfigurationManager configManager;
+CombinationManager comboManager;
 GestureRead gestureSensor; // Definizione effettiva (deve rimanere UNICA)
 GestureAnalyze gestureAnalyzer(gestureSensor);
 SpecialAction specialAction;
@@ -81,8 +83,12 @@ void setup()
     }
 
     logger.setSerialEnabled(serialEnabled);
+    // Load combinations
+    if (!comboManager.loadCombinations())
+    {
+        logger.log("Failed to load combinations");
+    }
     // Initialize macroManager with keypad config and wifi config
-    // Initialize serial communication
 
     Logger::getInstance().log("\nESP32 Keypad and Encoder Test");
     macroManager = MacroManager(
@@ -91,7 +97,12 @@ void setup()
 
     // Load combinations into macroManager
     {
-        JsonObject combos = configManager.getCombinations();
+        JsonObject combos = comboManager.getCombinations();
+        // some debug
+        //  String debugCombos;
+        //  serializeJson(combos, debugCombos);
+        //  Logger::getInstance().log("Combos: " + debugCombos);
+
         for (JsonPair combo : combos)
         {
             std::vector<std::string> actions;
@@ -103,7 +114,11 @@ void setup()
         }
     }
 
+    // Internal loaded combinations
+    Logger::getInstance().log("Loaded " + String(macroManager.combinations.size()) + " combinations");
+
     // Initialize I2C with configured pins
+    // TODO make optional
     const AccelerometerConfig &accelConfig = configManager.getAccelerometerConfig();
     Wire.begin(accelConfig.sdaPin, accelConfig.sclPin);
 
@@ -170,13 +185,14 @@ void setup()
                 wifiManager.connectWiFi(configManager.getWifiConfig().router_ssid.c_str(), configManager.getWifiConfig().router_password.c_str());
 
                 // Define the timeout duration (in milliseconds)
-                const unsigned long wifiConnectTimeout = 10000; // 10 seconds
+                // funziona senza?
+                const unsigned long wifiConnectTimeout = 5000; // 5 seconds
 
                 // Check WiFi connection for the specified duration
                 unsigned long startTime = millis();
                 while (!wifiManager.isConnected() && (millis() - startTime < wifiConnectTimeout))
                 {
-                    delay(5000); // Wait for 5s before checking again
+                    // delay(5000); // Wait for 5s before checking again
                     Logger::getInstance().log("Checking WiFi connection...");
                 }
 
@@ -191,10 +207,6 @@ void setup()
                     Logger::getInstance().log("Failed to connect to WiFi. Starting AP mode...");
                     wifiManager.beginAP(configManager.getWifiConfig().ap_ssid.c_str(), configManager.getWifiConfig().ap_password.c_str());
                 }
-               // else if (systemConfig.ap_autostart)
-               // {
-               //     specialAction.toggleAP(false);
-               // }
             }
         }
         if (systemConfig.ap_autostart)
