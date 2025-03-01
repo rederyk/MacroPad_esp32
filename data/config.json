@@ -3,7 +3,7 @@
     "ap_ssid": "ESP32_MacroPad",
     "ap_password": "my_cat_name123",
     "router_ssid": "FASTWEB-2",
-    "router_password": "***REMOVED***"
+    "router_password": "sta_password"
   },
   "system": {
     "ap_autostart": false,
