@@ -678,24 +678,55 @@
         }
 
         document.getElementById("status").textContent = "Saving...";
+        let saveSuccessful = false;
 
         try {
-          const response = await fetch(`/combo_set?set=${currentSet}`, {
+          // Crea una promise per il fetch POST
+          const fetchPromise = fetch(`/combo_set?set=${currentSet}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(setData),
           });
 
-          const message = await response.text();
-          document.getElementById("status").textContent =
-            "Configuration saved";
-          showNotification("Configuration saved successfully", "success");
+          // Crea una promise di timeout di 5 secondi
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("timeout")), 5000)
+          );
 
+          // Race tra fetch e timeout
+          const response = await Promise.race([fetchPromise, timeoutPromise]);
+
+          // Se riceviamo una risposta, proviamo a leggerla (ma in caso di device che si riavvia potrebbe non arrivare)
+          const message = await response.text();
+          document.getElementById("status").textContent = "Configuration saved";
+          showNotification("Configuration saved successfully", "success");
+          saveSuccessful = true;
           allCombinations[`combinations_${currentSet}`] = setData;
         } catch (error) {
-          console.error("Error saving combination set:", error);
-          document.getElementById("status").textContent = "Error saving";
-          showNotification("Error saving set", "error");
+          // Se il timeout scatta, consideriamo il salvataggio come andato a buon fine
+          if (error.message === "timeout") {
+            document.getElementById("status").textContent =
+              "Configuration saved (timeout)";
+            showNotification("Configuration saved successfully", "success");
+            saveSuccessful = true;
+            allCombinations[`combinations_${currentSet}`] = setData;
+          } else {
+            console.error("Error saving combination set:", error);
+            document.getElementById("status").textContent = "Error saving";
+            showNotification("Error saving set", "error");
+            return;
+          }
+        }
+
+        // Se il salvataggio è considerato andato a buon fine, riavvia la connessione ai log dopo 5 secondi
+        if (saveSuccessful) {
+          setTimeout(() => {
+            if (eventSource) {
+              eventSource.close();
+            }
+            setupLogConnection();
+            showNotification("Log reconnected automatically", "info");
+          }, 3000); // 5000 ms = 5 secondi
         }
       }
 
