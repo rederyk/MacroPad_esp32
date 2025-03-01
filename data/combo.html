@@ -1,490 +1,807 @@
 <!DOCTYPE html>
-<html lang="it">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Configurazione Combo Visuale - Tastiera Virtuale Migliorata</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
-  <style>
-    .keypad {
-      display: grid;
-      gap: 5px;
-      margin-bottom: 10px;
-    }
-    .key {
-      background-color: #f0f0f0;
-      border: 1px solid #ccc;
-      text-align: center;
-      padding: 15px;
-      cursor: pointer;
-      user-select: none;
-      border-radius: 4px;
-      font-weight: bold;
-    }
-    .key:hover {
-      background-color: #e0e0e0;
-    }
-    /* Layout per i tasti speciali sotto il keypad */
-    .special-keys {
-      margin-top: 10px;
-    }
-    .special-keys .row > div {
-      padding: 0 5px;
-    }
-    .vk-container {
-      margin-bottom: 20px;
-    }
-    .vk-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-      margin-bottom: 5px;
-    }
-    .vk-key {
-      padding: 8px;
-      background-color: #fff;
-      border: 1px solid #ccc;
-      cursor: pointer;
-      border-radius: 3px;
-      min-width: 40px;
-      text-align: center;
-    }
-    .vk-key.wide {
-      min-width: 80px;
-    }
-    .vk-key.extra-wide {
-      min-width: 120px;
-    }
-    .vk-key:hover {
-      background-color: #e0e0e0;
-    }
-    .toggle-active {
-      background-color: #007bff !important;
-      color: #fff;
-    }
-    .combo-btn {
-      min-width: 100px;
-    }
-  </style>
-</head>
-<body class="container mt-5">
-  <h1 class="text-center mb-4">Configurazione Combo Visuale</h1>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ESP32 Multi-Set Combinations IDE</title>
+    <!-- Bootstrap CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    />
+    <!-- CodeMirror CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css"
+    />
+    <!-- CodeMirror Theme - Dark -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/dracula.min.css"
+    />
+    <!-- CodeMirror Lint CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/lint/lint.css"
+    />
+    <!-- Font Awesome for icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      :root {
+        --editor-bg: #1e1e1e;
+        --editor-fg: #d4d4d4;
+        --tab-active-bg: #2d2d2d;
+        --tab-inactive-bg: #252526;
+        --tab-hover-bg: #303031;
+        --status-bar-bg: #007acc;
+        --btn-primary: #0e639c;
+        --btn-primary-hover: #1177bb;
+        --btn-secondary: #3a3d41;
+        --btn-secondary-hover: #45494e;
+        --btn-danger: #a1260d;
+        --btn-danger-hover: #bf2b0d;
+      }
 
-  <!-- Sezione Keypad e formazione combo -->
-  <div class="row">
-    <div class="col-md-6">
-      <h3>Keypad Visuale</h3>
-      <div id="keypad" class="keypad"></div>
-      <!-- Tasti speciali (CW, BUTTON, CWW) sotto il keypad -->
-      <div class="special-keys">
-        <div class="row">
-          <div class="col text-start">
-            <button class="btn btn-secondary" id="btnCW">CW</button>
-          </div>
-          <div class="col text-center">
-            <button class="btn btn-secondary" id="btnBUTTON">BUTTON</button>
-          </div>
-          <div class="col text-end">
-            <button class="btn btn-secondary" id="btnCWW">CWW</button>
+      body {
+        background-color: var(--editor-bg);
+        color: var(--editor-fg);
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      .container {
+        max-width: 1200px;
+      }
+
+      /* IDE-style header */
+      .ide-header {
+        background-color: var(--editor-bg);
+        padding: 5px 10px;
+        border-bottom: 1px solid #333;
+      }
+
+      /* Tab bar styling */
+      .tab-bar {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        background-color: var(--editor-bg);
+        border-bottom: 1px solid #444;
+        margin-bottom: 0;
+        padding-top: 5px;
+      }
+
+      .tab-item {
+        padding: 8px 15px;
+        background-color: var(--tab-inactive-bg);
+        color: #aaa;
+        cursor: pointer;
+        border-top-left-radius: 5px;
+        border-top-right-radius: 5px;
+        margin-right: 2px;
+        user-select: none;
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+      }
+
+      .tab-item:hover {
+        background-color: var(--tab-hover-bg);
+      }
+
+      .tab-item.active {
+        background-color: var(--tab-active-bg);
+        color: white;
+        border-top: 2px solid var(--status-bar-bg);
+      }
+
+      .tab-item .close-tab {
+        margin-left: 8px;
+        font-size: 12px;
+        opacity: 0.6;
+      }
+
+      .tab-item .close-tab:hover {
+        opacity: 1;
+      }
+
+      .tab-add {
+        padding: 8px 12px;
+        background-color: transparent;
+        color: #aaa;
+        cursor: pointer;
+        border: none;
+      }
+
+      .tab-add:hover {
+        color: white;
+      }
+
+      /* Editor styling */
+      .editor-container {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 150px);
+        border: 1px solid #444;
+        border-top: none;
+      }
+
+      .CodeMirror {
+        height: 100%;
+        font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      /* Button bar styling */
+      .ide-button-bar {
+        background-color: var(--editor-bg);
+        padding: 8px;
+        border-bottom: 1px solid #444;
+        display: flex;
+        gap: 5px;
+      }
+
+      .ide-btn {
+        background-color: var(--btn-secondary);
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 2px;
+        font-size: 13px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .ide-btn:hover {
+        background-color: var(--btn-secondary-hover);
+      }
+
+      .ide-btn-primary {
+        background-color: var(--btn-primary);
+      }
+
+      .ide-btn-primary:hover {
+        background-color: var(--btn-primary-hover);
+      }
+
+      .ide-btn-danger {
+        background-color: var(--btn-danger);
+      }
+
+      .ide-btn-danger:hover {
+        background-color: var(--btn-danger-hover);
+      }
+
+      /* Status bar styling */
+      .status-bar {
+        background-color: var(--status-bar-bg);
+        color: white;
+        padding: 3px 10px;
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .status-info {
+        display: flex;
+        gap: 15px;
+      }
+
+      /* Log container */
+      .logs-container {
+        margin-top: 20px;
+        background-color: #252526;
+        border: 1px solid #444;
+        border-radius: 3px;
+      }
+
+      .logs-header {
+        background-color: #333;
+        padding: 5px 10px;
+        border-bottom: 1px solid #444;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .logs-header h5 {
+        margin: 0;
+      }
+
+      /* Container for log header buttons */
+      .logs-header-buttons {
+        display: flex;
+        gap: 5px;
+      }
+
+      #logContainer {
+        height: 200px;
+        overflow-y: auto;
+        padding: 10px;
+        font-family: "Cascadia Code", Consolas, monospace;
+        font-size: 12px;
+        background-color: #1e1e1e;
+        color: #ddd;
+      }
+
+      /* Notification popup */
+      .notification {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 10px 15px;
+        border-radius: 4px;
+        color: white;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+
+      .notification.success {
+        background-color: #0e7a3a;
+      }
+
+      .notification.error {
+        background-color: #c41512;
+      }
+
+      .notification.info {
+        background-color: #0e639c;
+      }
+
+      .notification.show {
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container-fluid">
+      <!-- IDE Header -->
+      <div class="ide-header d-flex justify-content-between align-items-center">
+        <h4 class="m-0">ESP32 Multi-Set Combinations IDE</h4>
+        <button class="ide-btn" onclick="window.location.href='/'">
+          <i class="fas fa-arrow-left"></i> Back to Main Config
+        </button>
+      </div>
+
+      <!-- Tab Bar for Sets -->
+      <div class="tab-bar" id="tabBar">
+        <!-- Tabs will be generated dynamically -->
+        <button class="tab-add" id="addSetButton">
+          <i class="fas fa-plus"></i>
+        </button>
+      </div>
+
+      <!-- Editor Container -->
+      <div class="editor-container">
+        <!-- Button Toolbar -->
+        <div class="ide-button-bar">
+          <button type="button" id="saveButton" class="ide-btn ide-btn-primary">
+            <i class="fas fa-save"></i> Save
+          </button>
+          <button type="button" id="formatButton" class="ide-btn">
+            <i class="fas fa-align-left"></i> Format
+          </button>
+          <button
+            type="button"
+            id="deleteSetButton"
+            class="ide-btn ide-btn-danger"
+          >
+            <i class="fas fa-trash"></i> Delete Set
+          </button>
+        </div>
+
+        <!-- Editor -->
+        <textarea id="combinationsTextarea"></textarea>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+          <div id="status" class="status-message">Ready</div>
+          <div class="status-info">
+            <span id="cursorPosition">Ln 1, Col 1</span>
+            <span id="formatIndicator">JSON</span>
+            <span id="errorIndicator">0 errors</span>
           </div>
         </div>
       </div>
-      <button id="clearCombo" class="btn btn-warning mb-3 w-100 mt-2">Pulisci Combo</button>
-      <div class="mb-3">
-        <strong>Combo Selezionata:</strong>
-        <span id="currentCombo" class="ms-2"></span>
+
+      <!-- Logs Container -->
+      <div class="logs-container mt-3">
+        <div class="logs-header">
+          <h5>Server Logs</h5>
+          <div class="logs-header-buttons">
+            <!-- Pulsante per la riconnessione manuale -->
+            <button class="ide-btn" id="reconnectLogButton">
+              <i class="fas fa-sync-alt"></i> Riconnetti
+            </button>
+            <button class="ide-btn" id="clearLogsButton">
+              <i class="fas fa-broom"></i> Clear
+            </button>
+          </div>
+        </div>
+        <div id="logContainer"></div>
       </div>
+
+      <!-- Notification Popup -->
+      <div class="notification" id="notification"></div>
     </div>
 
-    <!-- Sezione comando -->
-    <div class="col-md-6">
-      <h3>Comando da Eseguire</h3>
-      <div class="mb-3">
-        <input type="text" id="commandInput" class="form-control" placeholder="Inserisci comando" />
-      </div>
-      <div class="mb-3">
-        <select id="systemActions" class="form-select">
-          <option value="">-- Seleziona Azione di Sistema --</option>
-        </select>
-      </div>
-      <div>
-        <strong>Comando Finale:</strong>
-        <span id="finalCommand" class="ms-2"></span>
-      </div>
-    </div>
-  </div>
+    <!-- Scripts -->
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- CodeMirror JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/javascript/javascript.min.js"></script>
+    <!-- CodeMirror Addons -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/lint/lint.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/lint/json-lint.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/selection/active-line.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/edit/matchbrackets.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/edit/closebrackets.js"></script>
+    <!-- jsonlint per il parsing JSON -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsonlint/1.6.0/jsonlint.min.js"></script>
+    <!-- Prettier -->
+    <script src="https://unpkg.com/prettier@2.8.8/standalone.js"></script>
+    <script src="https://unpkg.com/prettier@2.8.8/parser-babel.js"></script>
 
-  <hr />
+    <script>
+      // Global variables
+      let editor;
+      let allCombinations = {};
+      let currentSet = 0;
+      let errorCount = 0;
+      let eventSource = null;
 
-  <!-- Tastiera Virtuale Migliorata -->
-  <h3>Tastiera Virtuale</h3>
-  <div id="virtualKeyboard" class="vk-container"></div>
-
-  <hr />
-
-  <!-- Combo Esistenti -->
-  <h3>Combo Esistenti</h3>
-  <div id="comboList" class="mb-3"></div>
-  <button id="saveCombo" class="btn btn-primary w-100">Salva Combo</button>
-
-  <div id="status" class="mt-3 text-center"></div>
-
-  <script>
-    let advancedConfig = {};
-    let combinations = {};
-    let currentCombo = "";
-    let currentCommand = "";
-    // Stati per gestione tasti speciali e normali
-    let shiftActive = false;
-    let shiftLock = false;
-    let capsLock = false;
-    let specialKeyAdded = false; // indica se è stato aggiunto un tasto speciale
-
-    // Mappatura per i tasti con Shift attivo
-    const shiftMapping = {
-      '1': '!', '2': '@', '3': '#', '4': '$', '5': '%',
-      '6': '^', '7': '&', '8': '*', '9': '(', '0': ')',
-      '-': '_',
-      '=': '+',
-      '[': '{',
-      ']': '}',
-      ';': ':',
-      "'": '"',
-      ',': '<',
-      '.': '>',
-      '/': '?',
-      '\\': '|',
-      '`': '~'
-    };
-
-    // Lista predefinita di systemActions
-    const systemActionsList = [
-      "CALIBRATE_SENSOR",
-      "RESET_ALL",
-      "MEM_INFO",
-      "HOP_BLE_DEVICE",
-      "TOGGLE_BLE_WIFI",
-      "EXECUTE_GESTURE",
-    ];
-
-    async function loadConfigs() {
-      try {
-        const advRes = await fetch('/advanced.json');
-        if (!advRes.ok) throw new Error('Errore nel caricamento di advanced.json');
-        advancedConfig = await advRes.json();
-        drawKeypad();
-      } catch(e) {
-        document.getElementById('status').innerHTML = '⚠️ Errore caricamento advanced.json';
+      // Helper function to calculate position (line and column) from index
+      function computePos(text, index) {
+        var lines = text.slice(0, index).split("\n");
+        var line = lines.length - 1;
+        var ch = lines[lines.length - 1].length;
+        return CodeMirror.Pos(line, ch);
       }
 
-      try {
-        const combRes = await fetch('/combinations.json');
-        if (!combRes.ok) throw new Error('Errore nel caricamento di combinations.json');
-        combinations = await combRes.json();
-        populateComboList();
-      } catch(e) {
-        document.getElementById('status').innerHTML = '⚠️ Errore caricamento combinations.json';
-      }
-
-      populateSystemActions();
-      drawVirtualKeyboard();
-    }
-
-    function drawKeypad() {
-      const keypadDiv = document.getElementById('keypad');
-      keypadDiv.innerHTML = '';
-      const keypad = advancedConfig.keypad;
-      if (!keypad) return;
-      keypadDiv.style.gridTemplateColumns = `repeat(${keypad.cols}, 1fr)`;
-      for (let r = 0; r < keypad.rows; r++) {
-        for (let c = 0; c < keypad.cols; c++) {
-          const keyVal = keypad.keys[r][c];
-          const keyButton = document.createElement('div');
-          keyButton.className = 'key';
-          keyButton.innerText = keyVal;
-          keyButton.addEventListener('click', () => {
-            appendToCombo(keyVal);
-          });
-          keypadDiv.appendChild(keyButton);
-        }
-      }
-    }
-
-    // Aggiunge un tasto "normale" alla combo. Se è già stato aggiunto un tasto speciale,
-    // lo rimuove per permettere di continuare la formazione della combo.
-    function appendToCombo(key) {
-      if (specialKeyAdded) {
-        // Rimuove la parte speciale (dopo la virgola) per consentire ulteriori aggiunte
-        const parts = currentCombo.split(',');
-        currentCombo = parts[0];
-        specialKeyAdded = false;
-      }
-      currentCombo += (currentCombo ? '+' : '') + key;
-      document.getElementById('currentCombo').innerText = currentCombo;
-      updateFinalCommand();
-    }
-
-    // Aggiunge un tasto speciale alla combo utilizzando la virgola come separatore.
-    // Se un tasto speciale è già stato aggiunto, viene sostituito.
-    function appendSpecialKeyToCombo(key) {
-      if (!currentCombo) {
-        // Se non ci sono altri tasti, si aggiunge direttamente
-        currentCombo = key;
-      } else {
-        if (specialKeyAdded) {
-          // Sostituisci l'ultimo tasto speciale
-          const parts = currentCombo.split(',');
-          currentCombo = parts[0] + ',' + key;
-        } else {
-          currentCombo += ',' + key;
-          specialKeyAdded = true;
-        }
-      }
-      document.getElementById('currentCombo').innerText = currentCombo;
-      updateFinalCommand();
-    }
-
-    // Event listeners per i tasti speciali
-    document.getElementById('btnCW').addEventListener('click', () => appendSpecialKeyToCombo('CW'));
-    document.getElementById('btnCWW').addEventListener('click', () => appendSpecialKeyToCombo('CWW'));
-    document.getElementById('btnBUTTON').addEventListener('click', () => appendSpecialKeyToCombo('BUTTON'));
-
-    function populateSystemActions() {
-      const select = document.getElementById('systemActions');
-      systemActionsList.forEach(action => {
-        const option = document.createElement('option');
-        option.value = action;
-        option.innerText = action;
-        select.appendChild(option);
-      });
-      select.addEventListener('change', () => {
-        if(select.value) {
-          document.getElementById('commandInput').value = select.value;
-          updateFinalCommand();
-        }
-      });
-    }
-
-    // Disegna la tastiera virtuale migliorata
-    function drawVirtualKeyboard() {
-      const vkDiv = document.getElementById('virtualKeyboard');
-      vkDiv.innerHTML = '';
-
-      // RIGA: Tasti modificatori separati (solo Shift, rinominato in vkShiftMod)
-      const modRow = document.createElement('div');
-      modRow.className = 'vk-row';
-      const shiftBtn = document.createElement('button');
-      shiftBtn.className = 'vk-key btn btn-light';
-      shiftBtn.id = 'vkShiftMod';
-      shiftBtn.innerText = 'Shift';
-      shiftBtn.addEventListener('click', () => {
-        if (!shiftActive) {
-          shiftActive = true;
-          shiftLock = false;
-        } else if (shiftActive && !shiftLock) {
-          shiftLock = true;
-        } else {
-          shiftActive = false;
-          shiftLock = false;
-        }
-        shiftBtn.classList.toggle('toggle-active', shiftActive);
-        updateVirtualKeyboardKeys();
-      });
-      modRow.appendChild(shiftBtn);
-      vkDiv.appendChild(modRow);
-
-      // RIGA: Altri tasti modificatori (CTRL, ALT, SUPER)
-      const toggleRow = document.createElement('div');
-      toggleRow.className = 'vk-row';
-      const otherToggles = [
-        { label: 'CTRL', id: 'vkCtrl' },
-        { label: 'ALT', id: 'vkAlt' },
-        { label: 'SUPER', id: 'vkSuper' },
-        { label: 'SHIFT', id: 'vkShift' }
-      ];
-      otherToggles.forEach(item => {
-        const btn = document.createElement('button');
-        btn.className = 'vk-key btn btn-light';
-        btn.id = item.id;
-        btn.innerText = item.label;
-        btn.addEventListener('click', () => {
-          appendToCommand(item.label + '+');
-        });
-        toggleRow.appendChild(btn);
-      });
-      vkDiv.appendChild(toggleRow);
-
-      // RIGA: Tasti funzione e di controllo
-      const funcRow = document.createElement('div');
-      funcRow.className = 'vk-row';
-      const funcKeys = ['Esc', 'Tab', 'Backspace', 'Enter'];
-      funcKeys.forEach(k => {
-        const btn = document.createElement('button');
-        btn.className = 'vk-key btn btn-light ' + ((k === 'Backspace' || k === 'Enter') ? 'wide' : '');
-        btn.innerText = k;
-        btn.addEventListener('click', () => appendToCommand('[' + k + ']'));
-        funcRow.appendChild(btn);
-      });
-      vkDiv.appendChild(funcRow);
-
-      // RIGA: Tasti alfanumerici e simboli
-      const alnumRow = document.createElement('div');
-      alnumRow.className = 'vk-row';
-      const alnumKeys = [
-        'q','w','e','r','t','y','u','i','o','p',
-        'a','s','d','f','g','h','j','k','l',
-        'z','x','c','v','b','n','m',
-        '1','2','3','4','5','6','7','8','9','0',
-        '-','=','[',']',';',"'",
-        ',','.','/','`'
-      ];
-      alnumKeys.forEach(k => {
-        const btn = document.createElement('button');
-        btn.className = 'vk-key btn btn-light';
-        btn.dataset.base = k;
-        btn.innerText = getDisplayValue(k);
-        btn.addEventListener('click', () => {
-          appendToCommand(getDisplayValue(k));
-          // Se lo shift è attivo senza lock, lo disattiva dopo la pressione
-          if (shiftActive && !shiftLock) {
-            shiftActive = false;
-            document.getElementById('vkShiftMod').classList.remove('toggle-active');
-            updateVirtualKeyboardKeys();
+      // Custom JSON linting helper
+      CodeMirror.registerHelper("lint", "json", function (text) {
+        var found = [];
+        try {
+          jsonlint.parse(text);
+          errorCount = 0;
+          updateErrorIndicator();
+        } catch (e) {
+          var message = e.message;
+          var match = message.match(/line (\d+) column (\d+)/);
+          if (match) {
+            var line = parseInt(match[1], 10) - 1;
+            var ch = parseInt(match[2], 10) - 1;
+            found.push({
+              from: CodeMirror.Pos(line, ch),
+              to: CodeMirror.Pos(line, ch + 1),
+              message: message,
+              severity: "error",
+            });
+          } else {
+            found.push({
+              from: CodeMirror.Pos(0, 0),
+              to: CodeMirror.Pos(0, 1),
+              message: message,
+              severity: "error",
+            });
           }
-        });
-        alnumRow.appendChild(btn);
+          errorCount = 1;
+          updateErrorIndicator();
+        }
+
+        // Check for duplicate keys
+        var regex = /"([^"\\]*(?:\\.[^"\\]*)*)"\s*:/g;
+        var keys = {};
+        var m;
+        while ((m = regex.exec(text)) !== null) {
+          var key = m[1];
+          if (keys[key]) {
+            var pos = computePos(text, m.index);
+            found.push({
+              from: pos,
+              to: CodeMirror.Pos(pos.line, pos.ch + key.length + 2),
+              message: "Duplicate key: " + key,
+              severity: "error",
+            });
+            errorCount++;
+            updateErrorIndicator();
+          } else {
+            keys[key] = true;
+          }
+        }
+        return found;
       });
-      vkDiv.appendChild(alnumRow);
 
-      // RIGA: Barra spaziatrice e frecce
-      const extraRow = document.createElement('div');
-      extraRow.className = 'vk-row';
-      const spaceBtn = document.createElement('button');
-      spaceBtn.className = 'vk-key btn btn-light extra-wide';
-      spaceBtn.innerText = 'Spazio';
-      spaceBtn.addEventListener('click', () => appendToCommand(' '));
-      extraRow.appendChild(spaceBtn);
-
-      const arrowKeys = ['←','↑','↓','→'];
-      arrowKeys.forEach(arrow => {
-        const btn = document.createElement('button');
-        btn.className = 'vk-key btn btn-light';
-        btn.innerText = arrow;
-        btn.addEventListener('click', () => appendToCommand('['+arrow+']'));
-        extraRow.appendChild(btn);
-      });
-      vkDiv.appendChild(extraRow);
-
-      // RIGA: Tasti multimediali
-      const mediaRow = document.createElement('div');
-      mediaRow.className = 'vk-row';
-      const mediaKeys = ["VOL_UP", "VOL_DOWN", "FAST_VOL_UP", "FAST_VOL_DOWN", "NEXT_PLAYLIST", "PREV_PLAYLIST"];
-      mediaKeys.forEach(k => {
-        const btn = document.createElement('button');
-        btn.className = 'vk-key btn btn-light';
-        btn.innerText = k;
-        btn.addEventListener('click', () => appendToCommand(k));
-        mediaRow.appendChild(btn);
-      });
-      vkDiv.appendChild(mediaRow);
-    }
-
-    function getDisplayValue(key) {
-      if (/[a-z]/i.test(key)) {
-        if ((capsLock && !shiftActive) || (!capsLock && shiftActive)) {
-          return key.toUpperCase();
+      // Update error count in status bar
+      function updateErrorIndicator() {
+        const indicator = document.getElementById("errorIndicator");
+        if (errorCount === 0) {
+          indicator.textContent = "0 errors";
+          indicator.style.color = "#8f8";
         } else {
-          return key.toLowerCase();
+          indicator.textContent = `${errorCount} error${
+            errorCount > 1 ? "s" : ""
+          }`;
+          indicator.style.color = "#f88";
         }
-      } else if (shiftActive && shiftMapping[key]) {
-        return shiftMapping[key];
       }
-      return key;
-    }
 
-    function updateVirtualKeyboardKeys() {
-      const vkKeys = document.querySelectorAll('.vk-key');
-      vkKeys.forEach(btn => {
-        if (btn.dataset.base) {
-          btn.innerText = getDisplayValue(btn.dataset.base);
+      // Show notification
+      function showNotification(message, type = "success") {
+        const notification = document.getElementById("notification");
+        notification.textContent = message;
+        notification.className = `notification ${type} show`;
+
+        setTimeout(() => {
+          notification.className = `notification ${type}`;
+        }, 3000);
+      }
+
+      // Initialize CodeMirror with linting and advanced features
+      document.addEventListener("DOMContentLoaded", function () {
+        editor = CodeMirror.fromTextArea(
+          document.getElementById("combinationsTextarea"),
+          {
+            mode: { name: "javascript", json: true },
+            theme: "dracula",
+            lineNumbers: true,
+            tabSize: 2,
+            indentWithTabs: false,
+            smartIndent: true,
+            lineWrapping: false,
+            matchBrackets: true,
+            autoCloseBrackets: true,
+            styleActiveLine: true,
+            lint: true,
+            gutters: ["CodeMirror-lint-markers"],
+            extraKeys: {
+              "Ctrl-S": saveCurrentSet,
+            },
+          }
+        );
+
+        // Update cursor position display
+        editor.on("cursorActivity", function () {
+          const cursor = editor.getCursor();
+          document.getElementById("cursorPosition").textContent = `Ln ${
+            cursor.line + 1
+          }, Col ${cursor.ch + 1}`;
+        });
+
+        // Initialize SSE for logs (connettendosi manualmente)
+        setupLogConnection();
+
+        // Clear logs button
+        document
+          .getElementById("clearLogsButton")
+          .addEventListener("click", function () {
+            document.getElementById("logContainer").innerHTML = "";
+          });
+
+        // Riconnessione manuale
+        document
+          .getElementById("reconnectLogButton")
+          .addEventListener("click", function () {
+            if (eventSource) {
+              eventSource.close();
+            }
+            setupLogConnection();
+          });
+
+        // Load all combination sets
+        loadAllCombinations();
+      });
+
+      // Funzione per impostare la connessione ai log senza riconnessione automatica
+      function setupLogConnection() {
+        const logContainer = document.getElementById("logContainer");
+        eventSource = new EventSource("/log");
+
+        eventSource.onopen = function () {
+          console.log("Connessione ai log stabilita");
+          const logLine = document.createElement("div");
+          logLine.textContent = "Connessione ai log stabilita.";
+          logLine.style.color = "#8f8";
+          logContainer.appendChild(logLine);
+          logContainer.scrollTop = logContainer.scrollHeight;
+        };
+
+        eventSource.onmessage = function (e) {
+          const logLine = document.createElement("div");
+          logLine.textContent = e.data;
+          logContainer.appendChild(logLine);
+          logContainer.scrollTop = logContainer.scrollHeight;
+        };
+
+        eventSource.onerror = function (e) {
+          console.error(
+            "Errore nella connessione ai log. Clicca il pulsante 'Riconnetti' per riprovare."
+          );
+          const errorLog = document.createElement("div");
+          errorLog.textContent =
+            "Errore nella connessione. Clicca il pulsante 'Riconnetti' per riprovare.";
+          errorLog.style.color = "#f88";
+          logContainer.appendChild(errorLog);
+          logContainer.scrollTop = logContainer.scrollHeight;
+          eventSource.close();
+        };
+      }
+
+      async function loadAllCombinations() {
+        try {
+          document.getElementById("status").textContent =
+            "Loading combinations...";
+          const response = await fetch("/combo.json");
+          if (!response.ok) {
+            throw new Error("Failed to fetch combinations");
+          }
+
+          allCombinations = await response.json();
+
+          // Populate tabs
+          createSetTabs();
+
+          // Set the initial set to 0 or the first available set
+          const setKeys = Object.keys(allCombinations);
+          if (setKeys.length > 0) {
+            const firstSetKey = setKeys[0];
+            const firstSetNumber = parseInt(
+              firstSetKey.replace("combinations_", "")
+            );
+            currentSet = firstSetNumber;
+          }
+
+          // Load the current set data
+          loadCurrentSet();
+          document.getElementById("status").textContent = "Ready";
+          showNotification("Combinations loaded successfully");
+        } catch (error) {
+          console.error("Error loading combinations:", error);
+          document.getElementById("status").textContent =
+            "Error loading combinations";
+          showNotification("Error loading combinations", "error");
+        }
+      }
+
+      function createSetTabs() {
+        const tabBar = document.getElementById("tabBar");
+        const addButton = document.getElementById("addSetButton");
+
+        // Remove all existing tabs except add button
+        while (tabBar.firstChild !== addButton) {
+          tabBar.removeChild(tabBar.firstChild);
+        }
+
+        // Get all set keys and sort them numericamente
+        const setKeys = Object.keys(allCombinations)
+          .filter((key) => key.startsWith("combinations_"))
+          .sort((a, b) => {
+            const numA = parseInt(a.replace("combinations_", ""));
+            const numB = parseInt(b.replace("combinations_", ""));
+            return numA - numB;
+          });
+
+        // Add tab for each set
+        setKeys.forEach((key) => {
+          const setNumber = key.replace("combinations_", "");
+          const tabElement = document.createElement("div");
+          tabElement.className = "tab-item";
+          tabElement.dataset.set = setNumber;
+          tabElement.innerHTML = `
+          <span>Set ${setNumber}</span>
+          <span class="close-tab" title="Delete this set">×</span>
+        `;
+
+          // Add click handler for tab selection
+          tabElement.addEventListener("click", function (e) {
+            if (e.target.classList.contains("close-tab")) return;
+            currentSet = parseInt(this.dataset.set);
+            updateActiveTab();
+            loadCurrentSet();
+          });
+
+          // Add click handler for close button
+          const closeBtn = tabElement.querySelector(".close-tab");
+          closeBtn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            if (confirm(`Are you sure you want to delete Set ${setNumber}?`)) {
+              deleteSet(parseInt(setNumber));
+            }
+          });
+
+          // Insert before add button
+          tabBar.insertBefore(tabElement, addButton);
+        });
+
+        updateActiveTab();
+      }
+
+      function updateActiveTab() {
+        document.querySelectorAll(".tab-item").forEach((tab) => {
+          tab.classList.remove("active");
+        });
+
+        const activeTab = document.querySelector(
+          `.tab-item[data-set="${currentSet}"]`
+        );
+        if (activeTab) {
+          activeTab.classList.add("active");
+        }
+      }
+
+      function loadCurrentSet() {
+        const setKey = `combinations_${currentSet}`;
+
+        try {
+          if (allCombinations[setKey]) {
+            const formattedJson = prettier.format(
+              JSON.stringify(allCombinations[setKey]),
+              {
+                parser: "json",
+                plugins: prettierPlugins,
+                tabWidth: 2,
+                useTabs: false,
+              }
+            );
+            editor.setValue(formattedJson);
+          } else {
+            editor.setValue("{}");
+          }
+          document.getElementById("status").textContent = "Set loaded";
+        } catch (error) {
+          console.error("Error formatting:", error);
+          if (allCombinations[setKey]) {
+            editor.setValue(JSON.stringify(allCombinations[setKey], null, 2));
+          } else {
+            editor.setValue("{}");
+          }
+          document.getElementById("status").textContent =
+            "Set loaded without formatting";
+        }
+        setTimeout(() => editor.focus(), 100);
+      }
+
+      async function saveCurrentSet() {
+        let setData;
+        try {
+          setData = JSON.parse(editor.getValue());
+        } catch (error) {
+          showNotification("Invalid JSON format", "error");
+          return;
+        }
+
+        document.getElementById("status").textContent = "Saving...";
+
+        try {
+          const response = await fetch(`/combo_set?set=${currentSet}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(setData),
+          });
+
+          const message = await response.text();
+          document.getElementById("status").textContent =
+            "Configuration saved";
+          showNotification("Configuration saved successfully", "success");
+
+          allCombinations[`combinations_${currentSet}`] = setData;
+        } catch (error) {
+          console.error("Error saving combination set:", error);
+          document.getElementById("status").textContent = "Error saving";
+          showNotification("Error saving set", "error");
+        }
+      }
+
+      function addNewSet() {
+        let nextSet = 0;
+        while (allCombinations[`combinations_${nextSet}`]) {
+          nextSet++;
+        }
+
+        allCombinations[`combinations_${nextSet}`] = {};
+        currentSet = nextSet;
+        createSetTabs();
+        loadCurrentSet();
+        showNotification(`Created new set ${nextSet}`);
+      }
+
+      async function deleteSet(setNumber) {
+        const setCount = Object.keys(allCombinations).filter((key) =>
+          key.startsWith("combinations_")
+        ).length;
+
+        if (setCount <= 1) {
+          showNotification("Cannot delete the only remaining set", "error");
+          return;
+        }
+
+        const updatedCombinations = {};
+        for (const key in allCombinations) {
+          if (key !== `combinations_${setNumber}`) {
+            updatedCombinations[key] = allCombinations[key];
+          }
+        }
+
+        document.getElementById("status").textContent = "Deleting set...";
+
+        try {
+          const response = await fetch("/combo.json", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updatedCombinations),
+          });
+
+          const message = await response.text();
+          document.getElementById("status").textContent = "Set deleted";
+          showNotification(`Set ${setNumber} deleted successfully`, "success");
+
+          allCombinations = updatedCombinations;
+
+          const setKeys = Object.keys(allCombinations).filter((key) =>
+            key.startsWith("combinations_")
+          );
+
+          if (setKeys.length > 0) {
+            currentSet = parseInt(setKeys[0].replace("combinations_", ""));
+          } else {
+            allCombinations["combinations_0"] = {};
+            currentSet = 0;
+          }
+
+          createSetTabs();
+          loadCurrentSet();
+        } catch (error) {
+          console.error("Error deleting set:", error);
+          document.getElementById("status").textContent = "Error deleting set";
+          showNotification("Error deleting set", "error");
+        }
+      }
+
+      function formatWithPrettier() {
+        try {
+          const currentValue = editor.getValue();
+          const formatted = prettier.format(currentValue, {
+            parser: "json",
+            plugins: prettierPlugins,
+            tabWidth: 2,
+            useTabs: false,
+          });
+          editor.setValue(formatted);
+          showNotification("Code formatted");
+        } catch (error) {
+          console.error("Error formatting JSON:", error);
+          showNotification("Error formatting JSON", "error");
+        }
+      }
+
+      document
+        .getElementById("saveButton")
+        .addEventListener("click", saveCurrentSet);
+      document
+        .getElementById("formatButton")
+        .addEventListener("click", formatWithPrettier);
+      document
+        .getElementById("addSetButton")
+        .addEventListener("click", addNewSet);
+      document
+        .getElementById("deleteSetButton")
+        .addEventListener("click", function () {
+          deleteSet(currentSet);
+        });
+
+      document.addEventListener("keydown", function (e) {
+        if (e.ctrlKey && e.key === "s") {
+          e.preventDefault();
+          saveCurrentSet();
         }
       });
-    }
-
-    function appendToCommand(text) {
-      const input = document.getElementById('commandInput');
-      input.value += text;
-      updateFinalCommand();
-    }
-
-    function updateFinalCommand() {
-      let cmd = document.getElementById('commandInput').value.trim();
-      if(cmd && !cmd.startsWith('S_B:')) {
-        cmd = 'S_B:' + cmd;
-      }
-      currentCommand = cmd;
-      document.getElementById('finalCommand').innerText = currentCombo + ' -> ' + currentCommand;
-    }
-
-    document.getElementById('clearCombo').addEventListener('click', () => {
-      currentCombo = '';
-      specialKeyAdded = false;
-      document.getElementById('currentCombo').innerText = currentCombo;
-      updateFinalCommand();
-    });
-
-    function populateComboList() {
-      const listDiv = document.getElementById('comboList');
-      listDiv.innerHTML = '';
-      for (const combo in combinations) {
-        const action = combinations[combo][0] || '';
-        const btn = document.createElement('button');
-        btn.className = 'btn btn-outline-primary m-1 combo-btn';
-        btn.innerText = combo + " -> " + action;
-        btn.addEventListener('click', () => {
-          currentCombo = combo;
-          // Verifica se la combo contiene un tasto speciale (separato da virgola)
-          specialKeyAdded = combo.includes(',');
-          document.getElementById('currentCombo').innerText = currentCombo;
-          document.getElementById('commandInput').value = action;
-          updateFinalCommand();
-        });
-        listDiv.appendChild(btn);
-      }
-    }
-
-    document.getElementById('saveCombo').addEventListener('click', async () => {
-      if(!currentCombo || !currentCommand) {
-        document.getElementById('status').innerHTML = '❌ Compila la combo e il comando prima di salvare.';
-        return;
-      }
-      combinations[currentCombo] = [currentCommand];
-      try {
-        const response = await fetch('/combinations.json', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(combinations)
-        });
-        const message = await response.text();
-        document.getElementById('status').innerHTML = '✅ ' + message;
-        populateComboList();
-        // Ripulisce i campi per un flusso più user-friendly
-        currentCombo = '';
-        specialKeyAdded = false;
-        currentCommand = '';
-        document.getElementById('currentCombo').innerText = '';
-        document.getElementById('commandInput').value = '';
-        updateFinalCommand();
-      } catch (e) {
-        document.getElementById('status').innerHTML = '❌ Errore durante il salvataggio.';
-      }
-    });
-
-    document.getElementById('commandInput').addEventListener('input', () => {
-      updateFinalCommand();
-    });
-
-    loadConfigs();
-  </script>
-</body>
+    </script>
+  </body>
 </html>

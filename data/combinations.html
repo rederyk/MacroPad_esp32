@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ESP32 Combinations Configuration</title>
+    <title>ESP32 Multi-Set Combinations Configuration</title>
     <!-- Bootstrap CSS -->
     <link
       rel="stylesheet"
@@ -25,35 +25,75 @@
         border: 1px solid #ced4da;
         border-radius: 0.25rem;
       }
+      #setSelector {
+        max-width: 200px;
+        margin: 0 auto;
+      }
+      .btn-group-container {
+        margin-bottom: 20px;
+      }
     </style>
   </head>
   <body class="container mt-5">
-    <h1 class="text-center">Combinations Configuration</h1>
-    
-    <!-- Barra dei pulsanti in alto in riga -->
-    <div class="btn-group d-flex justify-content-center mb-3" role="group">
-      <button type="submit" form="combinationsForm" class="btn btn-primary mx-1">
-        Save Combinations
-      </button>
-      <button type="button" class="btn btn-info mx-1" id="formatButton">
-        Format with Prettier
-      </button>
-      <button type="button" class="btn btn-secondary mx-1" onclick="window.location.href='/'">
-        Back to Main Config
+    <h1 class="text-center">Multi-Set Combinations Configuration</h1>
+
+    <!-- Set selector -->
+    <div class="mb-4 text-center">
+      <label for="setSelector" class="form-label"
+        >Select Combination Set:</label
+      >
+      <select id="setSelector" class="form-select mb-3"></select>
+      <button type="button" class="btn btn-success" id="addSetButton">
+        Add New Set
       </button>
     </div>
 
-    <form id="combinationsForm">
-      <div class="mb-3">
-        <label for="combinationsTextarea" class="form-label">
-          Edit Combinations (JSON Format):
-        </label>
-        <textarea id="combinationsTextarea" class="form-control" rows="15"></textarea>
+    <!-- Buttons toolbar -->
+    <div class="btn-group-container d-flex justify-content-center mb-3">
+      <div class="btn-group" role="group">
+        <button type="button" id="saveButton" class="btn btn-primary mx-1">
+          Save Current Set
+        </button>
+        <button type="button" class="btn btn-warning mx-1" id="deleteSetButton">
+          Delete Current Set
+        </button>
+        <button type="button" class="btn btn-info mx-1" id="formatButton">
+          Format with Prettier
+        </button>
+        <button
+          type="button"
+          class="btn btn-secondary mx-1"
+          onclick="window.location.href='/'"
+        >
+          Back to Main Config
+        </button>
       </div>
-    </form>
+    </div>
+
+    <div class="mb-3">
+      <label for="combinationsTextarea" class="form-label">
+        Edit Combinations for Set <span id="currentSetLabel">0</span> (JSON
+        Format):
+      </label>
+      <textarea
+        id="combinationsTextarea"
+        class="form-control"
+        rows="15"
+      ></textarea>
+    </div>
     <div id="status" class="mt-3 text-center"></div>
 
-    <!-- Bootstrap JS -->
+    <!-- Connessione ai log server -->
+    <div class="mt-5">
+      <h3>Server Logs</h3>
+      <div
+        id="logContainer"
+        class="border p-3 bg-light"
+        style="height: 200px; overflow-y: auto; font-family: monospace"
+      ></div>
+    </div>
+
+    <!-- Bootstrap JS with Icons -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- CodeMirror JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
@@ -61,13 +101,13 @@
     <!-- CodeMirror Lint Addons -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/lint/lint.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/lint/json-lint.js"></script>
-    <!-- jsonlint per il parsing del JSON -->
+    <!-- jsonlint for JSON parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsonlint/1.6.0/jsonlint.min.js"></script>
     <!-- Prettier -->
     <script src="https://unpkg.com/prettier@2.8.8/standalone.js"></script>
     <script src="https://unpkg.com/prettier@2.8.8/parser-babel.js"></script>
     <script>
-      // Funzione di supporto per calcolare posizione (linea e colonna) dall'indice
+      // Helper function to calculate position (line and column) from index
       function computePos(text, index) {
         var lines = text.slice(0, index).split("\n");
         var line = lines.length - 1;
@@ -75,10 +115,10 @@
         return CodeMirror.Pos(line, ch);
       }
 
-      // Helper di linting personalizzato per JSON
-      CodeMirror.registerHelper("lint", "json", function(text) {
+      // Custom JSON linting helper
+      CodeMirror.registerHelper("lint", "json", function (text) {
         var found = [];
-        // Controllo della sintassi con jsonlint
+        // Syntax check with jsonlint
         try {
           jsonlint.parse(text);
         } catch (e) {
@@ -91,18 +131,18 @@
               from: CodeMirror.Pos(line, ch),
               to: CodeMirror.Pos(line, ch + 1),
               message: message,
-              severity: "error"
+              severity: "error",
             });
           } else {
             found.push({
               from: CodeMirror.Pos(0, 0),
               to: CodeMirror.Pos(0, 1),
               message: message,
-              severity: "error"
+              severity: "error",
             });
           }
         }
-        // Controllo delle chiavi duplicate
+        // Check for duplicate keys
         var regex = /"([^"\\]*(?:\\.[^"\\]*)*)"\s*:/g;
         var keys = {};
         var m;
@@ -114,7 +154,7 @@
               from: pos,
               to: CodeMirror.Pos(pos.line, pos.ch + key.length + 2),
               message: "Duplicate key: " + key,
-              severity: "error"
+              severity: "error",
             });
           } else {
             keys[key] = true;
@@ -123,27 +163,67 @@
         return found;
       });
 
-      // Inizializza CodeMirror con linting abilitato
-      var editor = CodeMirror.fromTextArea(
-        document.getElementById("combinationsTextarea"),
-        {
-          mode: { name: "javascript", json: true },
-          lineNumbers: true,
-          tabSize: 2,
-          indentWithTabs: false,
-          lint: true,
-          gutters: ["CodeMirror-lint-markers"]
-        }
-      );
+      // Global variables
+      let editor;
+      let allCombinations = {};
+      let currentSet = 0;
 
-      async function loadCombinations() {
+      // Initialize CodeMirror with linting
+      document.addEventListener("DOMContentLoaded", function () {
+        editor = CodeMirror.fromTextArea(
+          document.getElementById("combinationsTextarea"),
+          {
+            mode: { name: "javascript", json: true },
+            lineNumbers: true,
+            tabSize: 2,
+            indentWithTabs: false,
+            lint: true,
+            gutters: ["CodeMirror-lint-markers"],
+          }
+        );
+
+        // Inizializza la connessione SSE per i log
+        const eventSource = new EventSource("/log");
+        const logContainer = document.getElementById("logContainer");
+
+        eventSource.addEventListener("message", function (e) {
+          const logLine = document.createElement("div");
+          logLine.textContent = e.data;
+          logContainer.appendChild(logLine);
+          logContainer.scrollTop = logContainer.scrollHeight;
+        });
+
+        loadAllCombinations();
+      });
+
+      async function loadAllCombinations() {
         try {
-          const response = await fetch("/combinations.json");
-          if (!response.ok)
+          document.getElementById("status").innerHTML =
+            "⏳ Loading combinations...";
+          const response = await fetch("/combo.json");
+          if (!response.ok) {
             throw new Error("Failed to fetch combinations");
-          const combinations = await response.json();
-          // Imposta il contenuto formattato (pretty print)
-          editor.setValue(JSON.stringify(combinations, null, 2));
+          }
+
+          allCombinations = await response.json();
+
+          // Populate set selector
+          populateSetSelector();
+
+          // Set the initial set to 0 or the first available set
+          const setKeys = Object.keys(allCombinations);
+          if (setKeys.length > 0) {
+            const firstSetKey = setKeys[0];
+            const firstSetNumber = parseInt(
+              firstSetKey.replace("combinations_", "")
+            );
+            currentSet = firstSetNumber;
+          }
+
+          // Load the current set data
+          loadCurrentSet();
+          document.getElementById("status").innerHTML =
+            "✅ Combinations loaded.";
         } catch (error) {
           console.error("Error loading combinations:", error);
           document.getElementById("status").innerHTML =
@@ -151,36 +231,196 @@
         }
       }
 
-      async function saveCombinations(event) {
-        event.preventDefault();
-        let newComb;
+      function populateSetSelector() {
+        const selector = document.getElementById("setSelector");
+        selector.innerHTML = ""; // Clear existing options
+
+        // Get all set keys and sort them numerically
+        const setKeys = Object.keys(allCombinations)
+          .filter((key) => key.startsWith("combinations_"))
+          .sort((a, b) => {
+            const numA = parseInt(a.replace("combinations_", ""));
+            const numB = parseInt(b.replace("combinations_", ""));
+            return numA - numB;
+          });
+
+        // Add options for each set
+        setKeys.forEach((key) => {
+          const setNumber = key.replace("combinations_", "");
+          const option = document.createElement("option");
+          option.value = setNumber;
+          option.textContent = `Set ${setNumber}`;
+          selector.appendChild(option);
+        });
+
+        // Set current selection
+        selector.value = currentSet;
+
+        // Add change event listener
+        selector.addEventListener("change", function () {
+          currentSet = parseInt(this.value);
+          loadCurrentSet();
+        });
+      }
+
+      function loadCurrentSet() {
+        const setKey = `combinations_${currentSet}`;
+        document.getElementById("currentSetLabel").textContent = currentSet;
+
         try {
-          newComb = JSON.parse(editor.getValue());
+          if (allCombinations[setKey]) {
+            // Formatta con Prettier i dati del set corrente
+            const formattedJson = prettier.format(
+              JSON.stringify(allCombinations[setKey]),
+              {
+                parser: "json",
+                plugins: prettierPlugins,
+                tabWidth: 2,
+                useTabs: false,
+              }
+            );
+            // Imposta il valore già formattato
+            editor.setValue(formattedJson);
+          } else {
+            // Template vuoto per un nuovo set
+            editor.setValue("{}");
+          }
+          document.getElementById("status").innerHTML =
+            "✅ Set caricato e formattato.";
+        } catch (error) {
+          console.error("Errore durante la formattazione:", error);
+          // Fallback all'approccio originale in caso di errore
+          if (allCombinations[setKey]) {
+            editor.setValue(JSON.stringify(allCombinations[setKey], null, 2));
+          } else {
+            editor.setValue("{}");
+          }
+          document.getElementById("status").innerHTML =
+            "⚠️ Set caricato senza formattazione.";
+        }
+      }
+
+      async function saveCurrentSet() {
+        let setData;
+        try {
+          setData = JSON.parse(editor.getValue());
         } catch (error) {
           document.getElementById("status").innerHTML =
             "❌ Invalid JSON format.";
           return;
         }
+
         document.getElementById("status").innerHTML = "⏳ Saving...";
+
         try {
-          const response = await fetch("/combinations.json", {
+          // Save only the current set
+          const response = await fetch(`/combo_set?set=${currentSet}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(newComb),
+            body: JSON.stringify(setData),
           });
+
           const message = await response.text();
           document.getElementById("status").innerHTML = `✅ ${message}`;
+
+          // Update our local copy
+          allCombinations[`combinations_${currentSet}`] = setData;
         } catch (error) {
-          console.error("Error saving combinations:", error);
+          console.error("Error saving combination set:", error);
           document.getElementById("status").innerHTML =
-            "❌ Error saving combinations.";
+            "❌ Error saving combination set.";
+        }
+      }
+
+      function addNewSet() {
+        // Find the next available set number
+        let nextSet = 0;
+        while (allCombinations[`combinations_${nextSet}`]) {
+          nextSet++;
+        }
+
+        // Add empty set
+        allCombinations[`combinations_${nextSet}`] = {};
+
+        // Update the current set
+        currentSet = nextSet;
+
+        // Update UI
+        populateSetSelector();
+        loadCurrentSet();
+
+        document.getElementById(
+          "status"
+        ).innerHTML = `✅ Created new set ${nextSet}. Remember to save your changes.`;
+      }
+
+      async function deleteCurrentSet() {
+        // Cannot delete if there's only one set
+        const setCount = Object.keys(allCombinations).filter((key) =>
+          key.startsWith("combinations_")
+        ).length;
+
+        if (setCount <= 1) {
+          document.getElementById("status").innerHTML =
+            "❌ Cannot delete the only remaining set.";
+          return;
+        }
+
+        if (!confirm(`Are you sure you want to delete Set ${currentSet}?`)) {
+          return;
+        }
+
+        // Make a copy of all combinations without the current set
+        const updatedCombinations = {};
+        for (const key in allCombinations) {
+          if (key !== `combinations_${currentSet}`) {
+            updatedCombinations[key] = allCombinations[key];
+          }
+        }
+
+        document.getElementById("status").innerHTML = "⏳ Deleting set...";
+
+        try {
+          // Save the entire updated combination file
+          const response = await fetch("/combo.json", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updatedCombinations),
+          });
+
+          const message = await response.text();
+          document.getElementById("status").innerHTML = `✅ ${message}`;
+
+          // Update our local copy
+          allCombinations = updatedCombinations;
+
+          // Set current set to the first available one
+          const setKeys = Object.keys(allCombinations).filter((key) =>
+            key.startsWith("combinations_")
+          );
+
+          if (setKeys.length > 0) {
+            currentSet = parseInt(setKeys[0].replace("combinations_", ""));
+          } else {
+            // If somehow all sets were deleted, add a new empty one
+            allCombinations["combinations_0"] = {};
+            currentSet = 0;
+          }
+
+          // Update UI
+          populateSetSelector();
+          loadCurrentSet();
+        } catch (error) {
+          console.error("Error deleting set:", error);
+          document.getElementById("status").innerHTML =
+            "❌ Error deleting set.";
         }
       }
 
       function formatWithPrettier() {
         try {
           const currentValue = editor.getValue();
-          // Utilizza Prettier per formattare il contenuto JSON
+          // Use Prettier to format the JSON content
           const formatted = prettier.format(currentValue, {
             parser: "json",
             plugins: prettierPlugins,
@@ -197,13 +437,19 @@
         }
       }
 
+      // Event listeners
       document
-        .getElementById("combinationsForm")
-        .addEventListener("submit", saveCombinations);
+        .getElementById("saveButton")
+        .addEventListener("click", saveCurrentSet);
       document
         .getElementById("formatButton")
         .addEventListener("click", formatWithPrettier);
-      loadCombinations();
+      document
+        .getElementById("addSetButton")
+        .addEventListener("click", addNewSet);
+      document
+        .getElementById("deleteSetButton")
+        .addEventListener("click", deleteCurrentSet);
     </script>
   </body>
 </html>

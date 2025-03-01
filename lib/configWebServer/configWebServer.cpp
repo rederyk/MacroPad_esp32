@@ -41,6 +41,40 @@ bool writeConfigFile(const String &json)
     return true;
 }
 
+// Funzioni helper per leggere/scrivere il file combo.json
+String readComboFile()
+{
+    File file = LittleFS.open("/combo.json", "r");
+    if (!file)
+    {
+        Logger::getInstance().log("⚠️ Failed to open combo.json");
+        return "{}"; // Ritorna un oggetto JSON vuoto
+    }
+    String json = file.readString();
+    Logger::getInstance().log("combo.json size ");
+    Logger::getInstance().log(String(file.size()));
+    file.close();
+    if (json.length() == 0)
+    {
+        Logger::getInstance().log("⚠️ combo.json is empty!");
+        return "{}";
+    }
+    return json;
+}
+
+bool writeComboFile(const String &json)
+{
+    File file = LittleFS.open("/combo.json", "w");
+    if (!file)
+    {
+        Logger::getInstance().log("⚠️ Failed to open combo.json for writing.");
+        return false;
+    }
+    file.print(json);
+    file.close();
+    return true;
+}
+
 // Legge il file gesture_features.json
 String readGestureFeatureFile()
 {
@@ -170,7 +204,7 @@ void configWebServer::setupRoutes()
             request->send(500, "text/plain", "❌ Failed to save configuration.");
         } });
 
-    // --- Endpoint per la gestione delle "combinations" ---
+    // --- Endpoint per la gestione delle "combinations" (originale) ---
     // GET: restituisce solo la sezione "combinations" del config.json
     server.on("/combinations.json", HTTP_GET, [](AsyncWebServerRequest *request)
               {
@@ -228,6 +262,164 @@ void configWebServer::setupRoutes()
         } else {
             request->send(500, "text/plain", "❌ Failed to save combinations configuration.");
         } });
+
+    // --- Endpoint per il nuovo file combo.json ---
+    // GET: ottiene l'intero file combo.json
+    server.on("/combo.json", HTTP_GET, [](AsyncWebServerRequest *request)
+              { 
+                String comboJson = readComboFile();
+                request->send(200, "application/json", comboJson); });
+
+    // POST: aggiorna il file combo.json completo
+    server.on("/combo.json", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+                  // Funzione di callback vuota richiesta
+              },
+              [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
+              {
+                  // Gestione upload - non usata qui
+              },
+              [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+              {
+                static String jsonBuffer = "";
+                
+                // Aggiungiamo i dati ricevuti al buffer
+                for (size_t i = 0; i < len; i++) {
+                    jsonBuffer += (char)data[i];
+                }
+                
+                // Se abbiamo ricevuto tutti i dati, processiamo il JSON
+                if (index + len == total) {
+                    Logger::getInstance().log("📥 Received combo update, total size: " + String(total));
+                    
+                    // Parsifichiamo il JSON solo per verificare che sia valido
+                    DynamicJsonDocument doc(16384); // Aumentiamo la dimensione del buffer
+                    DeserializationError error = deserializeJson(doc, jsonBuffer);
+                    
+                    if (error) {
+                        Logger::getInstance().log("⚠️ Failed to parse combo.json: " + String(error.c_str()));
+                        request->send(400, "text/plain", "❌ Invalid JSON format");
+                    } else {
+                        // Se è valido, lo salviamo direttamente
+                        if (writeComboFile(jsonBuffer)) {
+                            Logger::getInstance().log("💾 Saved combo.json successfully");
+                            request->send(200, "text/plain", "✅ Combinations updated successfully! Restarting...");
+                            // Ritardiamo il riavvio per assicurarci che la risposta venga inviata
+                            delay(1000);
+                            ESP.restart();
+                        } else {
+                            request->send(500, "text/plain", "❌ Failed to save combo.json");
+                        }
+                    }
+                    
+                    // Reset del buffer per la prossima richiesta
+                    jsonBuffer = "";
+                } });
+
+    // --- Endpoint per ottenere un set specifico di combinazioni ---
+    server.on("/combo_set", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+                if (!request->hasArg("set")) {
+                    request->send(400, "text/plain", "Missing 'set' parameter");
+                    return;
+                }
+                
+                int setNumber = request->arg("set").toInt();
+                String setKey = "combinations_" + String(setNumber);
+                
+                String comboStr = readComboFile();
+                DynamicJsonDocument doc(16384);
+                DeserializationError error = deserializeJson(doc, comboStr);
+                
+                if (error) {
+                    Logger::getInstance().log("❌ Failed to parse combo.json: " + String(error.c_str()));
+                    request->send(500, "text/plain", "❌ Failed to parse combo.json");
+                    return;
+                }
+                
+                JsonVariant setData = doc[setKey];
+                String response;
+                if (setData.isNull()) {
+                    response = "{}";
+                } else {
+                    serializeJson(setData, response);
+                }
+                
+                request->send(200, "application/json", response); });
+
+    // --- Endpoint per aggiornare un set specifico di combinazioni ---
+    server.on("/combo_set", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
+                  // Funzione di callback vuota richiesta
+              },
+              [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final)
+              {
+                  // Gestione upload - non usata qui
+              },
+              [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+              {
+                static String jsonBuffer = "";
+                
+                if (!request->hasArg("set")) {
+                    request->send(400, "text/plain", "Missing 'set' parameter");
+                    return;
+                }
+                
+                int setNumber = request->arg("set").toInt();
+                String setKey = "combinations_" + String(setNumber);
+                
+                // Aggiungiamo i dati ricevuti al buffer
+                for (size_t i = 0; i < len; i++) {
+                    jsonBuffer += (char)data[i];
+                }
+                
+                // Se abbiamo ricevuto tutti i dati, processiamo il JSON
+                if (index + len == total) {
+                    Logger::getInstance().log("📥 Received update for " + setKey + ", size: " + String(total));
+                    
+                    // Leggiamo l'intero file combo.json
+                    String comboStr = readComboFile();
+                    DynamicJsonDocument comboDoc(16384);
+                    DeserializationError error = deserializeJson(comboDoc, comboStr);
+                    
+                    if (error) {
+                        Logger::getInstance().log("⚠️ Failed to parse current combo.json: " + String(error.c_str()));
+                        request->send(500, "text/plain", "❌ Failed to parse current combo.json");
+                        jsonBuffer = "";
+                        return;
+                    }
+                    
+                    // Parsifichiamo il nuovo set di combinazioni
+                    DynamicJsonDocument newSetDoc(8192);
+                    error = deserializeJson(newSetDoc, jsonBuffer);
+                    
+                    if (error) {
+                        Logger::getInstance().log("⚠️ Failed to parse new set: " + String(error.c_str()));
+                        request->send(400, "text/plain", "❌ Invalid JSON format for set");
+                        jsonBuffer = "";
+                        return;
+                    }
+                    
+                    // Aggiorniamo il set specifico
+                    comboDoc[setKey] = newSetDoc.as<JsonVariant>();
+                    
+                    // Serializziamo l'intero documento
+                    String updatedJson;
+                    serializeJson(comboDoc, updatedJson);
+                    
+                    // Salviamo il file aggiornato
+                    if (writeComboFile(updatedJson)) {
+                        Logger::getInstance().log("💾 Saved combo.json with updated " + setKey);
+                        request->send(200, "text/plain", "✅ Combination set updated successfully! Restarting...");
+                        delay(1000);
+                        ESP.restart();
+                    } else {
+                        request->send(500, "text/plain", "❌ Failed to save combo.json");
+                    }
+                    
+                    // Reset del buffer per la prossima richiesta
+                    jsonBuffer = "";
+                } });
 
     // --- Endpoint per la gestione delle "advanced" (tutte le altre config) ---
     // GET: restituisce tutte le sezioni del config.json tranne "wifi" e "combinations"
@@ -328,7 +520,8 @@ void configWebServer::setupRoutes()
         String html = file.readString();
         file.close();
         request->send(200, "text/html", html); });
-    // --- Endpoint per servire la pagina delle combo aggironata (combo.html) ---
+
+    // --- Endpoint per servire la pagina delle combo aggiornata (combo.html) ---
     server.on("/combo.html", HTTP_GET, [](AsyncWebServerRequest *request)
               {
         File file = LittleFS.open("/combo.html", "r");
@@ -494,7 +687,6 @@ void configWebServer::setupRoutes()
         request->send(200, "text/plain", "✅ printing Memory Info..."); });
 
     // Aggiungi l'output per gli eventi solo se non è già stato aggiunto.
-
     if (!eventsOutputAdded)
     {
         Logger::getInstance().addOutput([&](const String &msg)
