@@ -13,59 +13,52 @@
 #include "configManager.h"
 extern SpecialAction specialAction;
 
+#define GESTURE_HOLD_TIME 200 // Tempo di mantenimento della gesture in ms
+
 class MacroManager
 {
-private:
-    // Track active keys using bitmask (bits 0-15 represent keys 1-16)
-    uint16_t activeKeysMask;
-    // Keypad configuration reference
-    const KeypadConfig *keypadConfig;
-    // Wifi configuration reference
-    const WifiConfig *wifiConfig;
-    // Last input action
-    std::string lastAction;
-    // Timeout for key combinations
-    static constexpr unsigned long combo_delay = 50; // 100ms to complete combination
-    // SE rilascio il tasto in meno di questo tempo non viene recepito il rilascio,,,,,,TODO indagare 
-    // Last input action timestamp
-    unsigned long lastActionTime;
-    unsigned long lastRotationTime;
-    // Pending combination and its timestamp
-    std::string pendingCombination;
-    std::string lastExecutedCombination;
-    unsigned long lastCombinationTime;
-    unsigned long rotationReleaseTime = 0;  // Variabile globale o membro di classe
-
-    int expectedGestureId; // ID del gesto atteso
-    std::string lastExecutedAction;
-    // static bool is_action_locked;
-    bool is_action_locked;
-    bool gestureExecuted = false;
-    bool rotationNeedsRelease = false;
-    bool pendingRotationPress = false;
-    bool rotationActive = false;
-    unsigned long lastKeyPressTime = 0; // Timestamp of the last key press
-    static constexpr unsigned long debounceTime = 50; // Minimum time between key presses (milliseconds)
-    unsigned long gestureExecutionTime;
-    static constexpr unsigned long GESTURE_HOLD_TIME = 200; // Time to hold gesture actions (milliseconds)
-
-    // Helper methods
-    std::string getCurrentCombination();
-    void clearActiveKeys();
-    void releaseGestureActions(); // Declare the releaseGestureActions function
-    void pressAction(const std::string &action);
-    void processCombination(const InputEvent &event);
-    void releaseAction(const std::string &action);
-
-public:
-    void update();
-    std::map<std::string, std::vector<std::string>> combinations;
-
 public:
     MacroManager(const KeypadConfig *config, const WifiConfig *wifiConfig);
-
-    // Process events
     void handleInputEvent(const InputEvent &event);
+    void update();
+    void clearActiveKeys();
+
+    // Configurazione delle combinazioni
+    std::map<std::string, std::vector<std::string>> combinations;
+    unsigned long combo_delay = 50; // Default delay in ms
+    unsigned long encoder_pulse_duration = 150; // Durata dell'impulso dell'encoder in ms
+
+private:
+    uint16_t activeKeysMask;    // Current key state
+    uint16_t previousKeysMask;  // Previous key state to track changes
+    unsigned long lastCombinationTime;
+    unsigned long lastKeyPressTime;
+    unsigned long lastRotationTime;
+    unsigned long rotationReleaseTime;
+    unsigned long lastActionTime;
+    unsigned long encoderReleaseTime; // Tempo per il rilascio dell'encoder
+    std::string pendingCombination;
+    std::string lastAction;
+    std::string lastExecutedAction;
+    std::string encoderPendingAction; // Azione dell'encoder in attesa di rilascio
+    const KeypadConfig *keypadConfig;
+    const WifiConfig *wifiConfig;
+    bool is_action_locked = false;
+    bool gestureExecuted = false;
+    bool wasPartOfCombo = false;
+    bool newKeyPressed = false; // Flag to track when a new key is pressed
+    bool encoderReleaseScheduled = false; // Flag per indicare il rilascio programmato dell'encoder
+    unsigned long gestureExecutionTime = 0;
+
+    void pressAction(const std::string &action);
+    void releaseAction(const std::string &action);
+    std::string getCurrentCombination();
+    std::string getCurrentKeyCombination(); // Get only key combination without encoder/button actions
+    //void processCombination(const InputEvent &event);
+    void processKeyCombination();
+    void releaseGestureActions();
+
+
 };
 
-#endif
+#endif // MACRO_MANAGER_H

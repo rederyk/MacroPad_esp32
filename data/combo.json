@@ -57,5 +57,31 @@
     "1+2+3,BUTTON": ["TOGGLE_BLE_WIFI"],
     "1+4+7,BUTTON": ["HOP_BLE_DEVICE"],
     "7+8+9,BUTTON": ["RESET_ALL"]
+  },
+  "combinations_2": {
+    "1": ["S_B:1"],
+    "2": ["S_B:2"],
+    "3": ["S_B:3"],
+    "4": ["S_B:4"],
+    "5": ["S_B:5"],
+    "6": ["S_B:6"],
+    "7": ["S_B:7"],
+    "8": ["S_B:8"],
+    "9": ["S_B:9"],
+    "CW": ["S_B:MOUSE_MOVE_0_0_1_0"],
+    "CCW": ["S_B:MOUSE_MOVE_0_0_-1_0"],
+    "BUTTON": ["EXECUTE_GESTURE"],
+    "G_ID:1": ["S_B:CTRL+SUPER,Left_arrow"],
+    "G_ID:2": ["S_B:SUPER+q"],
+    "G_ID:0": ["S_B:CTRL+SUPER,Right_arrow"],
+    "G_ID:3": ["S_B:SUPER+l"],
+    "1,CW": ["S_B:VOL_UP"],
+    "1,CCW": ["S_B:VOL_DOWN"],
+    "1+2,CW": ["S_B:MOUSE_MOVE_0_0_5_0"],
+    "1+2,CCW": ["S_B:MOUSE_MOVE_0_0_-5_0"],
+    "1+5+9": ["CALIBRATE_SENSOR"],
+    "1+2+3,BUTTON": ["TOGGLE_BLE_WIFI"],
+    "1+4+7,BUTTON": ["HOP_BLE_DEVICE"],
+    "7+8+9,BUTTON": ["RESET_ALL"]
   }
 }

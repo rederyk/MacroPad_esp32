@@ -30,13 +30,17 @@ inline bool getKeyState(uint16_t mask, uint8_t key)
 
 MacroManager::MacroManager(const KeypadConfig *config, const WifiConfig *wifiConfig)
     : activeKeysMask(0),
+      previousKeysMask(0),
       lastCombinationTime(0),
       pendingCombination(""),
       keypadConfig(config),
-      wifiConfig(wifiConfig)
+      wifiConfig(wifiConfig),
+      newKeyPressed(false),
+      encoderReleaseScheduled(false)
 {
     lastActionTime = millis();
 }
+
 void MacroManager::pressAction(const std::string &action)
 {
     if (is_action_locked && !(action == "RESET_ALL"))
@@ -162,41 +166,115 @@ void MacroManager::handleInputEvent(const InputEvent &event)
     switch (event.type)
     {
     case InputEvent::EventType::KEY_PRESS:
+        // Salva lo stato precedente prima dell'aggiornamento
+        previousKeysMask = activeKeysMask;
+        wasPartOfCombo = false;
+
+        // Se è un rilascio di tasto che fa parte di una combinazione attiva
+        if (!event.state && !lastExecutedAction.empty() && getKeyState(activeKeysMask, event.value1))
+        {
+            wasPartOfCombo = true;
+        }
+
+        // Aggiorna lo stato del tasto
         setKeyState(activeKeysMask, event.value1, event.state);
+
         if (event.state)
         {
+            // On key press, update the time and set pending combination
             lastKeyPressTime = millis();
+            pendingCombination = getCurrentCombination();
+            lastCombinationTime = millis();
+            newKeyPressed = true; // Flag that a new key was pressed
         }
-        pendingCombination = getCurrentCombination();
-        lastCombinationTime = millis();
+        else if (wasPartOfCombo)
+        {
+            // Se rilasciamo un tasto che faceva parte di una combo, rilasciamo l'intera combo
+            if (!lastExecutedAction.empty())
+            {
+                releaseAction(lastExecutedAction);
+                lastExecutedAction.clear();
+              //  Logger::getInstance().log("Released combo on key release");
+            }
+        }
         break;
+
     case InputEvent::EventType::ROTATION:
+        // Gestione completa di un impulso di encoder (atomica)
         if (event.state)
         {
-            lastAction = (event.value1 > 0) ? "CW" : "CCW";
-            lastRotationTime = millis();
-            rotationReleaseTime = 0; // Reset in caso di nuove rotazioni
+            // Determina la direzione
+            std::string encoderAction = (event.value1 > 0) ? "CW" : "CCW";
+            std::string fullCombo = "";
+
+            // Costruisci la combinazione con l'encoder e i tasti attuali
+            if (activeKeysMask != 0)
+            {
+                // Ci sono tasti premuti, costruisci la combo "tasti+encoder"
+                std::string keysCombo = getCurrentKeyCombination(); // Solo i tasti
+                if (!keysCombo.empty())
+                {
+                    fullCombo = keysCombo + "," + encoderAction;
+                }
+                else
+                {
+                    fullCombo = encoderAction;
+                }
+            }
+            else
+            {
+                // Solo encoder
+                fullCombo = encoderAction;
+            }
+
+            Logger::getInstance().log("Encoder pulse: " + String(encoderAction.c_str()) + " combo: " + String(fullCombo.c_str()));
+
+            // Rilascia l'azione precedente se esiste
+            if (!lastExecutedAction.empty())
+            {
+                releaseAction(lastExecutedAction);
+                lastExecutedAction.clear();
+            }
+
+            // Controlla se questa combo esiste
+            if (combinations.find(fullCombo) != combinations.end())
+            {
+                // Esegui l'azione
+                for (const std::string &action : combinations[fullCombo])
+                {
+                    pressAction(action);
+                    lastExecutedAction = action;
+
+                    // Rilascia immediatamente dopo per garantire un impulso completo
+                    // Ritardiamo leggermente il rilascio per dare tempo all'azione di essere eseguita
+                    encoderReleaseScheduled = true;
+                    encoderReleaseTime = millis() + encoder_pulse_duration;
+                    encoderPendingAction = action;
+                }
+            }
         }
-        else
-        {
-            // Non azzerare lastAction subito, ma memorizza il tempo di rilascio
-            rotationReleaseTime = millis();
-        }
-        pendingCombination = getCurrentCombination();
-        lastCombinationTime = millis();
         break;
 
     case InputEvent::EventType::BUTTON:
         if (event.state)
         {
             lastAction = "BUTTON";
+            pendingCombination = getCurrentCombination();
+            lastCombinationTime = millis();
+            newKeyPressed = true; // Flag that a new input was registered
         }
         else
         {
             lastAction.clear();
+
+            // Se rilasciamo un pulsante che faceva parte di una combo, rilascia l'azione
+            if (!lastExecutedAction.empty())
+            {
+                releaseAction(lastExecutedAction);
+                lastExecutedAction.clear();
+                Logger::getInstance().log("Released combo on button release");
+            }
         }
-        pendingCombination = getCurrentCombination();
-        lastCombinationTime = millis();
         break;
 
     default:
@@ -251,48 +329,92 @@ std::string MacroManager::getCurrentCombination()
     return std::string(buffer);
 }
 
-void MacroManager::clearActiveKeys()
+std::string MacroManager::getCurrentKeyCombination()
 {
-    activeKeysMask = 0;
-}
+    char buffer[64]; // Pre-allocate buffer for combination
+    char *ptr = buffer;
+    bool first = true;
 
-void MacroManager::processCombination(const InputEvent &event)
-{
-    std::string fullCombination = getCurrentCombination();
-
-    // Regular combination processing
-    pendingCombination = fullCombination;
-    lastCombinationTime = millis();
-}
-
-void MacroManager::update()
-{
-    unsigned long currentTime = millis();
-
-    // Controlla se il combo_delay è scaduto e se c'è una combinazione in sospeso
-    if (!pendingCombination.empty() && (currentTime - lastCombinationTime >= combo_delay))
+    // Add active keys using bitmask (WITHOUT lastAction)
+    uint8_t totalKeys = keypadConfig->rows * keypadConfig->cols;
+    for (uint8_t key = 0; key < totalKeys; key++)
     {
-        // Rilascia l'azione precedente se esiste (può essere utile per evitare doppie esecuzioni)
-        if (!lastExecutedAction.empty())
+        if (getKeyState(activeKeysMask, key))
         {
-            releaseAction(lastExecutedAction);
-            lastExecutedAction.clear();
+            if (!first)
+            {
+                *ptr++ = '+';
+            }
+            // Get key label from keypad configuration
+            uint8_t row = key / keypadConfig->cols;
+            uint8_t col = key % keypadConfig->cols;
+            char keyLabel = this->keypadConfig->keys[row][col];
+            if (keyLabel != '\0')
+            {
+                *ptr++ = keyLabel;
+            }
+            first = false;
         }
-        // Esegui la nuova combinazione
+    }
+
+    *ptr = '\0'; // Null-terminate the string
+    return std::string(buffer);
+}
+
+void MacroManager::processKeyCombination()
+{
+    // Only execute if a new key was pressed and the combo is valid
+    if (newKeyPressed && !pendingCombination.empty())
+    {
+        // Check if there is a valid combination
         if (combinations.find(pendingCombination) != combinations.end())
         {
+            // Release previous action if exists
+            if (!lastExecutedAction.empty())
+            {
+                releaseAction(lastExecutedAction);
+                lastExecutedAction.clear();
+            }
+
+            // Execute the new combination
             for (const std::string &action : combinations[pendingCombination])
             {
                 pressAction(action);
                 lastExecutedAction = action;
             }
         }
-        else
-        {
-            pressAction(pendingCombination);
-            lastExecutedAction = pendingCombination;
-        }
+
         pendingCombination.clear();
+        newKeyPressed = false; // Reset the flag
+    }
+}
+
+void MacroManager::clearActiveKeys()
+{
+    activeKeysMask = 0;
+    previousKeysMask = 0;
+    pendingCombination.clear();
+    newKeyPressed = false;
+
+    // Se c'è un'azione attiva, rilasciala
+    if (!lastExecutedAction.empty())
+    {
+        releaseAction(lastExecutedAction);
+        lastExecutedAction.clear();
+    }
+
+    lastAction.clear();
+}
+
+void MacroManager::update()
+{
+    unsigned long currentTime = millis();
+
+    // Process pending combination if the combo_delay has passed and a new key was pressed
+    if (!pendingCombination.empty() && newKeyPressed &&
+        (currentTime - lastCombinationTime >= combo_delay))
+    {
+        processKeyCombination();
     }
 
     // Gestione del timeout per eventuali gesture, debounce, ecc.
@@ -305,21 +427,20 @@ void MacroManager::update()
         }
     }
 
-    // Se il rilascio della rotazione è in sospeso e combo_delay è trascorso
-    if (rotationReleaseTime != 0 && (currentTime - rotationReleaseTime >= combo_delay))
+    // Gestione del rilascio programmato dell'encoder
+    if (encoderReleaseScheduled && currentTime >= encoderReleaseTime)
     {
-        lastAction.clear();
-        rotationReleaseTime = 0;
-        releaseAction(lastExecutedAction);
-        lastExecutedAction.clear();
+        if (!encoderPendingAction.empty())
+        {
+            releaseAction(encoderPendingAction);
+           // Logger::getInstance().log("Auto-releasing encoder action: " + String(encoderPendingAction.c_str()));
+            encoderPendingAction.clear();
+            lastExecutedAction.clear();
+        }
+        encoderReleaseScheduled = false;
     }
-    // Se non ci sono chiavi attive e nessuna azione attuale, rilascia eventuali azioni pendenti
-    if (activeKeysMask == 0 && lastAction.empty() && !lastExecutedAction.empty())
-    {
-        releaseAction(lastExecutedAction);
-        lastExecutedAction.clear();
-    }
-    Logger::getInstance().processBuffer();
+
+   // Logger::getInstance().processBuffer();
 }
 
 void MacroManager::releaseGestureActions()
