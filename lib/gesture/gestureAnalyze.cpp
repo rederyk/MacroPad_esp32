@@ -106,85 +106,103 @@ int GestureAnalyze::findKNNMatch(int k) {
     extractFeatures(&buffer, queryFeatures);
 
     // Calculate distances to all stored gestures using matrix index as ID
-std::vector<std::pair<float, int>> distances;
-for (size_t i = 0; i < numGestures; i++) {
-    // Use matrix index as gesture ID
-    const int gestureID = i;
-    //Logger::getInstance().log("Processing Gesture ID: "+String(gestureID));
+    std::vector<std::pair<float, int>> distances;
+    for (size_t i = 0; i < numGestures; i++) {
+        // Use matrix index as gesture ID
+        const int gestureID = i;
+        //Logger::getInstance().log("Processing Gesture ID: "+String(gestureID));
 
-    // Check if all samples for this gesture ID are filled with 0.0
-    bool allZero = true;
-    for (size_t s = 0; s < numSamples; s++) {
-        for (size_t f = 0; f < numFeatures; f++) {
-            if (matrix[i][s][f] != 0.0f) {
-                allZero = false;
-                break;
+        // Check if all samples for this gesture ID are filled with 0.0
+        bool allZero = true;
+        for (size_t s = 0; s < numSamples; s++) {
+            for (size_t f = 0; f < numFeatures; f++) {
+                if (matrix[i][s][f] != 0.0f) {
+                    allZero = false;
+                    break;
+                }
+            }
+            if (!allZero) break;
+        }
+
+        if (allZero) {
+            //Logger::getInstance().log("[Info] Skipping gesture ID because all samples are 0.0");
+            continue;
+        }
+
+        float minDist = FLT_MAX;
+        
+        // Find minimum distance across samples
+        for (size_t s = 0; s < numSamples; s++) {
+            float dist = 0.0f;
+            for (size_t f = 0; f < numFeatures; f++) {
+                float diff = queryFeatures[f] - matrix[i][s][f];
+                dist += diff * diff;
+            }
+            if (dist < minDist) minDist = dist;
+        }
+        
+        distances.emplace_back(sqrt(minDist), gestureID);
+    }
+
+    // Sort distances and find k nearest neighbors
+    std::sort(distances.begin(), distances.end());
+
+    Logger::getInstance().log("Distances sorted:");
+    for (const auto& entry : distances) {
+        float dist = entry.first;
+        int id = entry.second;
+        Logger::getInstance().log("Distance: "+String(dist)+", ID: "+String(id));
+    }
+
+    // Set threshold for minimum distance
+    const float distanceThreshold = 100.0f;
+    
+    // If best match exceeds threshold, return empty string (represented as -2)
+    if (distances.empty() || distances[0].first > distanceThreshold) {
+        Logger::getInstance().log("No match found within threshold distance");
+        
+        // Cleanup matrix memory
+        for (size_t i = 0; i < numGestures; i++) {
+            for (size_t s = 0; s < numSamples; s++) {
+                delete[] matrix[i][s];
+            }
+            delete[] matrix[i];
+        }
+        delete[] matrix;
+        
+        return -2;  // Special code to indicate "empty string" result
+    }
+
+    // Count votes among top k matches
+    std::unordered_map<int, int> votes;
+    for (int i = 0; i < std::min(k, static_cast<int>(distances.size())); i++) {
+        votes[distances[i].second]++;
+    }
+
+    // Find gesture with most votes, using smallest distance for ties
+    int bestMatch = -1;
+    int maxVotes = 0;
+    float minDistance = FLT_MAX;
+
+    for (const auto& entry : votes) {
+        int id = entry.first;
+        int count = entry.second;
+        
+        // Find the smallest distance for this gesture
+        float currDist = FLT_MAX;
+        for (const auto& d : distances) {
+            if (d.second == id && d.first < currDist) {
+                currDist = d.first;
             }
         }
-        if (!allZero) break;
-    }
 
-    if (allZero) {
-        //Logger::getInstance().log("[Info] Skipping gesture ID because all samples are 0.0");
-        continue;
-    }
-
-    float minDist = FLT_MAX;
-    
-    // Find minimum distance across samples
-    for (size_t s = 0; s < numSamples; s++) {
-        float dist = 0.0f;
-        for (size_t f = 0; f < numFeatures; f++) {
-            float diff = queryFeatures[f] - matrix[i][s][f];
-            dist += diff * diff;
-        }
-        if (dist < minDist) minDist = dist;
-    }
-    
-    distances.emplace_back(sqrt(minDist), gestureID);
-}
-
-// Sort distances and find k nearest neighbors
-std::sort(distances.begin(), distances.end());
-
-Logger::getInstance().log("Distances sorted:");
- for (const auto& entry : distances) {
-    float dist = entry.first;
-    int id = entry.second;
-
-    Logger::getInstance().log("Dinstance: "+String(dist)+", ID: "+String(id));
-}
-
-// Count votes among top k matches
-std::unordered_map<int, int> votes;
-for (int i = 0; i < std::min(k, static_cast<int>(distances.size())); i++) {
-    votes[distances[i].second]++;
-}
-
-// Find gesture with most votes, using smallest distance for ties
-int bestMatch = -1;
-int maxVotes = 0;
-float minDistance = FLT_MAX;
-
-for (const auto& entry : votes) {
-    int id = entry.first;
-    int count = entry.second;
-    
-    // Find the smallest distance for this gesture
-    float currDist = FLT_MAX;
-    for (const auto& d : distances) {
-        if (d.second == id && d.first < currDist) {
-            currDist = d.first;
+        if (count > maxVotes || (count == maxVotes && currDist < minDistance)) {
+            maxVotes = count;
+            bestMatch = id;
+            minDistance = currDist;
         }
     }
-
-    if (count > maxVotes || (count == maxVotes && currDist < minDistance)) {
-        maxVotes = count;
-        bestMatch = id;
-        minDistance = currDist;
-    }
-}
-Logger::getInstance().log("Best Match ID: "+String(bestMatch));
+    Logger::getInstance().log("Best Match ID: "+String(bestMatch));
 
     // Cleanup matrix memory
     for (size_t i = 0; i < numGestures; i++) {

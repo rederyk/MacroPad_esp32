@@ -71,12 +71,17 @@ String SpecialAction::getGestureID()
     else
     {
         // Get gesture ID using KNN
-        int gestureID = gestureAnalyzer.findKNNMatch(6); // Use 3 nearest neighbors
-
-        // Format return string
+        int gestureID = gestureAnalyzer.findKNNMatch(6); // Use 6 nearest neighbors
         String result = "G_ID:";
-        result += String(gestureID);
-
+        if (gestureID >= 0)
+        {
+            // Format return string
+            result += String(gestureID);
+        }
+        else
+        {
+            result = "";
+        }
         return result;
     }
 }
@@ -299,7 +304,7 @@ void SpecialAction::toggleBleWifi()
 }
 void SpecialAction::toggleAP(bool toggle)
 {
-    // Nuovo metodo per accendere in modo utile AP 
+    // Nuovo metodo per accendere in modo utile AP
     if (!LittleFS.begin(true))
     {
         Logger::getInstance().log("Failed to initialize LittleFS");
@@ -334,7 +339,6 @@ void SpecialAction::toggleAP(bool toggle)
         return;
     }
 
-
     doc["system"]["ap_autostart"] = toggle;
 
     // **Salva le modifiche nel file**
@@ -349,7 +353,6 @@ void SpecialAction::toggleAP(bool toggle)
     outFile.close();
 
     Logger::getInstance().log(String("ap_autostart set to: ") + (toggle ? "false" : "true"));
-
 }
 
 void SpecialAction::clearGestureWithID(int key)
