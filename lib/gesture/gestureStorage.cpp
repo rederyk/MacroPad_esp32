@@ -475,37 +475,6 @@ float ***GestureStorage::convertJsonToMatrix3D(size_t &numGestures, size_t &numS
 
        // Logger::getInstance().log("Loaded gesture " + String(gestureID));
     }
-    /*
-        // Normalize features
-        normalizeFeatures(matrix, numGestures, numSamples, numFeatures);
-
-        // Debug print normalized values
-        Logger::getInstance().log("Normalized matrix values:");
-        for (size_t g = 0; g < numGestures; g++) {
-            for (size_t s = 0; s < numSamples; s++) {
-                String logMessage = "Gesture " + String(g) + " Sample " + String(s) + ": ";
-                for (size_t f = 0; f < numFeatures; f++) {
-                    logMessage += String(matrix[g][s][f]) + " ";
-                }
-                Logger::getInstance().log(logMessage);
-            }
-        }
-
-        // Standardize features
-        standardizeFeatures(matrix, numGestures, numSamples, numFeatures);
-
-        // Debug print standardized values
-        Logger::getInstance().log("Standardized matrix values:");
-        for (size_t g = 0; g < numGestures; g++) {
-            for (size_t s = 0; s < numSamples; s++) {
-                String logMessage = "Gesture " + String(g) + " Sample " + String(s) + ": ";
-                for (size_t f = 0; f < numFeatures; f++) {
-                    logMessage += String(matrix[g][s][f]) + " ";
-                }
-                Logger::getInstance().log(logMessage);
-            }
-        }
-     */
     return matrix;
 }
 

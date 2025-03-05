@@ -30,6 +30,8 @@
     "1+5+9": ["CALIBRATE_SENSOR"],
     "1+2+3,BUTTON": ["TOGGLE_BLE_WIFI"],
     "1+4+7,BUTTON": ["HOP_BLE_DEVICE"],
+    "4+5+6,BUTTON": ["TOGGLE_KEY_ORDER"],
+    "9+5+7,BUTTON": ["<TOGGLE_KEY_ORDER><S_B:PasswordCorta>"],
     "7+8+9,BUTTON": ["RESET_ALL"]
   },
   "combinations_1": {
