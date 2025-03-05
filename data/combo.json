@@ -10,9 +10,9 @@
     "8": ["S_B:Down_arrow"],
     "9": ["S_B:HOME"],
     "1+3": ["S_B:SUPER+TAB"],
-    "1+5": ["S_B:SUPER+t"],
+    "1+5": ["<S_B:SUPER+t><S_B:SUPER+w><S_B:SUPER+c>"],
     "2+5": ["S_B:SUPER+w"],
-    "3+5": ["S_B:SUPER+c"],
+    "3+5": ["<S_B:parola ><S_B:spazio, altra parola >"],
     "4+5": ["S_B:CTRL+SUPER,Left_arrow"],
     "5+6": ["S_B:CTRL+SUPER,Right_arrow"],
 

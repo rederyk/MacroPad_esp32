@@ -416,7 +416,7 @@ void BLEController::BLExecutor(String action, bool pressed)
   // Process only commands that start with "S_B:"
   if (action.startsWith("S_B:"))
   {
-    // Remove the prefix "S_B:"
+    // Remove the prefix "S_B:", mantenendo gli spazi dopo il prefisso
     String cmd = action.substring(4);
 
     // Split the command into groups separated by commas.
@@ -426,7 +426,8 @@ void BLEController::BLExecutor(String action, bool pressed)
       int groupEnd = cmd.indexOf(',', groupStart);
       String group = (groupEnd == -1) ? cmd.substring(groupStart)
                                       : cmd.substring(groupStart, groupEnd);
-      group.trim();
+
+      // Non fare trim() del gruppo intero per preservare gli spazi iniziali e finali
 
       if (group.length() > 0)
       {
@@ -437,27 +438,24 @@ void BLEController::BLExecutor(String action, bool pressed)
           int tokenEnd = group.indexOf('+', tokenStart);
           String token = (tokenEnd == -1) ? group.substring(tokenStart)
                                           : group.substring(tokenStart, tokenEnd);
-          token.trim();
+
+          // Manteniamo gli spazi nel token, non usiamo trim() qui
+
+          // Per mouse e comandi speciali, dobbiamo fare trim() solo per il controllo
+          String tokenTrimmed = token;
+          tokenTrimmed.trim();
 
           if (token.length() > 0)
           {
             bool handled = false;
             delay(10);
 
-            // mouse command debug
-            //  Logger::getInstance().log("Token: " + token);
-            //  Logger::getInstance().log("Group: " + group);
-
             // Check if the token is a mouse move command.
-            if (isMouseMoveToken(token))
+            if (isMouseMoveToken(tokenTrimmed))
             {
-              String command = token.substring(11); // Remove "MOUSE_MOVE_"
+              String command = tokenTrimmed.substring(11); // Remove "MOUSE_MOVE_"
               int x = 0, y = 0, wheel = 0, hWheel = 0;
               int count = sscanf(command.c_str(), "%d_%d_%d_%d", &x, &y, &wheel, &hWheel);
-
-              // Mouse command debug
-              // Logger::getInstance().log("Parsed command: " + (command));
-              // Logger::getInstance().log("Sscanf count: " + String(count));
 
               if (count == 4)
               {
@@ -470,9 +468,9 @@ void BLEController::BLExecutor(String action, bool pressed)
               }
             }
             // Check if the token is a mouse key command.
-            else if (isMouseKeyToken(token))
+            else if (isMouseKeyToken(tokenTrimmed))
             {
-              uint8_t mouseButton = getMouseKeyToken(token);
+              uint8_t mouseButton = getMouseKeyToken(tokenTrimmed);
               if (mouseButton != 0)
               {
                 if (pressed)
@@ -483,9 +481,9 @@ void BLEController::BLExecutor(String action, bool pressed)
               }
             }
             // Check if the token is a media key.
-            else if (isMediaKeyToken(token))
+            else if (isMediaKeyToken(tokenTrimmed))
             {
-              const uint8_t *mediaKey = getMediaKeyToken(token);
+              const uint8_t *mediaKey = getMediaKeyToken(tokenTrimmed);
               if (mediaKey != nullptr)
               {
                 if (pressed)
@@ -496,9 +494,9 @@ void BLEController::BLExecutor(String action, bool pressed)
               }
             }
             // Check if the token is a special key.
-            else if (isSpecialKeyToken(token))
+            else if (isSpecialKeyToken(tokenTrimmed))
             {
-              uint8_t keyCode = mapSpecialKey(token);
+              uint8_t keyCode = mapSpecialKey(tokenTrimmed);
               if (keyCode != 0)
               {
                 if (pressed)
@@ -521,15 +519,14 @@ void BLEController::BLExecutor(String action, bool pressed)
 
             // If nothing was recognized and the token is longer than one character,
             // assume it is a string and send it as text.
-            // write accetta anche stringhe lunghe dovrmmo cambiarrne la logica
-
             if (!handled && pressed && token.length() > 0)
             {
-              //   for (int i = 0; i < token.length(); i++) {
-              //     delay(10);
-              //     Keyboard.write(token[i]);
-              //   }
-              Keyboard.print(token);
+              for (int i = 0; i < token.length(); i++)
+              {
+                delay(10);
+                Keyboard.write(token[i]);
+              }
+              // Keyboard.print(token);
             }
           }
 

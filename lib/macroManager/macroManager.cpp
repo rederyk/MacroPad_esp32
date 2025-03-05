@@ -47,61 +47,74 @@ MacroManager::MacroManager(const KeypadConfig *config, const WifiConfig *wifiCon
 std::vector<std::string> MacroManager::parseChainedCommands(const std::string &compositeAction)
 {
     std::vector<std::string> commands;
-    
+
     // Check if the action contains any <> tags
-    if (compositeAction.find('<') == std::string::npos || 
-        compositeAction.find('>') == std::string::npos) {
+    if (compositeAction.find('<') == std::string::npos ||
+        compositeAction.find('>') == std::string::npos)
+    {
         // No chained commands, just return the original action
         commands.push_back(compositeAction);
         return commands;
     }
-    
+
     // Parse out all commands enclosed in <> and any text outside
     size_t startPos = 0;
     size_t openBracket = compositeAction.find('<', startPos);
-    
+
     // Parse through the string to find all commands
-    while (startPos < compositeAction.length()) {
+    while (startPos < compositeAction.length())
+    {
         // If we have an opening bracket, look for the closing one
-        if (openBracket != std::string::npos) {
+        if (openBracket != std::string::npos)
+        {
             // If there's text before the bracket, add it as a command
-            if (openBracket > startPos) {
+            if (openBracket > startPos)
+            {
                 std::string plainCommand = compositeAction.substr(startPos, openBracket - startPos);
-                if (!plainCommand.empty()) {
+                if (!plainCommand.empty())
+                {
                     commands.push_back(plainCommand);
                 }
             }
-            
+
             // Find the matching closing bracket
             size_t closeBracket = compositeAction.find('>', openBracket);
-            if (closeBracket != std::string::npos) {
+            if (closeBracket != std::string::npos)
+            {
                 // Extract the command inside the brackets (without the brackets)
                 std::string bracketCommand = compositeAction.substr(openBracket + 1, closeBracket - openBracket - 1);
-                if (!bracketCommand.empty()) {
+                if (!bracketCommand.empty())
+                {
                     commands.push_back(bracketCommand);
                 }
-                
+
                 // Move past this command
                 startPos = closeBracket + 1;
                 openBracket = compositeAction.find('<', startPos);
-            } else {
+            }
+            else
+            {
                 // No closing bracket found, treat the rest as a single command
                 std::string remainder = compositeAction.substr(startPos);
-                if (!remainder.empty()) {
+                if (!remainder.empty())
+                {
                     commands.push_back(remainder);
                 }
                 break;
             }
-        } else {
+        }
+        else
+        {
             // No more opening brackets, add the rest as a command
             std::string remainder = compositeAction.substr(startPos);
-            if (!remainder.empty()) {
+            if (!remainder.empty())
+            {
                 commands.push_back(remainder);
             }
             break;
         }
     }
-    
+
     return commands;
 }
 
@@ -110,14 +123,15 @@ void MacroManager::enqueueCommands(const std::string &compositeAction)
 {
     // Parse the composite action into individual commands
     std::vector<std::string> commands = parseChainedCommands(compositeAction);
-    
+
     // If there's only one command and it doesn't use <> syntax, use normal execution
-    if (commands.size() == 1 && compositeAction.find('<') == std::string::npos) {
+    if (commands.size() == 1 && compositeAction.find('<') == std::string::npos)
+    {
         pressAction(commands[0]);
         lastExecutedAction = commands[0];
         return;
     }
-    
+
     // Otherwise, queue all commands for sequential execution
     // First, clear any existing queue
     commandQueue.clear();
@@ -125,10 +139,10 @@ void MacroManager::enqueueCommands(const std::string &compositeAction)
     commandQueue = commands;
     processingCommandQueue = true;
     nextCommandTime = millis();
-    
+
     // We set this flag to prevent other actions, but our queue commands will still run
     is_action_locked = true;
-    
+
     Logger::getInstance().log("Enqueued " + String(commands.size()) + " commands for sequential execution");
 }
 
@@ -136,27 +150,31 @@ void MacroManager::enqueueCommands(const std::string &compositeAction)
 void MacroManager::processCommandQueue()
 {
     unsigned long currentTime = millis();
-    
+
     // If we're not processing a queue or it's not time for the next command yet, return
-    if (!processingCommandQueue || currentTime < nextCommandTime) {
+    if (!processingCommandQueue || currentTime < nextCommandTime)
+    {
         return;
     }
-    
+
     // If the queue is empty, we're done
-    if (commandQueue.empty()) {
+    if (commandQueue.empty())
+    {
         processingCommandQueue = false;
         is_action_locked = false;
         return;
     }
-    
+
     // Get the next command from the queue
     std::string command = commandQueue.front();
     commandQueue.erase(commandQueue.begin());
-    
+
     // Handle the special marker for ending the queue
-    if (command == "__RELEASE_LAST__") {
+    if (command == "__RELEASE_LAST__")
+    {
         // Ensure we clean up properly
-        if (!lastExecutedAction.empty()) {
+        if (!lastExecutedAction.empty())
+        {
             releaseAction(lastExecutedAction);
             lastExecutedAction.clear();
         }
@@ -164,25 +182,27 @@ void MacroManager::processCommandQueue()
         is_action_locked = false;
         return;
     }
-    
+
     // Execute the command
     Logger::getInstance().log("Executing queued command: " + String(command.c_str()));
-    
+
     // Release any previous action first
-    if (!lastExecutedAction.empty()) {
+    if (!lastExecutedAction.empty())
+    {
         releaseAction(lastExecutedAction);
         lastExecutedAction.clear();
     }
-    
+
     // Press the new action
     pressAction(command);
     lastExecutedAction = command;
-    
+
     // If this was the last command, we'll release it after a delay
-    if (commandQueue.empty()) {
-        commandQueue.push_back("__RELEASE_LAST__");  // Special marker for release only
+    if (commandQueue.empty())
+    {
+        commandQueue.push_back("__RELEASE_LAST__"); // Special marker for release only
     }
-    
+
     // Schedule the next command
     nextCommandTime = currentTime + COMMAND_DELAY;
 }
@@ -259,7 +279,8 @@ void MacroManager::pressAction(const std::string &action)
 void MacroManager::releaseAction(const std::string &action)
 {
     // Skip if it's our special marker
-    if (action == "__RELEASE_LAST__") {
+    if (action == "__RELEASE_LAST__")
+    {
         processingCommandQueue = false;
         is_action_locked = false;
         return;
@@ -452,7 +473,8 @@ void MacroManager::handleInputEvent(const InputEvent &event)
                 bool hasChainedCommands = false;
                 for (const std::string &action : combinations[fullCombo])
                 {
-                    if (action.find('<') != std::string::npos && action.find('>') != std::string::npos) {
+                    if (action.find('<') != std::string::npos && action.find('>') != std::string::npos)
+                    {
                         hasChainedCommands = true;
                         enqueueCommands(action);
                         break;
@@ -460,7 +482,8 @@ void MacroManager::handleInputEvent(const InputEvent &event)
                 }
 
                 // If no chained commands, execute normally
-                if (!hasChainedCommands) {
+                if (!hasChainedCommands)
+                {
                     // Esegui l'azione
                     for (const std::string &action : combinations[fullCombo])
                     {
@@ -708,7 +731,8 @@ void MacroManager::processKeyCombination()
             bool hasChainedCommands = false;
             for (const std::string &action : combinations[pendingCombination])
             {
-                if (action.find('<') != std::string::npos && action.find('>') != std::string::npos) {
+                if (action.find('<') != std::string::npos && action.find('>') != std::string::npos)
+                {
                     hasChainedCommands = true;
                     enqueueCommands(action);
                     break;
@@ -716,7 +740,8 @@ void MacroManager::processKeyCombination()
             }
 
             // If no chained commands, execute normally
-            if (!hasChainedCommands) {
+            if (!hasChainedCommands)
+            {
                 for (const std::string &action : combinations[pendingCombination])
                 {
                     pressAction(action);
@@ -726,6 +751,13 @@ void MacroManager::processKeyCombination()
         }
         else
         {
+            // Release previous action if exists
+            if (!lastExecutedAction.empty())
+            {
+                releaseAction(lastExecutedAction);
+                lastExecutedAction.clear();
+            }
+
             Logger::getInstance().log(String("combinazione non impostata") + String(pendingCombination.c_str()));
         }
 
@@ -742,9 +774,10 @@ void MacroManager::clearActiveKeys()
     pendingCombination.clear();
     newKeyPressed = false;
     keyPressOrder.clear(); // Pulisci anche l'ordine di pressione
-    
+
     // Reset command queue if it was in progress
-    if (processingCommandQueue) {
+    if (processingCommandQueue)
+    {
         commandQueue.clear();
         processingCommandQueue = false;
         is_action_locked = false;
@@ -765,9 +798,10 @@ void MacroManager::update()
     unsigned long currentTime = millis();
 
     // Process command queue if active
-    if (processingCommandQueue) {
+    if (processingCommandQueue)
+    {
         processCommandQueue();
-        return;  // Skip other processing while queue is active
+        return; // Skip other processing while queue is active
     }
 
     // Process pending combination if the combo_delay has passed and a new key was pressed
