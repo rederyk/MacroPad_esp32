@@ -12,7 +12,10 @@
     "serial_enabled": true,
     "BleMacAdd": 0,
     "combo_timeout": 100,
-    "BleName": "Macropad_esp32"
+    "BleName": "Macropad_esp32",
+    "sleep_enabled": true,
+    "sleep_timeout_ms": 30000,
+    "wakeup_pin2": 2
   },
   "keypad": {
     "rows": 3,

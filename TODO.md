@@ -10,22 +10,18 @@ The following improvements have been identified in the code:
 
 # TODO
 
-* conrollare esecuzione gesture
+* conrollare esecuzione gesture.. [V]
 
 * impostare combo_timout dalle config
 
-* decidere un modo consistente su cosa fare con comma "," nelle macro
+* decidere un modo consistente su cosa fare con comma ","e "+" nelle macro 
+
+* nel ble, sevono caratteri di escape ","e "+" , e i CAPS per tutti INDAGARE cilco perss per singoli caratteri stringhe
+
 
 * Se cambi nome e resta un device abbinato con il nome vecchio causa un riavvio , bisogna riabbinare il device da capo ,.....forse e un problema solo del mio pc
 
-* il mouse non usa x e y esempio..
-```
-    "1+4,CW": ["MOUSE_MOVE_0_5_0_0"],
-    "1+4,CCW": ["MOUSE_MOVE_0_-5_0_0"],
-    "4+7,CW": ["MOUSE_MOVE_-5_0_0_0"],
-    "4+7,CCW": ["MOUSE_MOVE_5_0_0_0"],
-    NON VA....
-```
-* BATTERY USAGE... 
+
+* BATTERY USAGE...provare la sleep_mode con diverse batterie 
 
 * comuqnue va...

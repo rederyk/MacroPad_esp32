@@ -4,7 +4,8 @@
 #include <Arduino.h>
 #include <vector>
 
-struct KeypadConfig {
+struct KeypadConfig
+{
     byte rows;
     byte cols;
     std::vector<byte> rowPins;
@@ -13,14 +14,16 @@ struct KeypadConfig {
     bool invertDirection;
 };
 
-struct EncoderConfig {
+struct EncoderConfig
+{
     byte pinA;
     byte pinB;
     byte buttonPin;
     int stepValue;
 };
 
-struct AccelerometerConfig {
+struct AccelerometerConfig
+{
 
     byte sdaPin;
     byte sclPin;
@@ -30,14 +33,16 @@ struct AccelerometerConfig {
     String axisMap;
 };
 
-struct WifiConfig {
+struct WifiConfig
+{
     String ap_ssid;
     String ap_password;
     String router_ssid;
     String router_password;
 };
 
-struct SystemConfig {
+struct SystemConfig
+{
     bool ap_autostart;
     bool router_autostart;
     bool enable_BLE;
@@ -45,6 +50,11 @@ struct SystemConfig {
     int BleMacAdd;
     int combo_timeout;
     String BleName;
+    // Nuovi campi per la gestione del power
+    bool sleep_enabled;             // Abilitare il sleep mode
+    unsigned long sleep_timeout_ms; // Timeout di inattività in millisecondi
+    gpio_num_t wakeup_pin;                 // Pin GPIO per il wakeup
+    gpio_num_t wakeup_pin2;                 // altro Pin GPIO per il wakeup
 };
 
 #endif

@@ -17,6 +17,7 @@
 #include "gestureAnalyze.h"
 #include "WIFIManager.h"
 #include "specialAction.h"
+#include "powerManager.h"
 
 WIFIManager wifiManager; // Create an instance of WIFIManager
 
@@ -28,6 +29,8 @@ struct TimedEvent
 };
 
 ConfigurationManager configManager;
+// Aggiungi l'istanza del PowerManager tra le altre variabili globali
+PowerManager powerManager;
 CombinationManager comboManager;
 GestureRead gestureSensor; // Definizione effettiva (deve rimanere UNICA)
 GestureAnalyze gestureAnalyzer(gestureSensor);
@@ -83,6 +86,9 @@ void setup()
     }
 
     logger.setSerialEnabled(serialEnabled);
+    // Inizializza il PowerManager con la configurazione
+    powerManager.begin(configManager.getSystemConfig(), configManager.getKeypadConfig());
+
     // Load combinations
     if (!comboManager.loadCombinations(configManager.getSystemConfig().BleMacAdd))
     {
@@ -242,6 +248,8 @@ void mainLoopTask(void *parameter)
             {
                 eventBuffer.push(timedEvent);
             }
+            // Registra attività utente
+            powerManager.registerActivity();
         }
 
         // Check for encoder events
@@ -254,6 +262,8 @@ void mainLoopTask(void *parameter)
             {
                 eventBuffer.push(timedEvent);
             }
+            // Registra attività utente
+            powerManager.registerActivity();
         }
 
         // Process buffered events
@@ -265,6 +275,19 @@ void mainLoopTask(void *parameter)
 
         // Update macro manager
         macroManager.update();
+
+        // Controlla inattività per sleep mode (solo in BLE mode)
+        if (powerManager.checkInactivity())
+        {
+            Logger::getInstance().log("Inactivity detected, entering sleep mode...");
+
+            // Svuota il buffer del logger
+            Logger::getInstance().processBuffer();
+
+            // Entra in sleep mode
+            powerManager.enterDeepSleep();
+            //powerManager.enterDeepSleepWithMultipleWakeupPins();
+        }
 
         Logger::getInstance().processBuffer();
         // Maintain consistent timing
