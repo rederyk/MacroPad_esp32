@@ -156,109 +156,109 @@ void BLEController::incrementName(int increment)
 // TODO usare strighe fisse e prenderle dal json
 bool isMediaKeyToken(const String &token)
 {
-  return token.equalsIgnoreCase("VOL_UP") ||
-         token.equalsIgnoreCase("VOL_DOWN") ||
-         token.equalsIgnoreCase("NEXT_TRACK") ||
-         token.equalsIgnoreCase("PREVIOUS_TRACK") ||
-         token.equalsIgnoreCase("STOP") ||
-         token.equalsIgnoreCase("PLAY_PAUSE") ||
-         token.equalsIgnoreCase("MUTE") ||
-         token.equalsIgnoreCase("WWW_HOME") ||
-         token.equalsIgnoreCase("LOCAL_MACHINE_BROWSER") ||
-         token.equalsIgnoreCase("CALCULATOR") ||
-         token.equalsIgnoreCase("WWW_BOOKMARKS") ||
-         token.equalsIgnoreCase("WWW_SEARCH") ||
-         token.equalsIgnoreCase("WWW_STOP") ||
-         token.equalsIgnoreCase("WWW_BACK") ||
-         token.equalsIgnoreCase("CONSUMER_CONTROL_CONFIGURATION") ||
-         token.equalsIgnoreCase("EMAIL_READER");
+  return token.equals("VOL_UP") ||
+         token.equals("VOL_DOWN") ||
+         token.equals("NEXT_TRACK") ||
+         token.equals("PREVIOUS_TRACK") ||
+         token.equals("STOP") ||
+         token.equals("PLAY_PAUSE") ||
+         token.equals("MUTE") ||
+         token.equals("WWW_HOME") ||
+         token.equals("LOCAL_MACHINE_BROWSER") ||
+         token.equals("CALCULATOR") ||
+         token.equals("WWW_BOOKMARKS") ||
+         token.equals("WWW_SEARCH") ||
+         token.equals("WWW_STOP") ||
+         token.equals("WWW_BACK") ||
+         token.equals("CONSUMER_CONTROL_CONFIGURATION") ||
+         token.equals("EMAIL_READER");
 }
 
 // Verifica se il token corrisponde a una special key
 bool isSpecialKeyToken(const String &token)
 {
-  return token.equalsIgnoreCase("CTRL") ||
-         token.equalsIgnoreCase("SHIFT") ||
-         token.equalsIgnoreCase("ALT") ||
-         token.equalsIgnoreCase("SUPER") ||
-         token.equalsIgnoreCase("RIGHT_CTRL") ||
-         token.equalsIgnoreCase("RIGHT_SHIFT") ||
-         token.equalsIgnoreCase("RIGHT_ALT") ||
-         token.equalsIgnoreCase("RIGHT_GUI") ||
-         token.equalsIgnoreCase("UP_ARROW") ||
-         token.equalsIgnoreCase("DOWN_ARROW") ||
-         token.equalsIgnoreCase("LEFT_ARROW") ||
-         token.equalsIgnoreCase("RIGHT_ARROW") ||
-         token.equalsIgnoreCase("BACKSPACE") ||
-         token.equalsIgnoreCase("TAB") ||
-         token.equalsIgnoreCase("RETURN") ||
-         token.equalsIgnoreCase("ESC") ||
-         token.equalsIgnoreCase("INSERT") ||
-         token.equalsIgnoreCase("DELETE") ||
-         token.equalsIgnoreCase("PAGE_UP") ||
-         token.equalsIgnoreCase("PAGE_DOWN") ||
-         token.equalsIgnoreCase("HOME") ||
-         token.equalsIgnoreCase("END") ||
-         token.equalsIgnoreCase("CAPS_LOCK") ||
-         token.equalsIgnoreCase("F1") ||
-         token.equalsIgnoreCase("F2") ||
-         token.equalsIgnoreCase("F3") ||
-         token.equalsIgnoreCase("F4") ||
-         token.equalsIgnoreCase("F5") ||
-         token.equalsIgnoreCase("F6") ||
-         token.equalsIgnoreCase("F7") ||
-         token.equalsIgnoreCase("F8") ||
-         token.equalsIgnoreCase("F9") ||
-         token.equalsIgnoreCase("F10") ||
-         token.equalsIgnoreCase("F11") ||
-         token.equalsIgnoreCase("F12") ||
-         token.equalsIgnoreCase("F13") ||
-         token.equalsIgnoreCase("F14") ||
-         token.equalsIgnoreCase("F15") ||
-         token.equalsIgnoreCase("F16") ||
-         token.equalsIgnoreCase("F17") ||
-         token.equalsIgnoreCase("F18") ||
-         token.equalsIgnoreCase("F19") ||
-         token.equalsIgnoreCase("F20") ||
-         token.equalsIgnoreCase("F21") ||
-         token.equalsIgnoreCase("F22") ||
-         token.equalsIgnoreCase("F23") ||
-         token.equalsIgnoreCase("F24");
+  return token.equals("CTRL") ||
+         token.equals("SHIFT") ||
+         token.equals("ALT") ||
+         token.equals("SUPER") ||
+         token.equals("RIGHT_CTRL") ||
+         token.equals("RIGHT_SHIFT") ||
+         token.equals("RIGHT_ALT") ||
+         token.equals("RIGHT_GUI") ||
+         token.equals("UP_ARROW") ||
+         token.equals("DOWN_ARROW") ||
+         token.equals("LEFT_ARROW") ||
+         token.equals("RIGHT_ARROW") ||
+         token.equals("BACKSPACE") ||
+         token.equals("TAB") ||
+         token.equals("RETURN") ||
+         token.equals("ESC") ||
+         token.equals("INSERT") ||
+         token.equals("DELETE") ||
+         token.equals("PAGE_UP") ||
+         token.equals("PAGE_DOWN") ||
+         token.equals("HOME") ||
+         token.equals("END") ||
+         token.equals("CAPS_LOCK") ||
+         token.equals("F1") ||
+         token.equals("F2") ||
+         token.equals("F3") ||
+         token.equals("F4") ||
+         token.equals("F5") ||
+         token.equals("F6") ||
+         token.equals("F7") ||
+         token.equals("F8") ||
+         token.equals("F9") ||
+         token.equals("F10") ||
+         token.equals("F11") ||
+         token.equals("F12") ||
+         token.equals("F13") ||
+         token.equals("F14") ||
+         token.equals("F15") ||
+         token.equals("F16") ||
+         token.equals("F17") ||
+         token.equals("F18") ||
+         token.equals("F19") ||
+         token.equals("F20") ||
+         token.equals("F21") ||
+         token.equals("F22") ||
+         token.equals("F23") ||
+         token.equals("F24");
 }
 
 const uint8_t *getMediaKeyToken(const String &token)
 {
-  if (token.equalsIgnoreCase("NEXT_TRACK"))
+  if (token.equals("NEXT_TRACK"))
     return KEY_MEDIA_NEXT_TRACK;
-  else if (token.equalsIgnoreCase("PREVIOUS_TRACK"))
+  else if (token.equals("PREVIOUS_TRACK"))
     return KEY_MEDIA_PREVIOUS_TRACK;
-  else if (token.equalsIgnoreCase("STOP"))
+  else if (token.equals("STOP"))
     return KEY_MEDIA_STOP;
-  else if (token.equalsIgnoreCase("PLAY_PAUSE"))
+  else if (token.equals("PLAY_PAUSE"))
     return KEY_MEDIA_PLAY_PAUSE;
-  else if (token.equalsIgnoreCase("MUTE"))
+  else if (token.equals("MUTE"))
     return KEY_MEDIA_MUTE;
-  else if (token.equalsIgnoreCase("VOL_UP"))
+  else if (token.equals("VOL_UP"))
     return KEY_MEDIA_VOLUME_UP;
-  else if (token.equalsIgnoreCase("VOL_DOWN"))
+  else if (token.equals("VOL_DOWN"))
     return KEY_MEDIA_VOLUME_DOWN;
-  else if (token.equalsIgnoreCase("WWW_HOME"))
+  else if (token.equals("WWW_HOME"))
     return KEY_MEDIA_WWW_HOME;
-  else if (token.equalsIgnoreCase("LOCAL_MACHINE_BROWSER"))
+  else if (token.equals("LOCAL_MACHINE_BROWSER"))
     return KEY_MEDIA_LOCAL_MACHINE_BROWSER;
-  else if (token.equalsIgnoreCase("CALCULATOR"))
+  else if (token.equals("CALCULATOR"))
     return KEY_MEDIA_CALCULATOR;
-  else if (token.equalsIgnoreCase("WWW_BOOKMARKS"))
+  else if (token.equals("WWW_BOOKMARKS"))
     return KEY_MEDIA_WWW_BOOKMARKS;
-  else if (token.equalsIgnoreCase("WWW_SEARCH"))
+  else if (token.equals("WWW_SEARCH"))
     return KEY_MEDIA_WWW_SEARCH;
-  else if (token.equalsIgnoreCase("WWW_STOP"))
+  else if (token.equals("WWW_STOP"))
     return KEY_MEDIA_WWW_STOP;
-  else if (token.equalsIgnoreCase("WWW_BACK"))
+  else if (token.equals("WWW_BACK"))
     return KEY_MEDIA_WWW_BACK;
-  else if (token.equalsIgnoreCase("CONSUMER_CONTROL_CONFIGURATION"))
+  else if (token.equals("CONSUMER_CONTROL_CONFIGURATION"))
     return KEY_MEDIA_CONSUMER_CONTROL_CONFIGURATION;
-  else if (token.equalsIgnoreCase("EMAIL_READER"))
+  else if (token.equals("EMAIL_READER"))
     return KEY_MEDIA_EMAIL_READER;
   return nullptr;
 }
@@ -272,99 +272,99 @@ void BLEController::moveMouse(signed char x, signed char y, signed char wheel, s
 
 uint8_t mapSpecialKey(const String &token)
 {
-  if (token.equalsIgnoreCase("CTRL"))
+  if (token.equals("CTRL"))
     return KEY_LEFT_CTRL;
-  else if (token.equalsIgnoreCase("SHIFT"))
+  else if (token.equals("SHIFT"))
     return KEY_LEFT_SHIFT;
-  else if (token.equalsIgnoreCase("ALT"))
+  else if (token.equals("ALT"))
     return KEY_LEFT_ALT;
-  else if (token.equalsIgnoreCase("SUPER"))
+  else if (token.equals("SUPER"))
     return KEY_LEFT_GUI;
-  else if (token.equalsIgnoreCase("RIGHT_CTRL"))
+  else if (token.equals("RIGHT_CTRL"))
     return KEY_RIGHT_CTRL;
-  else if (token.equalsIgnoreCase("RIGHT_SHIFT"))
+  else if (token.equals("RIGHT_SHIFT"))
     return KEY_RIGHT_SHIFT;
-  else if (token.equalsIgnoreCase("RIGHT_ALT"))
+  else if (token.equals("RIGHT_ALT"))
     return KEY_RIGHT_ALT;
-  else if (token.equalsIgnoreCase("RIGHT_GUI"))
+  else if (token.equals("RIGHT_GUI"))
     return KEY_RIGHT_GUI;
-  else if (token.equalsIgnoreCase("UP_ARROW"))
+  else if (token.equals("UP_ARROW"))
     return KEY_UP_ARROW;
-  else if (token.equalsIgnoreCase("DOWN_ARROW"))
+  else if (token.equals("DOWN_ARROW"))
     return KEY_DOWN_ARROW;
-  else if (token.equalsIgnoreCase("LEFT_ARROW"))
+  else if (token.equals("LEFT_ARROW"))
     return KEY_LEFT_ARROW;
-  else if (token.equalsIgnoreCase("RIGHT_ARROW"))
+  else if (token.equals("RIGHT_ARROW"))
     return KEY_RIGHT_ARROW;
-  else if (token.equalsIgnoreCase("BACKSPACE"))
+  else if (token.equals("BACKSPACE"))
     return KEY_BACKSPACE;
-  else if (token.equalsIgnoreCase("TAB"))
+  else if (token.equals("TAB"))
     return KEY_TAB;
-  else if (token.equalsIgnoreCase("RETURN"))
+  else if (token.equals("RETURN"))
     return KEY_RETURN;
-  else if (token.equalsIgnoreCase("ESC"))
+  else if (token.equals("ESC"))
     return KEY_ESC;
-  else if (token.equalsIgnoreCase("INSERT"))
+  else if (token.equals("INSERT"))
     return KEY_INSERT;
-  else if (token.equalsIgnoreCase("DELETE"))
+  else if (token.equals("DELETE"))
     return KEY_DELETE;
-  else if (token.equalsIgnoreCase("PAGE_UP"))
+  else if (token.equals("PAGE_UP"))
     return KEY_PAGE_UP;
-  else if (token.equalsIgnoreCase("PAGE_DOWN"))
+  else if (token.equals("PAGE_DOWN"))
     return KEY_PAGE_DOWN;
-  else if (token.equalsIgnoreCase("HOME"))
+  else if (token.equals("HOME"))
     return KEY_HOME;
-  else if (token.equalsIgnoreCase("END"))
+  else if (token.equals("END"))
     return KEY_END;
-  else if (token.equalsIgnoreCase("CAPS_LOCK"))
+  else if (token.equals("CAPS_LOCK"))
     return KEY_CAPS_LOCK;
-  else if (token.equalsIgnoreCase("F1"))
+  else if (token.equals("F1"))
     return KEY_F1;
-  else if (token.equalsIgnoreCase("F2"))
+  else if (token.equals("F2"))
     return KEY_F2;
-  else if (token.equalsIgnoreCase("F3"))
+  else if (token.equals("F3"))
     return KEY_F3;
-  else if (token.equalsIgnoreCase("F4"))
+  else if (token.equals("F4"))
     return KEY_F4;
-  else if (token.equalsIgnoreCase("F5"))
+  else if (token.equals("F5"))
     return KEY_F5;
-  else if (token.equalsIgnoreCase("F6"))
+  else if (token.equals("F6"))
     return KEY_F6;
-  else if (token.equalsIgnoreCase("F7"))
+  else if (token.equals("F7"))
     return KEY_F7;
-  else if (token.equalsIgnoreCase("F8"))
+  else if (token.equals("F8"))
     return KEY_F8;
-  else if (token.equalsIgnoreCase("F9"))
+  else if (token.equals("F9"))
     return KEY_F9;
-  else if (token.equalsIgnoreCase("F10"))
+  else if (token.equals("F10"))
     return KEY_F10;
-  else if (token.equalsIgnoreCase("F11"))
+  else if (token.equals("F11"))
     return KEY_F11;
-  else if (token.equalsIgnoreCase("F12"))
+  else if (token.equals("F12"))
     return KEY_F12;
-  else if (token.equalsIgnoreCase("F13"))
+  else if (token.equals("F13"))
     return KEY_F13;
-  else if (token.equalsIgnoreCase("F14"))
+  else if (token.equals("F14"))
     return KEY_F14;
-  else if (token.equalsIgnoreCase("F15"))
+  else if (token.equals("F15"))
     return KEY_F15;
-  else if (token.equalsIgnoreCase("F16"))
+  else if (token.equals("F16"))
     return KEY_F16;
-  else if (token.equalsIgnoreCase("F17"))
+  else if (token.equals("F17"))
     return KEY_F17;
-  else if (token.equalsIgnoreCase("F18"))
+  else if (token.equals("F18"))
     return KEY_F18;
-  else if (token.equalsIgnoreCase("F19"))
+  else if (token.equals("F19"))
     return KEY_F19;
-  else if (token.equalsIgnoreCase("F20"))
+  else if (token.equals("F20"))
     return KEY_F20;
-  else if (token.equalsIgnoreCase("F21"))
+  else if (token.equals("F21"))
     return KEY_F21;
-  else if (token.equalsIgnoreCase("F22"))
+  else if (token.equals("F22"))
     return KEY_F22;
-  else if (token.equalsIgnoreCase("F23"))
+  else if (token.equals("F23"))
     return KEY_F23;
-  else if (token.equalsIgnoreCase("F24"))
+  else if (token.equals("F24"))
     return KEY_F24;
   else
   {
@@ -378,25 +378,25 @@ uint8_t mapSpecialKey(const String &token)
 bool isMouseKeyToken(String token)
 {
   token.trim();
-  return token.equalsIgnoreCase("MOUSE_LEFT") ||
-         token.equalsIgnoreCase("MOUSE_RIGHT") ||
-         token.equalsIgnoreCase("MOUSE_MIDDLE") ||
-         token.equalsIgnoreCase("MOUSE_BACK") ||
-         token.equalsIgnoreCase("MOUSE_FORWARD");
+  return token.equals("MOUSE_LEFT") ||
+         token.equals("MOUSE_RIGHT") ||
+         token.equals("MOUSE_MIDDLE") ||
+         token.equals("MOUSE_BACK") ||
+         token.equals("MOUSE_FORWARD");
 }
 
 uint8_t getMouseKeyToken(String token)
 {
   token.trim();
-  if (token.equalsIgnoreCase("MOUSE_LEFT"))
+  if (token.equals("MOUSE_LEFT"))
     return MOUSE_LEFT;
-  else if (token.equalsIgnoreCase("MOUSE_RIGHT"))
+  else if (token.equals("MOUSE_RIGHT"))
     return MOUSE_RIGHT;
-  else if (token.equalsIgnoreCase("MOUSE_MIDDLE"))
+  else if (token.equals("MOUSE_MIDDLE"))
     return MOUSE_MIDDLE;
-  else if (token.equalsIgnoreCase("MOUSE_BACK"))
+  else if (token.equals("MOUSE_BACK"))
     return MOUSE_BACK;
-  else if (token.equalsIgnoreCase("MOUSE_FORWARD"))
+  else if (token.equals("MOUSE_FORWARD"))
     return MOUSE_FORWARD;
 
   return 0; // No valid mouse token found.
@@ -416,133 +416,208 @@ void BLEController::BLExecutor(String action, bool pressed)
   // Process only commands that start with "S_B:"
   if (action.startsWith("S_B:"))
   {
-    // Remove the prefix "S_B:", mantenendo gli spazi dopo il prefisso
+    // Remove the prefix "S_B:"
     String cmd = action.substring(4);
+    cmd.trim(); // Trim any whitespace
 
-    // Split the command into groups separated by commas.
-    int groupStart = 0;
-    while (true)
+    // Handle special cases for literal + and , characters
+    if (cmd.equals("++"))
     {
-      int groupEnd = cmd.indexOf(',', groupStart);
-      String group = (groupEnd == -1) ? cmd.substring(groupStart)
-                                      : cmd.substring(groupStart, groupEnd);
+      if (pressed)
+        Keyboard.press('+');
+      else
+        Keyboard.release('+');
+      return;
+    }
+    else if (cmd.equals(",,"))
+    {
+      if (pressed)
+        Keyboard.press(',');
+      else
+        Keyboard.release(',');
+      return;
+    }
 
-      // Non fare trim() del gruppo intero per preservare gli spazi iniziali e finali
+    // Split the command into groups separated by commas
+    // Better approach: use a dedicated parsing function
+    String groups[10]; // Assuming max 10 groups
+    int groupCount = 0;
+    int startIndex = 0;
+    bool inEscape = false;
 
-      if (group.length() > 0)
+    for (int i = 0; i < cmd.length(); i++)
+    {
+      if (cmd[i] == ',' && !inEscape)
       {
-        // Within each group, tokens are separated by '+'
-        int tokenStart = 0;
-        while (true)
+        if (i > startIndex)
         {
-          int tokenEnd = group.indexOf('+', tokenStart);
-          String token = (tokenEnd == -1) ? group.substring(tokenStart)
-                                          : group.substring(tokenStart, tokenEnd);
+          groups[groupCount++] = cmd.substring(startIndex, i);
+        }
+        startIndex = i + 1;
+      }
+      else if (cmd[i] == '+' && i + 1 < cmd.length() && cmd[i + 1] == '+')
+      {
+        inEscape = !inEscape;
+        i++; // Skip the next +
+      }
+    }
 
-          // Manteniamo gli spazi nel token, non usiamo trim() qui
+    // Add the last group
+    if (startIndex < cmd.length())
+    {
+      groups[groupCount++] = cmd.substring(startIndex);
+    }
 
-          // Per mouse e comandi speciali, dobbiamo fare trim() solo per il controllo
-          String tokenTrimmed = token;
-          tokenTrimmed.trim();
+    // Process each group
+    for (int g = 0; g < groupCount; g++)
+    {
+      String group = groups[g];
 
-          if (token.length() > 0)
+      // Split tokens by +
+      String tokens[10]; // Assuming max 10 tokens per group
+      int tokenCount = 0;
+      startIndex = 0;
+      inEscape = false;
+
+      for (int i = 0; i < group.length(); i++)
+      {
+        if (group[i] == '+' && !inEscape)
+        {
+          if (i > startIndex)
           {
-            bool handled = false;
-            delay(10);
-
-            // Check if the token is a mouse move command.
-            if (isMouseMoveToken(tokenTrimmed))
-            {
-              String command = tokenTrimmed.substring(11); // Remove "MOUSE_MOVE_"
-              int x = 0, y = 0, wheel = 0, hWheel = 0;
-              int count = sscanf(command.c_str(), "%d_%d_%d_%d", &x, &y, &wheel, &hWheel);
-
-              if (count == 4)
-              {
-                moveMouse((signed char)x, (signed char)y, (signed char)wheel, (signed char)hWheel);
-                handled = true;
-              }
-              else
-              {
-                Logger::getInstance().log("Invalid MOUSE_MOVE command: " + token);
-              }
-            }
-            // Check if the token is a mouse key command.
-            else if (isMouseKeyToken(tokenTrimmed))
-            {
-              uint8_t mouseButton = getMouseKeyToken(tokenTrimmed);
-              if (mouseButton != 0)
-              {
-                if (pressed)
-                  Mouse.press(mouseButton);
-                else
-                  Mouse.release(mouseButton);
-                handled = true;
-              }
-            }
-            // Check if the token is a media key.
-            else if (isMediaKeyToken(tokenTrimmed))
-            {
-              const uint8_t *mediaKey = getMediaKeyToken(tokenTrimmed);
-              if (mediaKey != nullptr)
-              {
-                if (pressed)
-                  Keyboard.press(mediaKey);
-                else
-                  Keyboard.release(mediaKey);
-                handled = true;
-              }
-            }
-            // Check if the token is a special key.
-            else if (isSpecialKeyToken(tokenTrimmed))
-            {
-              uint8_t keyCode = mapSpecialKey(tokenTrimmed);
-              if (keyCode != 0)
-              {
-                if (pressed)
-                  Keyboard.press(keyCode);
-                else
-                  Keyboard.release(keyCode);
-                handled = true;
-              }
-            }
-            // If the token is a single character, convert it to uint8_t.
-            else if (token.length() == 1)
-            {
-              uint8_t keyCode = (uint8_t)token.charAt(0);
-              if (pressed)
-                Keyboard.press(keyCode);
-              else
-                Keyboard.release(keyCode);
-              handled = true;
-            }
-
-            // If nothing was recognized and the token is longer than one character,
-            // assume it is a string and send it as text.
-            if (!handled && pressed && token.length() > 0)
-            {
-              for (int i = 0; i < token.length(); i++)
-              {
-                delay(10);
-                Keyboard.write(token[i]);
-              }
-              // Keyboard.print(token);
-            }
+            tokens[tokenCount++] = group.substring(startIndex, i);
           }
-
-          if (tokenEnd == -1)
-            break;
-          tokenStart = tokenEnd + 1;
-        } // End of token loop.
+          startIndex = i + 1;
+        }
+        else if (group[i] == '+' && i + 1 < group.length() && group[i + 1] == '+')
+        {
+          inEscape = !inEscape;
+          i++; // Skip the next +
+        }
       }
 
-      if (groupEnd == -1)
-        break;
-      groupStart = groupEnd + 1;
-    } // End of group loop.
+      // Add the last token
+      if (startIndex < group.length())
+      {
+        tokens[tokenCount++] = group.substring(startIndex);
+      }
+
+      // Process tokens
+      for (int t = 0; t < tokenCount; t++)
+      {
+        String token = tokens[t];
+        token.trim();
+
+        // Replace escaped characters
+        token.replace("++", "+");
+        token.replace(",,", ",");
+
+        // Process the token
+        if (isMouseMoveToken(token))
+        {
+          // Handle mouse move
+          String command = token.substring(11); // Remove "MOUSE_MOVE_"
+          int x = 0, y = 0, wheel = 0, hWheel = 0;
+          int count = sscanf(command.c_str(), "%d_%d_%d_%d", &x, &y, &wheel, &hWheel);
+
+          if (count == 4)
+          {
+            moveMouse((signed char)x, (signed char)y, (signed char)wheel, (signed char)hWheel);
+            Logger::getInstance().log("Mouse moved: " + String(x) + "," + String(y));
+          }
+          else
+          {
+            Logger::getInstance().log("Invalid MOUSE_MOVE command: " + token);
+          }
+        }
+        else if (isMouseKeyToken(token))
+
+        {
+          // Handle mouse button
+          uint8_t mouseButton = getMouseKeyToken(token);
+          if (mouseButton != 0)
+          {
+            if (pressed)
+              Mouse.press(mouseButton);
+            else
+              Mouse.release(mouseButton);
+            Logger::getInstance().log("Mouse button: " + token + (pressed ? " pressed" : " released"));
+          }
+        }
+        else if (isMediaKeyToken(token))
+        {
+          // Handle media key
+          const uint8_t *mediaKey = getMediaKeyToken(token);
+          if (mediaKey != nullptr)
+          {
+            if (pressed)
+              Keyboard.press(mediaKey);
+            // Keyboard.write(mediaKey);
+            else
+              Keyboard.release(mediaKey);
+            Logger::getInstance().log("Media key: " + token + (pressed ? " pressed" : " released"));
+          }
+        }
+        else if (isSpecialKeyToken(token))
+        {
+          // Handle special key
+          uint8_t keyCode = mapSpecialKey(token);
+          if (keyCode != 0)
+          {
+            if (pressed)
+              Keyboard.press(keyCode);
+            else
+              Keyboard.release(keyCode);
+            Logger::getInstance().log("Special key: " + token + (pressed ? " pressed" : " released"));
+          }
+        }
+        else if (token.length() == 1)
+        {
+          // Handle single character - improve mapping for non-ASCII chars
+          char c = token.charAt(0);
+          if (pressed)
+          {
+            // Map character to HID code
+            Keyboard.press(c);
+            Logger::getInstance().log("Character pressed: " + String(c));
+          }
+          else
+          {
+            Keyboard.release(c);
+            Logger::getInstance().log("Character released: " + String(c));
+          }
+        }
+        else if (token.length() > 1)
+        {
+          if (pressed)
+          {
+            // Handle text string - use a better approach
+            Logger::getInstance().log("Printing string: " + token);
+            // Use the print method which handles the mapping internally
+            Keyboard.print(String(token));
+            // No need for character-by-character with delays
+          }
+          else
+          {
+
+            // chissa che vada davverp......
+            Keyboard.releaseAll();
+          }
+          /// il problema dovrebbe essere nei press multpili ,
+          // quando ce un carattere CASE blecombo usa in contemporanea lo SHIFT ma,
+          // quando si preme due tasti con lo shift insieme succedono guai
+          // soluzione controlla e gestisci lo shift internamente assegnando ad ogni carattere un valore CAPS true o false
+          // convertendo la stringa in minuscolo per poi premere e rilasciare nel modo corretto SHIFT
+          /// altri forse
+          // TIenI CONTO DEL LAYOUT E FAI DELLE PROVE CON QUELLO ITA
+          // impostare anche una variabile per scegliere il layout?????? indagare se blecombo supporta i layout ....
+        }
+      }
+    }
   }
   else
   {
-    // Handle other commands (e.g., AP_MODE, MEM_INFO) if necessary.
+    Logger::getInstance().log("No valid command found to send BLE");
+    return;
   }
 }

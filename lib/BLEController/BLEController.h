@@ -18,6 +18,7 @@ private:
     bool statoPrecedente;
     String originalName;
     uint8_t originalMAC[6];
+    char pressed_Char = '\0'; // null character to represent "no character pressed"
 
     // Funzione privata per stampare il MAC in formato leggibile.
     void printMacAddress(const uint8_t *mac);
