@@ -260,6 +260,15 @@ void MacroManager::pressAction(const std::string &action)
     {
         specialAction.hopBleDevice();
     }
+    else if (action.rfind("DELAY_", 0) == 0)
+    {
+        // Estrae il valore del delay in ms
+        std::string delayStr = action.substr(6);
+        int totalDelayMs = std::stoi(delayStr);
+
+        specialAction.actionDelay(totalDelayMs);
+    }
+
     // Is useless now??
     else if (action == "AP_MODE")
     {

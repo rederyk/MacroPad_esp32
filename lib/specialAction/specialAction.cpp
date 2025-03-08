@@ -20,6 +20,63 @@ void SpecialAction::resetDevice()
     ESP.restart();
 }
 
+void SpecialAction::actionDelay(int totalDelayMs)
+{
+    // Calcola il numero di passi basato su 100ms per puntino
+    const int dotIntervalMs = 100;                                  // Un puntino ogni 100ms
+    int steps = (totalDelayMs + dotIntervalMs - 1) / dotIntervalMs; // Arrotonda per eccesso
+    int intervalMs = dotIntervalMs;
+
+    // Simboli per migliorare la visualizzazione
+    const char *symbols[] = {"⏱️", "⌛", "⏳"};
+    int symbolIndex = 0;
+
+    // Esegue il countdown
+    for (int i = steps; i >= 0; i--)
+    {
+        // Cambia simbolo ogni 3 iterazioni per creare animazione
+        symbolIndex = (steps - i) % 3;
+
+        // Calcola ms rimanenti
+        int remainingMs = i * intervalMs;
+        if (remainingMs > totalDelayMs)
+            remainingMs = totalDelayMs; // Previene valori superiori al totale
+
+        // Formatta i ms: se > 1000, mostra secondi, altrimenti ms
+        std::string timeDisplay;
+        if (remainingMs >= 1000)
+        {
+            float seconds = remainingMs / 1000.0f;
+            char buffer[10];
+            sprintf(buffer, "%.1fs", seconds);
+            timeDisplay = buffer;
+        }
+        else
+        {
+            timeDisplay = std::to_string(remainingMs) + "ms";
+        }
+
+        // Crea barra di progresso con puntini (un puntino ogni 100ms circa)
+        std::string progressBar = "[";
+        for (int j = 0; j < steps; j++)
+        {
+            progressBar += (j < i) ? "." : " ";
+        }
+        progressBar += "]";
+
+        // Log pulito e informativo
+        Logger::getInstance().log(symbols[symbolIndex] + String(" ") +
+                                  String(progressBar.c_str()) + " " +
+                                  String(timeDisplay.c_str()));
+        Logger::getInstance().processBuffer();
+
+        if (i > 0)
+        {
+            delay(intervalMs);
+        }
+    }
+}
+
 int SpecialAction::getKeypadInput(unsigned long timeout)
 {
     unsigned long startTime = millis();

@@ -4,26 +4,28 @@
 
 #include <Arduino.h>
 
-class SpecialAction {
+class SpecialAction
+{
 public:
     /// System commands
     void resetDevice();
-    
+    void actionDelay(int totalDelayMs);
+
     /// Sensor management
     void calibrateSensor();
     void toggleSampling(bool pressed);
-    
+
     /// Gesture handling
-    bool saveGesture(int id);  // Returns success status
+    bool saveGesture(int id); // Returns success status
     void clearAllGestures();
-    void clearGestureWithID(int key=-1);
-    
+    void clearGestureWithID(int key = -1);
+
     /// Data conversion
     bool convertJsonToBinary(); // Returns success status
-    void printJson(); // Prints JSON data
-    
+    void printJson();           // Prints JSON data
+
     /// Gesture training
-    void trainGesture(bool pressed ,int key=-1);
+    void trainGesture(bool pressed, int key = -1);
     String getGestureID();
 
     void printMemoryInfo();
@@ -31,7 +33,6 @@ public:
     void hopBleDevice();
     void toggleBleWifi();
     void toggleAP(bool toogle);
-   
 
 private:
     int getKeypadInput(unsigned long timeout);
