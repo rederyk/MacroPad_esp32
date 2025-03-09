@@ -132,6 +132,8 @@ void setup()
     if (!gestureSensor.begin())
     {
         Logger::getInstance().log("Could not find ADXL345 sensor. Check wiring!");
+        // TODO rendere acceleroemtro opzionale
+
         while (1)
             ;
     }
@@ -171,11 +173,11 @@ void setup()
 
         int mac = systemConfig.BleMacAdd;
         bleController.incrementMacAddress(mac);
-        delay(100);
+        delay(20);
         bleController.incrementName(mac);
-        delay(100);
+        delay(20);
         bleController.startBluetooth();
-        delay(100);
+        delay(20);
 
         Logger::getInstance().log("Free heap after Bluetooth start: " + String(ESP.getFreeHeap()) + " bytes");
     }
@@ -183,38 +185,37 @@ void setup()
     {
 
         // Conditionally start STA
+
         if (systemConfig.router_autostart)
         {
-            if (systemConfig.router_autostart)
+            Logger::getInstance().log("Starting STA mode...");
+            wifiManager.connectWiFi(configManager.getWifiConfig().router_ssid.c_str(), configManager.getWifiConfig().router_password.c_str());
+
+            // Define the timeout duration (in milliseconds)
+            // funziona senza?
+            const unsigned long wifiConnectTimeout = 10000; // 5 seconds
+
+            // Check WiFi connection for the specified duration
+            unsigned long startTime = millis();
+            while (!wifiManager.isConnected() && (millis() - startTime < wifiConnectTimeout))
             {
-                Logger::getInstance().log("Starting STA mode...");
-                wifiManager.connectWiFi(configManager.getWifiConfig().router_ssid.c_str(), configManager.getWifiConfig().router_password.c_str());
+                // delay(5000); // Wait for 5s before checking again
+                Logger::getInstance().log("Checking WiFi connection...");
+            }
 
-                // Define the timeout duration (in milliseconds)
-                // funziona senza?
-                const unsigned long wifiConnectTimeout = 5000; // 5 seconds
+            // If not connected after the timeout, start the AP
+            if (!wifiManager.isConnected())
 
-                // Check WiFi connection for the specified duration
-                unsigned long startTime = millis();
-                while (!wifiManager.isConnected() && (millis() - startTime < wifiConnectTimeout))
+            {
+                if (!systemConfig.ap_autostart)
                 {
-                    // delay(5000); // Wait for 5s before checking again
-                    Logger::getInstance().log("Checking WiFi connection...");
+                    specialAction.toggleAP(true);
                 }
-
-                // If not connected after the timeout, start the AP
-                if (!wifiManager.isConnected())
-
-                {
-                    if (!systemConfig.ap_autostart)
-                    {
-                        specialAction.toggleAP(true);
-                    }
-                    Logger::getInstance().log("Failed to connect to WiFi. Starting AP mode...");
-                    wifiManager.beginAP(configManager.getWifiConfig().ap_ssid.c_str(), configManager.getWifiConfig().ap_password.c_str());
-                }
+                Logger::getInstance().log("Failed to connect to WiFi. Starting AP mode...");
+                wifiManager.beginAP(configManager.getWifiConfig().ap_ssid.c_str(), configManager.getWifiConfig().ap_password.c_str());
             }
         }
+
         if (systemConfig.ap_autostart)
         {
             Logger::getInstance().log("Starting AP mode...");
@@ -286,7 +287,7 @@ void mainLoopTask(void *parameter)
 
             // Entra in sleep mode
             powerManager.enterDeepSleep();
-            //powerManager.enterDeepSleepWithMultipleWakeupPins();
+            // powerManager.enterDeepSleepWithMultipleWakeupPins();
         }
 
         Logger::getInstance().processBuffer();
