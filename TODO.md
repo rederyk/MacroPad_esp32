@@ -1,5 +1,5 @@
 
-## Identified Improvements
+# Identified Improvements
 
 The following improvements have been identified in the code:
 
@@ -10,16 +10,14 @@ The following improvements have been identified in the code:
 
 # TODO
 
-* conrollare esecuzione gesture.. [V]
+## impostare combo_timout dalle config[]
 
-* impostare combo_timout dalle config[]
 
-* decidere un modo consistente su cosa fare con comma ","e "+" nelle macro []
+## decidere un modo consistente su cosa fare con comma ","e "+" nelle macro []
 
-* nel ble, sevono caratteri di escape ","e "+" , e i CAPS per tutti INDAGARE cilco perss per singoli caratteri stringhe
-        escape funzionate con doppio carattere ++ o,, [V]
 
-* problema CASE sensitive duro a morire       /// il problema dovrebbe essere nei press multpili ,
+## problema CASE sensitive duro a morire
+       /// il problema dovrebbe essere nei press multpili ,
           // quando ce un carattere CASE blecombo usa in contemporanea lo SHIFT ma,
           // quando si preme due tasti con lo shift insieme succedono guai
           // sene trova prova nei singili caratteri che se premuti molto veloce diventano lowercase, altrimenti vanno bene..
@@ -28,22 +26,65 @@ The following improvements have been identified in the code:
         // TIenI CONTO DEL LAYOUT E FAI DELLE PROVE CON QUELLO ITA
           // impostare anche una variabile per scegliere il layout?????? indagare se blecombo supporta i layout .... 
 
+## Se cambi nome e resta un device abbinato con il nome vecchio causa un riavvio , bisogna riabbinare il device da capo ,.....forse e un problema solo del mio pc
 
 
-* Se cambi nome e resta un device abbinato con il nome vecchio causa un riavvio , bisogna riabbinare il device da capo ,.....forse e un problema solo del mio pc
+## BATTERY USAGE...provare la sleep_mode con diverse batterie 
+  - lipo 3.7V 820mAh >1Giorno
 
 
-* BATTERY USAGE...provare la sleep_mode con diverse batterie 
-    - lipo 3.7V 820mAh >1Giorno
-- metti una spacial action per andare in sleep oltre al timeout..
-- cerca di usare il keypad per il wakeup meglio su pressioni ripetute...
+
+## Singolo led RGB per feedback modalita....
+
+
+## cerca di usare il keypad per il wakeup meglio su pressioni ripetute...
+
+
+### Possibili soluzioni 
+
+ 
+2. **Metodo “singolo pin” (ext0) + diodo/OR:** 
+ 
+  - Se vuoi svegliare l’ESP32 premendo **qualsiasi**  tasto, spesso si usa un trucco hardware: si uniscono tutte le linee del keypad tramite diodi in un “OR cablato” su un singolo GPIO RTC con pull-up. Premendo *qualunque* tasto, quella linea si porta a LOW e fa scattare `esp_sleep_enable_ext0_wakeup(..., livelloBasso)`.
+
+  - Funziona, ma serve un piccolo adattatore hardware (una serie di diodi) e una resistenza di pull-up; oppure si sfrutta il pull-up interno se la corrente di leakage è accettabile.
+ 
+4. **
+Usare ext1 con `ANY_HIGH`** 
+ 
+  - Se le linee “in stato di riposo” possono essere tenute tutte a LOW, e premendo un tasto una di esse va a HIGH, allora puoi abilitare `esp_sleep_enable_ext1_wakeup(mask, ESP_EXT1_WAKEUP_ANY_HIGH)`.
+ 
+  - Devi però **invertire**  il modo di pilotare la tastiera:
+
+    - le righe (o le colonne) che in deep sleep diventano input RTC con pull-down,
+
+    - l’altra dimensione le lasci in output a 3.3V,
+
+    - in modo che, quando premi un tasto, almeno una delle linee di input “sale” da 0V (pull-down) a 3.3V.
+ 
+  - Non sempre è banale, perché devi verificare che tutti i pin coinvolti siano **RTC**  e che tu non abbia “conflitti” con altre funzioni hardware.
+ 
+6. **Uso del co-processore ULP** 
+
+  - L’ULP (Ultra Low Power) dell’ESP32 può rimanere attivo durante il deep sleep e fare un mini-scan della tastiera, con un consumo nettamente inferiore rispetto alla CPU principale (ma pur sempre maggiore rispetto allo standby totale).
+
+  - In quel caso, puoi programmare l’ULP per impostare alcune linee in uscita e altre in ingresso, e se rileva un cambio di stato, può svegliare la CPU.
+
+  - È il sistema più flessibile, ma anche il più complesso da implementare, perché devi scrivere un piccolo programma in “assembly ULP” o usare una libreria apposita.
+
+
+
+# DOIT
+* nel ble, sevono caratteri di escape ","e "+" , e i CAPS per tutti INDAGARE cilco perss per singoli caratteri stringhe
+        escape funzionate con doppio carattere ++ o,, [V]
+
 
 * una SPecialAction che semplicemnte aspetta sarebbe molto utile nei comandi concatenati,
-  "2+5+8"["<S_B:SUPER+t><TIME_SLEEP_1000><S_B:btop><TIME_SLEEP_500><S_B:RETURN>"],
+  "2+5+8"["<S_B:SUPER+t><TIME_SLEEP_1000><S_B:btop><TIME_SLEEP_500><S_B:RETURN>"], [V]
 
   
+- metti una spacial action per andare in sleep oltre al timeout..
+  "1+2+3+4+5+6+7+8+9": ["ENTER_SLEEP"] [V]
 
-
-* Singolo led RGB per feedback modalita....
 
 * comuqnue va...

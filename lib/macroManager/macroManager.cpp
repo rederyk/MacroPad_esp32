@@ -260,6 +260,10 @@ void MacroManager::pressAction(const std::string &action)
     {
         specialAction.hopBleDevice();
     }
+    else if (action == "ENTER_SLEEP")
+    {
+        specialAction.enterSleep();
+    }
     else if (action.rfind("DELAY_", 0) == 0)
     {
         // Estrae il valore del delay in ms

@@ -15,12 +15,7 @@ void PowerManager::begin(const SystemConfig &sysConfig, const KeypadConfig &keyp
     inactivityTimeout = sysConfig.sleep_timeout_ms;
     isBleMode = sysConfig.enable_BLE;
 
-    // Set wakeup pin from keypad config (assuming first key as wakeup pin)
-    if (keypadConfig.rowPins.size() > 0 && keypadConfig.colPins.size() > 0)
-    {
-        wakeupPin = static_cast<gpio_num_t>(keypadConfig.colPins[0]);
-    }
-    wakeupPin2 = sysConfig.wakeup_pin2;
+    wakeupPin = sysConfig.wakeup_pin;
 
     // Reset activity timer
     resetActivityTimer();
@@ -53,34 +48,51 @@ bool PowerManager::checkInactivity()
     return (millis() - lastActivityTime > inactivityTimeout);
 }
 
-
-
-void PowerManager::enterDeepSleep()
+void PowerManager::enterDeepSleep(bool force)
 {
-    if (!isBleMode)
+    if (!isBleMode&&!force)
     {
-        Logger::getInstance().log("Sleep mode only available in BLE mode");
+        Logger::getInstance().log("⚠️ Sleep mode only available in BLE mode ⚠️");
         return;
     }
 
-    Logger::getInstance().log(String(inactivityTimeout/1000)+String(" Second while last input Enter deep sleep mode"));
-    Logger::getInstance().log(String("pin di wake up impostato su <BUTTON> pin ") + String(wakeupPin2));
+    // ASCII visualization of sleep parameters
+    Logger::getInstance().log("┌─────────────────────────────────────┐");
+    Logger::getInstance().log("│ 🔋 SLEEP PARAMS                     │");
+    Logger::getInstance().log("├─────────────┬─────────┬────────────┤");
+    Logger::getInstance().log("│ ⏱️  Timeout  │ 🔔 Wake │ ⏰ Backup   │");
+    delay(20);
+    Logger::getInstance().log("│ " + String(inactivityTimeout / 1000) + "s" + String("          ").substring(0, 10 - String(inactivityTimeout / 1000).length()) + "│ PIN" + String(wakeupPin) + String("     ").substring(0, 7 - String(wakeupPin).length()) + "│ 8h        │");
+    delay(20);
 
-    // Configure wakeup sources
-    esp_sleep_enable_ext0_wakeup(wakeupPin2, LOW); // LOW level for button press
+    Logger::getInstance().log("└─────────────┴─────────┴────────────┘");
+    delay(20);
 
-    // Also enable timer wakeup as a backup (8 hours)
-    esp_sleep_enable_timer_wakeup(28800000000ULL); // 8 hours in microseconds
-
-    // Flush logger before sleep
     Logger::getInstance().processBuffer();
 
-    // Perform any necessary cleanup
-    // Note: We don't need to explicitly disconnect BLE here as ESP_DEEP_SLEEP_START will
-    // reset most peripherals. If needed, specific resources can be released before sleep.
+    // Configure wakeup sources first (before animation)
+    esp_sleep_enable_ext0_wakeup(wakeupPin, LOW);
+    esp_sleep_enable_timer_wakeup(28800000000ULL); // 8h backup
+
+    // Enhanced final sleep box with system stats
+    Logger::getInstance().log("╔══════════════════════════════════╗");
+    Logger::getInstance().log("║ 💤 DEEP SLEEP MODE ACTIVATED 💤  ║");
+    Logger::getInstance().log("╠══════════════════════════════════╣");
+    delay(20);
+
+    Logger::getInstance().log("║ Mem: " + String(ESP.getFreeHeap() / 1024) + "KB | Uptime: " + String(millis() / 60000) + "m ║");
+    delay(20);
+
+    Logger::getInstance().log("║ Mode: BLE | Next wake: Button/8h ║");
+    Logger::getInstance().log("╚══════════════════════════════════╝");
+    delay(20);
+
+    Logger::getInstance().processBuffer();
+    delay(500);
+
 
     // Enter deep sleep
     esp_deep_sleep_start();
 
-    // Code will continue from setup() after wakeup
+    // Code continues from setup() after wakeup
 }

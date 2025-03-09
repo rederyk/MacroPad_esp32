@@ -78,8 +78,6 @@ bool ConfigurationManager::loadConfig()
 
         if (systemConfigJson.containsKey("wakeup_pin"))
             this->systemConfig.wakeup_pin = systemConfigJson["wakeup_pin"];
-        if (systemConfigJson.containsKey("wakeup_pin2"))
-            this->systemConfig.wakeup_pin2 = systemConfigJson["wakeup_pin2"];
 
         if (systemConfigJson.containsKey("sleep_timeout_ms"))
             this->systemConfig.sleep_timeout_ms = systemConfigJson["sleep_timeout_ms"];

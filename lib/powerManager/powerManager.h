@@ -16,7 +16,6 @@ private:
     bool sleepEnabled;
     bool isBleMode;
     gpio_num_t wakeupPin;
-    gpio_num_t wakeupPin2;
 
 public:
     PowerManager();
@@ -25,7 +24,7 @@ public:
     void resetActivityTimer();
     void registerActivity();
     bool checkInactivity();
-    void enterDeepSleep();
+    void enterDeepSleep(bool force = false);
 };
 
 #endif // POWER_MANAGER_H

@@ -54,7 +54,6 @@ struct SystemConfig
     bool sleep_enabled;             // Abilitare il sleep mode
     unsigned long sleep_timeout_ms; // Timeout di inattività in millisecondi
     gpio_num_t wakeup_pin;                 // Pin GPIO per il wakeup
-    gpio_num_t wakeup_pin2;                 // altro Pin GPIO per il wakeup
 };
 
 #endif

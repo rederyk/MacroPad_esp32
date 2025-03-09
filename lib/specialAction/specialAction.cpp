@@ -8,16 +8,23 @@
 #include <LittleFS.h>
 #include "keypad.h"
 #include "Logger.h"
+#include "powerManager.h"
 
 extern Keypad *keypad;
 
 extern GestureRead gestureSensor;
 extern GestureAnalyze gestureAnalyzer;
 extern GestureStorage gestureStorage;
+extern PowerManager powerManager;
 
 void SpecialAction::resetDevice()
 {
     ESP.restart();
+}
+void SpecialAction::enterSleep()
+{ 
+    
+    powerManager.enterDeepSleep(true);
 }
 
 void SpecialAction::actionDelay(int totalDelayMs)

@@ -32,6 +32,7 @@ public:
     void executeGesture(bool pressed);
     void hopBleDevice();
     void toggleBleWifi();
+    void enterSleep();
     void toggleAP(bool toogle);
 
 private:
