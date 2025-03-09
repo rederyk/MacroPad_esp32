@@ -199,7 +199,7 @@ void setup()
             unsigned long startTime = millis();
             while (!wifiManager.isConnected() && (millis() - startTime < wifiConnectTimeout))
             {
-                // delay(5000); // Wait for 5s before checking again
+                delay(5000); // Wait for 5s before checking again
                 Logger::getInstance().log("Checking WiFi connection...");
             }
 
@@ -207,12 +207,13 @@ void setup()
             if (!wifiManager.isConnected())
 
             {
+                Logger::getInstance().log("Failed to connect to STA_MODE_WiFi. ");
                 if (!systemConfig.ap_autostart)
                 {
-                    specialAction.toggleAP(true);
+
+                    Logger::getInstance().log("Starting AP BACKUP MODE...");
+                    wifiManager.beginAP(configManager.getWifiConfig().ap_ssid.c_str(), configManager.getWifiConfig().ap_password.c_str());
                 }
-                Logger::getInstance().log("Failed to connect to WiFi. Starting AP mode...");
-                wifiManager.beginAP(configManager.getWifiConfig().ap_ssid.c_str(), configManager.getWifiConfig().ap_password.c_str());
             }
         }
 
