@@ -34,6 +34,8 @@ A versatile, customizable macro pad built on the ESP32 platform, featuring gestu
   - Real-time logging and debugging
 
   - Persistent settings storage
+ 
+  - RGB led feedback 🌈
 
 ## 🚀 Getting Started 
 
