@@ -53,17 +53,10 @@ A versatile, customizable macro pad built on the ESP32 platform, featuring gestu
 
 - Arduino IDE or PlatformIO
 
-### Dependencies 
-
-
-```diff
-- ArduinoJson
-- ESPAsyncWebServer
-- LittleFS
-- BleCombo
-```
 
 ### Installation 
+
+0. **build your macropad ,connect all input device you need to correct pin, led and adxl is optional**
  
 1. **Clone the repository:** 
 
@@ -71,7 +64,7 @@ A versatile, customizable macro pad built on the ESP32 platform, featuring gestu
 git clone https://github.com/rederyk/MacroPad_esp32.git
 ```
  
-2. **Install the required libraries**  using the Arduino Library Manager or PlatformIO.
+2. **Wait paltformio to Install the required libraries**  using the Arduino Library Manager or PlatformIO.
  
 3. **Configure your hardware connections**  in the `config.json` file.
  
