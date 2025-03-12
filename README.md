@@ -99,7 +99,7 @@ Detailed setup instructions can be found in [INSTRUCTIONS.md](INSTRUCTIONS.md) .
 ### Gesture Training & Execution 🤖🖐️ 
  
 - **Train Your Gestures:** 
-Assign the `TRAIN_GESTURE` action to the **BUTTON** . (Switch to the Web interface’s systemAction page if ou want view what you press) ,Hold the button while performing a movement, then release and press a numeric key (e.g., **1**  → registers as **G_ID:0** ). Repeat to record multiple sample of the same gesture.
+Assign the `TRAIN_GESTURE` action to the **BUTTON** from the combo page. (Switch to the Web interface’s systemAction page if you want view what you press, or new combo2 page include a serial and auto recconnect ) ,Hold the button while performing a movement, then release and press a numeric key (e.g., **1**  → registers as **G_ID:0** ). Repeat to record multiple sample of the same gesture.
  
 - **Execute Gestures:** 
 Switch the **BUTTON**  action to `EXECUTE_GESTURE`, then perform the gesture. The web interface’s systemAction page displays real-time matching scores, showing which gesture was recognized.
