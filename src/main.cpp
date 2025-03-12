@@ -6,6 +6,7 @@
 
 #include <ArduinoJson.h>
 #include "Logger.h"
+#include "Led.h"
 #include "configManager.h"
 #include "combinationManager.h"
 #include "keypad.h"
@@ -18,6 +19,13 @@
 #include "WIFIManager.h"
 #include "specialAction.h"
 #include "powerManager.h"
+// Definisce i pin per il LED RGB
+#define RED_PIN 25
+#define GREEN_PIN 26
+#define BLUE_PIN 27
+
+// Configurazione: true per LED ad anodo comune, false per catodo comune
+#define COMMON_ANODE false
 
 WIFIManager wifiManager; // Create an instance of WIFIManager
 
@@ -68,6 +76,9 @@ void setup()
     Logger &logger = Logger::getInstance();
 
     logger.log("🔹 Logger avviato correttamente!");
+    Led::getInstance().begin(RED_PIN, GREEN_PIN, BLUE_PIN, COMMON_ANODE);
+    Led::getInstance().setColor(255, 0, 255); // Magenta
+    Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
 
     // Load configuration first
     if (!configManager.loadConfig())
@@ -168,6 +179,7 @@ void setup()
     // autostart stuff
     if (systemConfig.enable_BLE)
     {
+
         bleController.storeOriginalMAC();
         //        Keyboard.deviceName = systemConfig.BleName.c_str();
 
@@ -180,6 +192,8 @@ void setup()
         delay(20);
 
         Logger::getInstance().log("Free heap after Bluetooth start: " + String(ESP.getFreeHeap()) + " bytes");
+        Led::getInstance().setColor(0, 0, 255); // Blu
+        Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
     }
     else
     {
@@ -189,17 +203,20 @@ void setup()
         if (systemConfig.router_autostart)
         {
             Logger::getInstance().log("Starting STA mode...");
+
             wifiManager.connectWiFi(configManager.getWifiConfig().router_ssid.c_str(), configManager.getWifiConfig().router_password.c_str());
 
             // Define the timeout duration (in milliseconds)
             // funziona senza?
-            const unsigned long wifiConnectTimeout = 10000; // 5 seconds
+            const unsigned long wifiConnectTimeout = 5000; // 5 seconds
 
             // Check WiFi connection for the specified duration
             unsigned long startTime = millis();
+
             while (!wifiManager.isConnected() && (millis() - startTime < wifiConnectTimeout))
             {
-                delay(5000); // Wait for 5s before checking again
+
+                delay(wifiConnectTimeout / 2); // Wait for 5s before checking again
                 Logger::getInstance().log("Checking WiFi connection...");
             }
 
@@ -211,14 +228,24 @@ void setup()
                 if (!systemConfig.ap_autostart)
                 {
 
+                    Led::getInstance().setColor(255, 0, 0); // Rosso
+                    Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
                     Logger::getInstance().log("Starting AP BACKUP MODE...");
                     wifiManager.beginAP(configManager.getWifiConfig().ap_ssid.c_str(), configManager.getWifiConfig().ap_password.c_str());
                 }
+            }
+            else
+            {
+                Led::getInstance().setColor(0, 255, 0); // Verde
+                Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
+                Logger::getInstance().log("connesso a " + configManager.getWifiConfig().router_ssid);
             }
         }
 
         if (systemConfig.ap_autostart)
         {
+            Led::getInstance().setColor(255, 0, 0); // Rosso
+            Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
             Logger::getInstance().log("Starting AP mode...");
             wifiManager.beginAP(configManager.getWifiConfig().ap_ssid.c_str(), configManager.getWifiConfig().ap_password.c_str());
         }

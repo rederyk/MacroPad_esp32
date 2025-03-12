@@ -2,6 +2,7 @@
 #include <DNSServer.h>
 #include <esp_wifi.h>
 #include <Logger.h>
+//#include <Led.h>
 
 WIFIManager::WIFIManager() : apEnabled(false), staEnabled(false), webServer(), webServerRunning(false)
 {
@@ -70,6 +71,7 @@ void WIFIManager::beginAP(const char *apSSID, const char *apPassword)
         Logger::getInstance().log("✅ AP Mode attivata con successo."
                                   "IP Adress: " +
                                   String(WiFi.softAPIP()));
+
 
         wifi_mode_t mode;
         esp_wifi_get_mode(&mode);
@@ -143,7 +145,7 @@ void WIFIManager::enableSTA(const char *ssid, const char *password)
 
     WiFi.begin(ssid, password);
     Logger::getInstance().log("🌐 Connessione alla rete WiFi in corso...");
-
+    // Definisci alcuni colori
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 20)
     {
@@ -157,6 +159,7 @@ void WIFIManager::enableSTA(const char *ssid, const char *password)
         Logger::getInstance().log("\n✅ WiFi connesso con successo."
                                   "IP Adress: " +
                                   String(WiFi.localIP()));
+ //       Led::getInstance().setColor(0, 255, 0);
 
         updateStatus();
     }
@@ -268,6 +271,7 @@ void WIFIManager::toggleSta(const char *ssid, const char *password)
     }
 }
 
-bool WIFIManager::isConnected() {
+bool WIFIManager::isConnected()
+{
     return staEnabled && (WiFi.status() == WL_CONNECTED);
 }

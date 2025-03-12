@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <Logger.h>
+#include "Led.h"
 #include <float.h> // For FLT_MAX
 #include <vector>
 
@@ -192,9 +193,8 @@ bool GestureRead::wakeup()
     return _accelerometer.start();
 }
 
-
 float GestureRead::getMappedX()
-//TODO dont calculate if axis is in the same axis and dir 
+// TODO dont calculate if axis is in the same axis and dir
 
 {
 
@@ -262,13 +262,14 @@ void GestureRead::updateSampling()
 
     unsigned long currentTime = millis();
 
-    if (currentTime - lastSampleTime >= 10)
+    if (currentTime - lastSampleTime >= (_sampleHZ / 10))
     { // 100Hz = 10ms
         bool sampling = _isSampling;
         uint16_t count = _sampleBuffer.sampleCount;
 
         if (sampling && count < _maxSamples)
         {
+
             if (_accelerometer.update())
             {
                 _sampleBuffer.samples[count].x =
@@ -280,17 +281,40 @@ void GestureRead::updateSampling()
                 _sampleBuffer.sampleCount = count + 1;
                 lastSampleTime = currentTime;
 
-               // Logger::getInstance().log(String(_sampleBuffer.sampleCount) + String("Sample X ") + String(_sampleBuffer.samples[count].x));
+                // Map accelerometer values (-4g to +4g) to RGB (0-255)
+                float x = _sampleBuffer.samples[count].x;
+                float y = _sampleBuffer.samples[count].y;
+                float z = _sampleBuffer.samples[count].z;
+
+                // Clamping: assicuriamoci che il valore non superi 4g in modulo
+                x = fabs(x) > 4.0f ? 4.0f : fabs(x);
+                y = fabs(y) > 4.0f ? 4.0f : fabs(y);
+                z = fabs(z) > 4.0f ? 4.0f : fabs(z);
+
+                // Mapping: da 0-4 a 0-255
+                int r = (int)(x * 255.0f / 4.0f); // asse X -> Rosso
+                int g = (int)(y * 255.0f / 4.0f); // asse Y -> Verde
+                int b = (int)(z * 255.0f / 4.0f); // asse Z -> Blu
+
+                // Set LED color based on accelerometer values
+                Led::getInstance().setColor(r, g, b, false);
             }
         }
         else if (sampling && count >= _maxSamples)
         {
             _bufferFull = true;
+
+            // Restore original color
+            Led::getInstance().setColor(true);
+
             stopSampling();
             return;
         }
         else
         {
+            // Restore original color
+            Led::getInstance().setColor(true);
+
             stopSampling();
             return;
         }
