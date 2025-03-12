@@ -2,7 +2,10 @@
 
 Led *Led::instance = nullptr;
 
-Led::Led() : redValue(0), greenValue(0), blueValue(0) {}
+Led::Led()
+    : redValue(0), greenValue(0), blueValue(0), initialized(false) // inizializza la variabile
+{
+}
 
 Led::~Led() {}
 
@@ -45,48 +48,81 @@ void Led::begin(int redPin, int greenPin, int bluePin, bool commonAnode)
     analogWrite(greenPin, 0);
     analogWrite(bluePin, 0);
   }
+
+  initialized = true; // Segnala che begin() è stato chiamato correttamente
 }
-  // Overload 1: Imposta il colore con i valori RGB.
-  // Il parametro 'save' (default false) specifica se salvare il colore.
-  void Led::setColor(int red, int green, int blue, bool save) {
-    if (save) {
-      savedRed = red;
-      savedGreen = green;
-      savedBlue = blue;
-      colorSaved = true;
-    }
-    
-    redValue = red;
-    greenValue = green;
-    blueValue = blue;
-    
-    if (commonAnode) {
-      analogWrite(redPin, 255 - red);
-      analogWrite(greenPin, 255 - green);
-      analogWrite(bluePin, 255 - blue);
-    } else {
-      analogWrite(redPin, red);
-      analogWrite(greenPin, green);
-      analogWrite(bluePin, blue);
-    }
+
+// Overload 1: Imposta il colore con i valori RGB.
+// Il parametro 'save' (default false) specifica se salvare il colore.
+void Led::setColor(int red, int green, int blue, bool save)
+{
+  if (!initialized)
+  {
+    // Se non inizializzato, esce subito o gestisce diversamente
+    return;
   }
 
-  // Overload 2: Se chiamato con un solo booleano, se è true e un colore è stato salvato, lo ripristina
-  void Led::setColor(bool restore) {
-    if (restore && colorSaved) {
-      // Chiamando l'overload precedente con save=false per evitare di sovrascrivere il valore salvato
-      setColor(savedRed, savedGreen, savedBlue, false);
-    }
+  if (save)
+  {
+    savedRed = red;
+    savedGreen = green;
+    savedBlue = blue;
+    colorSaved = true;
   }
+
+  redValue = red;
+  greenValue = green;
+  blueValue = blue;
+
+  if (commonAnode)
+  {
+    analogWrite(redPin, 255 - red);
+    analogWrite(greenPin, 255 - green);
+    analogWrite(bluePin, 255 - blue);
+  }
+  else
+  {
+    analogWrite(redPin, red);
+    analogWrite(greenPin, green);
+    analogWrite(bluePin, blue);
+  }
+}
+
+// Overload 2: Se chiamato con un solo booleano, se è true e un colore è stato salvato, lo ripristina
+void Led::setColor(bool restore)
+{
+  if (!initialized)
+  {
+    return;
+  }
+  if (restore && colorSaved)
+  {
+    // Chiamando l'overload precedente con save=false per evitare di sovrascrivere il valore salvato
+    setColor(savedRed, savedGreen, savedBlue, false);
+  }
+}
 
 void Led::getColor(int &red, int &green, int &blue)
 {
+  if (!initialized)
+  {
+    // Se non inizializzato, restituisce valori di default o lascia invariati i parametri
+    red = 0;
+    green = 0;
+    blue = 0;
+    return;
+  }
   red = redValue;
   green = greenValue;
   blue = blueValue;
 }
+
 String Led::getColorLog(bool testo, bool emoji)
 {
+  if (!initialized)
+  {
+    return "Errore: LED non inizializzato";
+  }
   // Default parameters
   if (testo == false && emoji == false)
   {
@@ -222,7 +258,7 @@ String Led::getColorLog(bool testo, bool emoji)
   }
   else
   {
-    // Color not specifically defined, create a generic name
+    // Colore non definito in maniera specifica: nome generico
     if (redValue > greenValue && redValue > blueValue)
     {
       colorName = "ROSSASTRO";
@@ -245,7 +281,7 @@ String Led::getColorLog(bool testo, bool emoji)
     }
   }
 
-  // Build the result string based on requested format
+  // Costruisce la stringa in base al formato richiesto
   if (testo && emoji)
   {
     result = colorName + " " + colorEmoji;

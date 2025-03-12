@@ -17,6 +17,7 @@ private:
   // Variabili per il salvataggio del colore
   int savedRed, savedGreen, savedBlue;
   bool colorSaved = false;
+  bool initialized = false;
   int redValue;
   int greenValue;
   int blueValue;

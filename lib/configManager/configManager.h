@@ -9,27 +9,28 @@
 
 #include "configTypes.h"
 
-
-
 // Forward declaration
 class MacroManager;
 
-class ConfigurationManager {
+class ConfigurationManager
+{
 private:
     KeypadConfig keypadConfig;
     EncoderConfig encoderConfig;
+    LedConfig ledConfig;
     AccelerometerConfig accelerometerConfig;
     SystemConfig systemConfig;
-
 
 public:
     ConfigurationManager();
     bool loadConfig();
-    const KeypadConfig& getKeypadConfig() const;
-    const EncoderConfig& getEncoderConfig() const;
-    const AccelerometerConfig& getAccelerometerConfig() const;
-    const WifiConfig& getWifiConfig() const;
-    const SystemConfig& getSystemConfig() const;
+    const KeypadConfig &getKeypadConfig() const;
+    const EncoderConfig &getEncoderConfig() const;
+    const AccelerometerConfig &getAccelerometerConfig() const;
+    const WifiConfig &getWifiConfig() const;
+    const SystemConfig &getSystemConfig() const;
+    const LedConfig &getLedConfig() const;
+
 private:
     WifiConfig wifiConfig;
 };

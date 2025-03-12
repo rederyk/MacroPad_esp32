@@ -21,6 +21,14 @@ struct EncoderConfig
     byte buttonPin;
     int stepValue;
 };
+struct LedConfig
+{
+    byte pinRed;
+    byte pinGreen;
+    byte pinBlue;
+    bool anodeCommon;
+    bool active;
+};
 
 struct AccelerometerConfig
 {
@@ -31,6 +39,7 @@ struct AccelerometerConfig
     int sampleRate;
     int threshold;
     String axisMap;
+    bool active;
 };
 
 struct WifiConfig

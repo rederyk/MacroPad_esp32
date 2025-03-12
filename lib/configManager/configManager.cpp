@@ -30,6 +30,7 @@ bool ConfigurationManager::loadConfig()
     filter["encoder"] = true;
     filter["accelerometer"] = true;
     filter["system"] = true;
+    filter["led"] = true;
 
     // Increase buffer size and add error handling
     StaticJsonDocument<4096> doc;
@@ -47,6 +48,7 @@ bool ConfigurationManager::loadConfig()
     encoderConfig = EncoderConfig();
     accelerometerConfig = AccelerometerConfig();
     wifiConfig = WifiConfig();
+    ledConfig = LedConfig();
 
     // Load wifi configuration if it exists
     JsonVariant wifiConfigJson = doc["wifi"];
@@ -161,6 +163,23 @@ bool ConfigurationManager::loadConfig()
             this->encoderConfig.stepValue = encoderConfig["stepValue"];
     }
 
+    // Load encoder configuration if it exists
+    JsonVariant ledConfig = doc["led"];
+    if (!ledConfig.isNull() && ledConfig.is<JsonObject>())
+    {
+        if (ledConfig.containsKey("pinRed"))
+            this->ledConfig.pinRed = ledConfig["pinRed"];
+        if (ledConfig.containsKey("pinGreen"))
+            this->ledConfig.pinGreen = ledConfig["pinGreen"];
+        this->ledConfig.pinRed = ledConfig["pinRed"];
+        if (ledConfig.containsKey("pinBlue"))
+            this->ledConfig.pinBlue = ledConfig["pinBlue"];
+        if (ledConfig.containsKey("anodeCommon"))
+            this->ledConfig.anodeCommon = ledConfig["anodeCommon"];
+        if (ledConfig.containsKey("active"))
+            this->ledConfig.active = ledConfig["active"];
+    }
+
     // Load accelerometer configuration if it exists
     JsonVariant accelerometerConfig = doc["accelerometer"];
     if (!accelerometerConfig.isNull() && accelerometerConfig.is<JsonObject>())
@@ -177,6 +196,8 @@ bool ConfigurationManager::loadConfig()
             this->accelerometerConfig.threshold = accelerometerConfig["threshold"];
         if (accelerometerConfig.containsKey("axisMap"))
             this->accelerometerConfig.axisMap = accelerometerConfig["axisMap"].as<const char *>();
+        if (accelerometerConfig.containsKey("active"))
+            this->accelerometerConfig.active = accelerometerConfig["active"];
     }
 
     configFile.close();
@@ -202,6 +223,10 @@ const AccelerometerConfig &ConfigurationManager::getAccelerometerConfig() const
 const WifiConfig &ConfigurationManager::getWifiConfig() const
 {
     return wifiConfig;
+}
+const LedConfig &ConfigurationManager::getLedConfig() const
+{
+    return ledConfig;
 }
 
 const SystemConfig &ConfigurationManager::getSystemConfig() const

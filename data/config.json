@@ -35,12 +35,20 @@
     "buttonPin": 2,
     "stepValue": 1
   },
+  "led": {
+    "pinRed": 25,
+    "pinGreen": 26,
+    "pinBlue": 27,
+    "anode_common": false,
+    "active": true
+  },
   "accelerometer": {
     "sdaPin": 19,
     "sclPin": 23,
     "sensitivity": 2.0,
     "sampleRate": 100,
     "threshold": 500,
-    "axisMap": "zyx"
+    "axisMap": "zyx",
+    "active": true
   }
 }

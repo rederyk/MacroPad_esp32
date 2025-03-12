@@ -5,7 +5,6 @@ The following improvements have been identified in the code:
 
 1.  **String Usage:** Substitute Arduino `String` with `std::string` for better memory management and performance.
 2.  **Hardcoded Numbers:** Substitute hardcoded numbers with `static const` to improve readability and maintainability.
-3.  **File Handling:** Create a common method to read, edit, and save files to reduce code duplication and improve maintainability.
 
 
 # TODO
@@ -30,15 +29,20 @@ The following improvements have been identified in the code:
 
 
 ## BATTERY USAGE...provare la sleep_mode con diverse batterie 
-  - lipo 3.7V 820mAh >1Giorno
+  - lipo 3.7V 820mAh >2Giorno (ble_mode ,sleep 50s)
 
 
 
 ## Singolo led RGB per feedback modalita....
-
+- implementato sistema di log Led RGB con metodi di save ripristino e colori effimeri [V]
+- mappato sampling xyz delle gesture al led rgb CI STA....[V]
+- impostati pin e opt dal config.json [V]
+* creare funzioni utili ai pattern fade blink rainbow eccetera 
+* impostare colori impostabili nel config per le modalita BLE AP STA 
 
 ## cerca di usare il keypad per il wakeup meglio su pressioni ripetute...
-
+- usare un pin di rotazione dell encoder vale usarli entrambi per via del debounce solo software (FEATURE??) 
+* necessaria modifica hardware pin dedidacato con diodo collegato a tutto il keypad 
 
 ### Possibili soluzioni 
 

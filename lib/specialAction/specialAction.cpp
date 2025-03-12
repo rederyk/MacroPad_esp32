@@ -16,14 +16,15 @@ extern GestureRead gestureSensor;
 extern GestureAnalyze gestureAnalyzer;
 extern GestureStorage gestureStorage;
 extern PowerManager powerManager;
+extern ConfigurationManager configManager;
 
 void SpecialAction::resetDevice()
 {
     ESP.restart();
 }
 void SpecialAction::enterSleep()
-{ 
-    
+{
+
     powerManager.enterDeepSleep(true);
 }
 
@@ -114,6 +115,11 @@ int SpecialAction::getKeypadInput(unsigned long timeout)
 
 void SpecialAction::calibrateSensor()
 {
+    if (!configManager.getAccelerometerConfig().active)
+    {
+        Logger::getInstance().log("Accelerometer disabled");
+        return;
+    }
     if (gestureSensor.calibrate())
     {
         Logger::getInstance().log("Calibration successful!");
@@ -126,6 +132,11 @@ void SpecialAction::calibrateSensor()
 
 String SpecialAction::getGestureID()
 {
+    if (!configManager.getAccelerometerConfig().active)
+    {
+        Logger::getInstance().log("Accelerometer disabled");
+        return "";
+    }
     static unsigned long executeTime = 0;
 
     if (gestureSensor.isSampling())
@@ -152,6 +163,11 @@ String SpecialAction::getGestureID()
 
 void SpecialAction::toggleSampling(bool pressed)
 {
+    if (!configManager.getAccelerometerConfig().active)
+    {
+        Logger::getInstance().log("Accelerometer disabled");
+        return;
+    }
     if (pressed)
     {
         if (!gestureSensor.isSampling())
@@ -180,6 +196,11 @@ void SpecialAction::toggleSampling(bool pressed)
 
 bool SpecialAction::saveGesture(int id)
 {
+    if (!configManager.getAccelerometerConfig().active)
+    {
+        Logger::getInstance().log("Accelerometer disabled");
+        return false;
+    }
     // Basic ID validation inline
     if (id < 0 || id > 8)
     {
@@ -442,6 +463,11 @@ void SpecialAction::clearGestureWithID(int key)
 
 void SpecialAction::executeGesture(bool pressed)
 {
+    if (!configManager.getAccelerometerConfig().active)
+    {
+        Logger::getInstance().log("Accelerometer disabled");
+        return;
+    }
     static unsigned long executeTime = 0;
 
     // Toggle sampling state
@@ -471,6 +497,11 @@ void SpecialAction::executeGesture(bool pressed)
 }
 void SpecialAction::trainGesture(bool pressed, int key)
 {
+    if (!configManager.getAccelerometerConfig().active)
+    {
+        Logger::getInstance().log("Accelerometer disabled");
+        return;
+    }
     // Toggle sampling state
     toggleSampling(pressed);
 

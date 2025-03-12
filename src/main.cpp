@@ -19,13 +19,7 @@
 #include "WIFIManager.h"
 #include "specialAction.h"
 #include "powerManager.h"
-// Definisce i pin per il LED RGB
-#define RED_PIN 25
-#define GREEN_PIN 26
-#define BLUE_PIN 27
 
-// Configurazione: true per LED ad anodo comune, false per catodo comune
-#define COMMON_ANODE false
 
 WIFIManager wifiManager; // Create an instance of WIFIManager
 
@@ -37,7 +31,6 @@ struct TimedEvent
 };
 
 ConfigurationManager configManager;
-// Aggiungi l'istanza del PowerManager tra le altre variabili globali
 PowerManager powerManager;
 CombinationManager comboManager;
 GestureRead gestureSensor; // Definizione effettiva (deve rimanere UNICA)
@@ -76,9 +69,6 @@ void setup()
     Logger &logger = Logger::getInstance();
 
     logger.log("🔹 Logger avviato correttamente!");
-    Led::getInstance().begin(RED_PIN, GREEN_PIN, BLUE_PIN, COMMON_ANODE);
-    Led::getInstance().setColor(255, 0, 255); // Magenta
-    Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
 
     // Load configuration first
     if (!configManager.loadConfig())
@@ -87,6 +77,14 @@ void setup()
         logger.log("Failed to load configuration from json! forced enable serial true");
         while (true)
             ;
+    }
+
+    const LedConfig ledConfig = configManager.getLedConfig();
+    if (ledConfig.active)
+    {
+        Led::getInstance().begin(ledConfig.pinRed, ledConfig.pinGreen, ledConfig.pinBlue, ledConfig.anodeCommon);
+        Led::getInstance().setColor(255, 0, 255); // Magenta
+        Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
     }
     // Set serial enabled based on config
 
@@ -137,16 +135,19 @@ void setup()
     // Initialize I2C with configured pins
     // TODO make optional
     const AccelerometerConfig &accelConfig = configManager.getAccelerometerConfig();
-    Wire.begin(accelConfig.sdaPin, accelConfig.sclPin);
-
-    // Start the sensor
-    if (!gestureSensor.begin())
+    if (accelConfig.active)
     {
-        Logger::getInstance().log("Could not find ADXL345 sensor. Check wiring!");
-        // TODO rendere acceleroemtro opzionale
+        Wire.begin(accelConfig.sdaPin, accelConfig.sclPin);
 
-        while (1)
-            ;
+        // Start the sensor
+        if (!gestureSensor.begin())
+        {
+            Logger::getInstance().log("Could not find ADXL345 sensor. Check wiring!");
+            // TODO rendere acceleroemtro opzionale
+
+            while (1)
+                ;
+        }
     }
     // Initialize hardware with configurations
     keypad = new Keypad(&configManager.getKeypadConfig());
