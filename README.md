@@ -66,7 +66,7 @@ A versatile, customizable macro pad built on the ESP32 platform, featuring gestu
 1. **Clone the repository:** 
 
 ```bash
-git clone <repository_url>
+git clone https://github.com/rederyk/MacroPad_esp32.git
 ```
  
 2. **Install the required libraries**  using the Arduino Library Manager or PlatformIO.
