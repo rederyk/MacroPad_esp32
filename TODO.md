@@ -29,7 +29,7 @@ The following improvements have been identified in the code:
 
 
 ## BATTERY USAGE...provare la sleep_mode con diverse batterie 
-  - lipo 3.7V 820mAh >2Giorno (ble_mode ,sleep 50s)
+  - lipo 3.7V 820mAh ~2 weeks (ble_mode ,sleep 50s)
 
 
 
