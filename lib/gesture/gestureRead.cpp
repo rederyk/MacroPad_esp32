@@ -125,7 +125,7 @@ bool GestureRead::calibrate(uint16_t calibrationSamples)
             sumZ += getMappedZ();
         }
 
-        delay(10);
+      //   vTaskDelay(pdMS_TO_TICKS(10)); // Dai tempo al tempo
     }
 
     _calibrationOffset.x = sumX / calibrationSamples;

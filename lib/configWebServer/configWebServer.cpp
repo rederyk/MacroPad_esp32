@@ -216,7 +216,9 @@ void configWebServer::setupRoutes()
             Logger::getInstance().log("💾 Saved Configuration:");
             Logger::getInstance().log(updatedJson);
             request->send(200, "text/plain", "✅ Configuration updated successfully! Restarting...");
-            delay(1000);
+            vTaskDelay(pdMS_TO_TICKS(1000)); // Dai tempo al tempo
+
+
             ESP.restart();
         } else {
             request->send(500, "text/plain", "❌ Failed to save configuration.");
@@ -275,7 +277,7 @@ void configWebServer::setupRoutes()
             Logger::getInstance().log("💾 Saved Combinations Configuration:");
             Logger::getInstance().log(updatedJson);
             request->send(200, "text/plain", "✅ Combinations updated successfully! Restarting...");
-            delay(1000);
+             vTaskDelay(pdMS_TO_TICKS(1000)); // Dai tempo al tempo
             ESP.restart();
         } else {
             request->send(500, "text/plain", "❌ Failed to save combinations configuration.");
@@ -323,7 +325,7 @@ void configWebServer::setupRoutes()
                             Logger::getInstance().log("💾 Saved combo.json successfully");
                             request->send(200, "text/plain", "✅ Combinations updated successfully! Restarting...");
                             // Ritardiamo il riavvio per assicurarci che la risposta venga inviata
-                            delay(1000);
+                             vTaskDelay(pdMS_TO_TICKS(1000)); // Dai tempo al tempo
                             ESP.restart();
                         } else {
                             request->send(500, "text/plain", "❌ Failed to save combo.json");
@@ -429,7 +431,7 @@ void configWebServer::setupRoutes()
                     if (writeComboFile(updatedJson)) {
                         Logger::getInstance().log("💾 Saved combo.json with updated " + setKey);
                         request->send(200, "text/plain", "✅ Combination set updated successfully! Restarting...");
-                        delay(1000);
+                         vTaskDelay(pdMS_TO_TICKS(1000)); // Dai tempo al tempo
                         ESP.restart();
                     } else {
                         request->send(500, "text/plain", "❌ Failed to save combo.json");
@@ -504,7 +506,7 @@ void configWebServer::setupRoutes()
             Logger::getInstance().log("💾 Saved Advanced Configuration:");
             Logger::getInstance().log(updatedJson);
             request->send(200, "text/plain", "✅ Advanced config updated successfully! Restarting...");
-            delay(1000);
+             vTaskDelay(pdMS_TO_TICKS(1000)); // Dai tempo al tempo
             ESP.restart();
         } else {
             request->send(500, "text/plain", "❌ Failed to save advanced configuration.");
@@ -597,7 +599,7 @@ void configWebServer::setupRoutes()
             Logger::getInstance().log("💾 Saved gesture_features configuration:");
             Logger::getInstance().log(newBody);
             request->send(200, "text/plain", "✅ Gesture feature configuration updated successfully! Restarting...");
-            delay(1000);
+             vTaskDelay(pdMS_TO_TICKS(1000)); // Dai tempo al tempo
             ESP.restart();
         } else {
             request->send(500, "text/plain", "❌ Failed to save gesture feature configuration.");

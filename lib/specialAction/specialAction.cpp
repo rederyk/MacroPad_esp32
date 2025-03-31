@@ -98,7 +98,9 @@ void SpecialAction::actionDelay(int totalDelayMs)
 
         if (i > 0)
         {
-            delay(intervalMs);
+
+            vTaskDelay(pdMS_TO_TICKS(intervalMs)); // Dai tempo al tempo
+
         }
     }
 }
@@ -126,7 +128,7 @@ int SpecialAction::getKeypadInput(unsigned long timeout)
             Logger::getInstance().log("Timeout");
             return -1;
         }
-        delay(10);
+        vTaskDelay(pdMS_TO_TICKS(10)); // Dai tempo al logger
     }
     return key;
 }

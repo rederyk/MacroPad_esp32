@@ -75,39 +75,26 @@ void PowerManager::enterDeepSleep(bool force)
         return;
     }
 
-    // ASCII visualization of sleep parameters
-    Logger::getInstance().log("┌─────────────────────────────────────┐");
-    Logger::getInstance().log("│ 🔋 SLEEP PARAMS                     │");
-    Logger::getInstance().log("├─────────────┬─────────┬────────────┤");
-    Logger::getInstance().log("│ ⏱️  Timeout  │ 🔔 Wake │ ⏰ Backup   │");
-    delay(20);
-    Logger::getInstance().log("│ " + String(inactivityTimeout / 1000) + "s" + String("          ").substring(0, 10 - String(inactivityTimeout / 1000).length()) + "│ PIN" + String(wakeupPin) + String("     ").substring(0, 7 - String(wakeupPin).length()) + "│ 8h        │");
-    delay(20);
-
-    Logger::getInstance().log("└─────────────┴─────────┴────────────┘");
-    delay(20);
-
-    Logger::getInstance().processBuffer();
-
     // Configure wakeup sources first (before animation)
     esp_sleep_enable_ext0_wakeup(wakeupPin, LOW);
     esp_sleep_enable_timer_wakeup(28800000000ULL); // 8h backup
-
-    // Enhanced final sleep box with system stats
-    Logger::getInstance().log("╔══════════════════════════════════╗");
-    Logger::getInstance().log("║ 💤 DEEP SLEEP MODE ACTIVATED 💤  ║");
-    Logger::getInstance().log("╠══════════════════════════════════╣");
-    delay(20);
-
-    Logger::getInstance().log("║ Mem: " + String(ESP.getFreeHeap() / 1024) + "KB | Uptime: " + String(millis() / 60000) + "m ║");
-    delay(20);
-
-    Logger::getInstance().log("║ Mode: BLE | Next wake: Button/8h ║");
-    Logger::getInstance().log("╚══════════════════════════════════╝");
-    delay(20);
+    // Comprehensive sleep parameters table
+    Logger::getInstance().log("╔═════════════════════════════════════════════════╗");
+    Logger::getInstance().log("║                  🔋 SLEEP PARAMS                 ║");
+    Logger::getInstance().log("╠═════════════════════════════════════════════════╣");
+    Logger::getInstance().log("║ Timeout (s):  " + String(inactivityTimeout / 1000) + String(" ").substring(0, 18 - String(inactivityTimeout / 1000).length()) + "║");
+    Logger::getInstance().log("║ Wakeup Pin:   " + String(wakeupPin) + String(" ").substring(0, 18 - String(wakeupPin).length()) + "║");
+    Logger::getInstance().log("║ Backup Time:  8h" + String(" ").substring(0, 20) + "║");
+    Logger::getInstance().log("║ Free Memory:  " + String(ESP.getFreeHeap() / 1024) + " KB" + String(" ").substring(0, 16 - String(ESP.getFreeHeap() / 1024).length()) + "║");
+    Logger::getInstance().log("║ Uptime:       " + String(millis() / 60000) + " m" + String(" ").substring(0, 18 - String(millis() / 60000).length()) + "║");
+    Logger::getInstance().log("║ Mode:         BLE" + String(" ").substring(0, 20) + "║");
+    Logger::getInstance().log("║ Next Wake:    Button/8h" + String(" ").substring(0, 15) + "║");
+    Logger::getInstance().log("╚═════════════════════════════════════════════════╝");
+    Logger::getInstance().processBuffer();
+    vTaskDelay(pdMS_TO_TICKS(100)); // Dai tempo al tempo
 
     Logger::getInstance().processBuffer();
-    delay(500);
+    vTaskDelay(pdMS_TO_TICKS(500)); // Dai tempo al tempo
 
 
     // Enter deep sleep

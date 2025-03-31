@@ -90,5 +90,7 @@ Usare ext1 con `ANY_HIGH`**
 - metti una spacial action per andare in sleep oltre al timeout..
   "1+2+3+4+5+6+7+8+9": ["ENTER_SLEEP"] [V]
 
+- sostituiti delay  e timing con xtaskdealay [V]
 
 * comuqnue va...
+

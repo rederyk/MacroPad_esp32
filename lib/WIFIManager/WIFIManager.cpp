@@ -1,27 +1,26 @@
 /*
  * ESP32 MacroPad Project
  * Copyright (C) [2025] [Enrico Mori]
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 
 #include "WIFIManager.h"
 #include <DNSServer.h>
 #include <esp_wifi.h>
 #include <Logger.h>
-//#include <Led.h>
+// #include <Led.h>
 
 WIFIManager::WIFIManager() : apEnabled(false), staEnabled(false), webServer(), webServerRunning(false)
 {
@@ -78,7 +77,9 @@ void WIFIManager::beginAP(const char *apSSID, const char *apPassword)
     apEnabled = true;
 
     updateWiFiMode();
-    delay(500);
+    vTaskDelay(pdMS_TO_TICKS(500)); // Dai tempo al tempo
+
+    //  delay(500);
 
     IPAddress apIP(192, 168, 4, 1);
     WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
@@ -90,7 +91,6 @@ void WIFIManager::beginAP(const char *apSSID, const char *apPassword)
         Logger::getInstance().log("✅ AP Mode attivata con successo."
                                   "IP Adress: " +
                                   String(WiFi.softAPIP()));
-
 
         wifi_mode_t mode;
         esp_wifi_get_mode(&mode);
@@ -160,7 +160,9 @@ void WIFIManager::enableSTA(const char *ssid, const char *password)
     staEnabled = true;
 
     updateWiFiMode();
-    delay(1000);
+    vTaskDelay(pdMS_TO_TICKS(500)); // Dai tempo al temoo
+
+    //  delay(1000);
 
     WiFi.begin(ssid, password);
     Logger::getInstance().log("🌐 Connessione alla rete WiFi in corso...");
@@ -168,7 +170,10 @@ void WIFIManager::enableSTA(const char *ssid, const char *password)
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 20)
     {
-        delay(500);
+
+        vTaskDelay(pdMS_TO_TICKS(500)); // Dai tempo al tempo
+
+        //  delay(500);
         Logger::getInstance().log(".", false);
         attempts++;
     }
@@ -178,7 +183,7 @@ void WIFIManager::enableSTA(const char *ssid, const char *password)
         Logger::getInstance().log("\n✅ WiFi connesso con successo."
                                   "IP Adress: " +
                                   String(WiFi.localIP()));
- //       Led::getInstance().setColor(0, 255, 0);
+        //       Led::getInstance().setColor(0, 255, 0);
 
         updateStatus();
     }
@@ -230,7 +235,9 @@ void WIFIManager::updateWiFiMode()
         WiFi.mode(newMode);
         lastMode = newMode;
         Logger::getInstance().log("🔄 Modalità WiFi aggiornata.");
-        delay(100);
+        vTaskDelay(pdMS_TO_TICKS(50)); // Dai tempo al tempo
+
+        //  delay(100);
     }
 
     if (apEnabled || staEnabled)

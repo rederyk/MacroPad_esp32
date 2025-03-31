@@ -6,8 +6,8 @@
     "router_password": "password"
   },
   "system": {
-    "ap_autostart": false,
-    "router_autostart": true,
+    "ap_autostart": true,
+    "router_autostart": false,
     "enable_BLE": false,
     "serial_enabled": true,
     "BleMacAdd": 0,
@@ -49,6 +49,6 @@
     "sampleRate": 100,
     "threshold": 500,
     "axisMap": "zyx",
-    "active": true
+    "active": false
   }
 }

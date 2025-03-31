@@ -205,11 +205,11 @@ void setup()
 
         int mac = systemConfig.BleMacAdd;
         bleController.incrementMacAddress(mac);
-        delay(20);
+        vTaskDelay(pdMS_TO_TICKS(50)); // Dai tempo al BLE
         bleController.incrementName(mac);
-        delay(20);
+        vTaskDelay(pdMS_TO_TICKS(50)); // Dai tempo al BLE
         bleController.startBluetooth();
-        delay(20);
+        vTaskDelay(pdMS_TO_TICKS(50)); // Dai tempo al BLE
 
         Logger::getInstance().log("Free heap after Bluetooth start: " + String(ESP.getFreeHeap()) + " bytes");
         Led::getInstance().setColor(0, 0, 255); // Blu
@@ -236,7 +236,9 @@ void setup()
             while (!wifiManager.isConnected() && (millis() - startTime < wifiConnectTimeout))
             {
 
-                delay(wifiConnectTimeout / 2); // Wait for 5s before checking again
+               // delay(wifiConnectTimeout / 2); // Wait for 5s before checking again
+                vTaskDelay(pdMS_TO_TICKS(wifiConnectTimeout / 2)); // Wait for 5s before checking again
+
                 Logger::getInstance().log("Checking WiFi connection...");
             }
 
@@ -280,12 +282,29 @@ void setup()
 
 void mainLoopTask(void *parameter)
 {
-    static unsigned long lastUpdateTime = 0;
-    const unsigned long updateInterval = 1; // 1ms base interval
+    // Definisci la frequenza desiderata in tick
+    // Prova con un intervallo iniziale, ad esempio 1ms
+    const TickType_t xFrequency = pdMS_TO_TICKS(5); // 1 ms = 1000 µs
+    TickType_t xLastWakeTime;
+
+    // Inizializza xLastWakeTime con il tempo corrente PRIMA di entrare nel loop
+    xLastWakeTime = xTaskGetTickCount(); // Ottiene il conteggio attuale dei tick
+
+    // Variabili per tracciare il tempo massimo
+    long maxExecutionTimeMicros = 0; // Tempo massimo nel periodo di log
+    const unsigned long logIntervalMillis = 5000; // Logga il massimo ogni 5 secondi
+    unsigned long lastLogTime = millis();
+
+    Logger::getInstance().log("mainLoopTask started. Target interval: " + String(pdTICKS_TO_MS(xFrequency)) + " ms. Logging max execution time every " + String(logIntervalMillis) + " ms.");
 
     for (;;)
     {
-        unsigned long now = millis();
+        // --- Inizio Misurazione ---
+        int64_t startTimeMicros = esp_timer_get_time();
+
+        // ----- INIZIO del tuo codice del loop -----
+        // Metti qui TUTTO il codice che vuoi eseguire ad ogni ciclo
+        unsigned long now = millis(); // Necessario per i timestamp degli eventi
 
         // Check for keypad events
         if (keypad->processInput())
@@ -293,11 +312,7 @@ void mainLoopTask(void *parameter)
             TimedEvent timedEvent;
             timedEvent.event = keypad->getEvent();
             timedEvent.timestamp = now;
-            if (eventBuffer.size() < MAX_BUFFER_SIZE)
-            {
-                eventBuffer.push(timedEvent);
-            }
-            // Registra attività utente
+            if (eventBuffer.size() < MAX_BUFFER_SIZE) { eventBuffer.push(timedEvent); }
             powerManager.registerActivity();
         }
 
@@ -307,44 +322,57 @@ void mainLoopTask(void *parameter)
             TimedEvent timedEvent;
             timedEvent.event = rotaryEncoder->getEvent();
             timedEvent.timestamp = now;
-            if (eventBuffer.size() < MAX_BUFFER_SIZE)
-            {
-                eventBuffer.push(timedEvent);
-            }
-            // Registra attività utente
+            if (eventBuffer.size() < MAX_BUFFER_SIZE) { eventBuffer.push(timedEvent); }
             powerManager.registerActivity();
         }
 
         // Process buffered events
         processEvents();
+
+        // --- Operazioni potenzialmente più lunghe ---
         bleController.checkConnection();
+        gestureSensor.updateSampling(); // Assicurati che non blocchi
+        macroManager.update(); // Assicurati che non blocchi
 
-        // Update gesture sampling
-        gestureSensor.updateSampling();
-
-        // Update macro manager
-        macroManager.update();
-
-        // Controlla inattività per sleep mode (solo in BLE mode)
+        // Controlla inattività per sleep mode
         if (powerManager.checkInactivity())
         {
-            Logger::getInstance().log("Inactivity detected, entering sleep mode...");
-
-            // Svuota il buffer del logger
-            Logger::getInstance().processBuffer();
-
-            // Entra in sleep mode
-            powerManager.enterDeepSleep();
-            // powerManager.enterDeepSleepWithMultipleWakeupPins();
+             Logger::getInstance().log("Inactivity detected, entering sleep mode...");
+             Logger::getInstance().processBuffer(); // Svuota prima di dormire
+             vTaskDelay(pdMS_TO_TICKS(50)); // Dai tempo al logger
+             powerManager.enterDeepSleep();
+             // Non ritorna da deep sleep qui
         }
 
+        // Invio log accumulati (può richiedere tempo se buffer pieno)
         Logger::getInstance().processBuffer();
-        // Maintain consistent timing
-        if (now - lastUpdateTime < updateInterval)
+        // ----- FINE del tuo codice del loop -----
+
+        // --- Fine Misurazione ---
+        int64_t endTimeMicros = esp_timer_get_time();
+        long executionTimeMicros = (long)(endTimeMicros - startTimeMicros);
+
+        // Aggiorna il tempo massimo riscontrato *in questo intervallo di log*
+        if (executionTimeMicros > maxExecutionTimeMicros)
         {
-            delay(updateInterval - (now - lastUpdateTime));
+            maxExecutionTimeMicros = executionTimeMicros;
         }
-        lastUpdateTime = now;
+
+        // --- Log Periodico del Massimo ---
+        unsigned long currentTime = millis();
+        if (currentTime - lastLogTime >= logIntervalMillis)
+        {
+            // Logga il tempo massimo trovato negli ultimi 'logIntervalMillis'
+            Logger::getInstance().log("Max loop exec time (last " + String(logIntervalMillis / 1000.0, 1) + "s): " + String(maxExecutionTimeMicros) + " µs");
+
+            // Resetta il massimo per trovare il picco nel prossimo intervallo
+            maxExecutionTimeMicros = 0;
+            lastLogTime = currentTime; // Aggiorna il tempo dell'ultimo log
+        }
+
+        // Attendi fino al prossimo momento di attivazione calcolato
+        // Questo cede il controllo allo scheduler fino al prossimo intervallo
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }
 
