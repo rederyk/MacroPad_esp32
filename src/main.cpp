@@ -1,21 +1,20 @@
 /*
  * ESP32 MacroPad Project
  * Copyright (C) [2025] [Enrico Mori]
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 
 #include <Arduino.h>
 #include <queue>
@@ -38,7 +37,6 @@
 #include "WIFIManager.h"
 #include "specialAction.h"
 #include "powerManager.h"
-
 
 WIFIManager wifiManager; // Create an instance of WIFIManager
 
@@ -236,7 +234,7 @@ void setup()
             while (!wifiManager.isConnected() && (millis() - startTime < wifiConnectTimeout))
             {
 
-               // delay(wifiConnectTimeout / 2); // Wait for 5s before checking again
+                // delay(wifiConnectTimeout / 2); // Wait for 5s before checking again
                 vTaskDelay(pdMS_TO_TICKS(wifiConnectTimeout / 2)); // Wait for 5s before checking again
 
                 Logger::getInstance().log("Checking WiFi connection...");
@@ -291,7 +289,7 @@ void mainLoopTask(void *parameter)
     xLastWakeTime = xTaskGetTickCount(); // Ottiene il conteggio attuale dei tick
 
     // Variabili per tracciare il tempo massimo
-    long maxExecutionTimeMicros = 0; // Tempo massimo nel periodo di log
+    long maxExecutionTimeMicros = 0;              // Tempo massimo nel periodo di log
     const unsigned long logIntervalMillis = 5000; // Logga il massimo ogni 5 secondi
     unsigned long lastLogTime = millis();
 
@@ -312,7 +310,10 @@ void mainLoopTask(void *parameter)
             TimedEvent timedEvent;
             timedEvent.event = keypad->getEvent();
             timedEvent.timestamp = now;
-            if (eventBuffer.size() < MAX_BUFFER_SIZE) { eventBuffer.push(timedEvent); }
+            if (eventBuffer.size() < MAX_BUFFER_SIZE)
+            {
+                eventBuffer.push(timedEvent);
+            }
             powerManager.registerActivity();
         }
 
@@ -322,7 +323,10 @@ void mainLoopTask(void *parameter)
             TimedEvent timedEvent;
             timedEvent.event = rotaryEncoder->getEvent();
             timedEvent.timestamp = now;
-            if (eventBuffer.size() < MAX_BUFFER_SIZE) { eventBuffer.push(timedEvent); }
+            if (eventBuffer.size() < MAX_BUFFER_SIZE)
+            {
+                eventBuffer.push(timedEvent);
+            }
             powerManager.registerActivity();
         }
 
@@ -332,22 +336,22 @@ void mainLoopTask(void *parameter)
         // --- Operazioni potenzialmente più lunghe ---
         bleController.checkConnection();
         gestureSensor.updateSampling(); // Assicurati che non blocchi
-        macroManager.update(); // Assicurati che non blocchi
+        macroManager.update();          // Assicurati che non blocchi
 
         // Controlla inattività per sleep mode
         if (powerManager.checkInactivity())
         {
-             Logger::getInstance().log("Inactivity detected, entering sleep mode...");
-             Logger::getInstance().processBuffer(); // Svuota prima di dormire
-             vTaskDelay(pdMS_TO_TICKS(50)); // Dai tempo al logger
-             powerManager.enterDeepSleep();
-             // Non ritorna da deep sleep qui
+            Logger::getInstance().log("Inactivity detected, entering sleep mode...");
+            Logger::getInstance().processBuffer(); // Svuota prima di dormire
+            vTaskDelay(pdMS_TO_TICKS(50));         // Dai tempo al logger
+            powerManager.enterDeepSleep();
+            // Non ritorna da deep sleep qui
         }
 
         // Invio log accumulati (può richiedere tempo se buffer pieno)
         Logger::getInstance().processBuffer();
         // ----- FINE del tuo codice del loop -----
-
+    /*
         // --- Fine Misurazione ---
         int64_t endTimeMicros = esp_timer_get_time();
         long executionTimeMicros = (long)(endTimeMicros - startTimeMicros);
@@ -358,17 +362,19 @@ void mainLoopTask(void *parameter)
             maxExecutionTimeMicros = executionTimeMicros;
         }
 
-        // --- Log Periodico del Massimo ---
-        unsigned long currentTime = millis();
-        if (currentTime - lastLogTime >= logIntervalMillis)
-        {
-            // Logga il tempo massimo trovato negli ultimi 'logIntervalMillis'
-            Logger::getInstance().log("Max loop exec time (last " + String(logIntervalMillis / 1000.0, 1) + "s): " + String(maxExecutionTimeMicros) + " µs");
+    
+          // --- Log Periodico del Massimo ---
+           unsigned long currentTime = millis();
+           if (currentTime - lastLogTime >= logIntervalMillis)
+           {
+               // Logga il tempo massimo trovato negli ultimi 'logIntervalMillis'
+               Logger::getInstance().log("Max loop exec time (last " + String(logIntervalMillis / 1000.0, 1) + "s): " + String(maxExecutionTimeMicros) + " µs");
 
-            // Resetta il massimo per trovare il picco nel prossimo intervallo
-            maxExecutionTimeMicros = 0;
-            lastLogTime = currentTime; // Aggiorna il tempo dell'ultimo log
-        }
+               // Resetta il massimo per trovare il picco nel prossimo intervallo
+               maxExecutionTimeMicros = 0;
+               lastLogTime = currentTime; // Aggiorna il tempo dell'ultimo log
+           }
+     */
 
         // Attendi fino al prossimo momento di attivazione calcolato
         // Questo cede il controllo allo scheduler fino al prossimo intervallo
