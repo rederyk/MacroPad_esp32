@@ -289,4 +289,7 @@ Reconfigure the BUTTON to trigger `EXECUTE_GESTURE` (e.g., `"BUTTON": ["EXECUTE_
 - **Test and Verify:** 
 Hold the BUTTON and perform your gesture. The log panel on the System Actions page will display the executed gesture along with KNN feature scores, indicating which registered gesture was the closest match.
 
+##  **FAQ**
+### **connection problem**
+ - attenzione a rimuovere i device duplicati da windows ,esempio esp_macropad_1 non si connettera se windows ha gia assiociato esp_macropad_0 o altri,
 
