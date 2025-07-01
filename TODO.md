@@ -27,7 +27,9 @@ The following improvements have been identified in the code:
 
 ## Se cambi nome e resta un device abbinato con il nome vecchio causa un riavvio , bisogna riabbinare il device da capo ,.....forse e un problema solo del mio pc
 
+## memoria limitata json per macro ,dividere il file per ongi set e usare dynamic memory,
 
+## poca reattivita o tasti sovraposti nel tempo ,indagare
 ## BATTERY USAGE...provare la sleep_mode con diverse batterie 
   - lipo 3.7V 820mAh ~2 weeks (ble_mode ,sleep 50s)
 
