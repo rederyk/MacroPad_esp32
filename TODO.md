@@ -9,6 +9,11 @@ The following improvements have been identified in the code:
 
 # TODO
 
+- memoria si riempie con le gesture , migliora la gestione del buffer senza farlo crashare
+
+- accelerometro mpu implementato e testato ma,  necessita di aggiunta feature esclusive gyro e temp ,perche ce la temp a quanto pare, inoltre dovremmo ritestare adxl per sapere se va ancora dopo le modifiche
+
+
 ## impostare combo_timout dalle config[]
 
 

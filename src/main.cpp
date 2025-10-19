@@ -150,20 +150,31 @@ void setup()
     Logger::getInstance().log("Loaded " + String(macroManager.combinations.size()) + " combinations");
 
     // Initialize I2C with configured pins
-    // TODO make optional
+
     const AccelerometerConfig &accelConfig = configManager.getAccelerometerConfig();
     if (accelConfig.active)
     {
         Wire.begin(accelConfig.sdaPin, accelConfig.sclPin);
 
-        // Start the sensor
-        if (!gestureSensor.begin())
+        String accelType = accelConfig.type.length() > 0 ? accelConfig.type : "adxl345";
+        accelType.toLowerCase();
+        String message = "Initialising accelerometer type: " + accelType;
+        if (accelConfig.address)
         {
-            Logger::getInstance().log("Could not find ADXL345 sensor. Check wiring!");
-            // TODO rendere acceleroemtro opzionale
+            message += " (0x";
+            message += String(accelConfig.address, HEX);
+            message += ")";
+        }
+        Logger::getInstance().log(message);
 
-            while (1)
-                ;
+        // Start the sensor
+        if (!gestureSensor.begin(accelConfig))
+        {
+            Logger::getInstance().log("Accelerometer init failed, continuing without gesture support.");
+        }
+        else
+        {
+            Logger::getInstance().log("Accelerometer initialised successfully.");
         }
     }
     // Initialize hardware with configurations

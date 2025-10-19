@@ -3,11 +3,11 @@
     "ap_ssid": "ESP32_MacroPad",
     "ap_password": "my_cat_name123",
     "router_ssid": "FASTWEB-2",
-    "router_password": "password"
+    "router_password": "figlioDIputtan@8964"
   },
   "system": {
-    "ap_autostart": true,
-    "router_autostart": false,
+    "ap_autostart": false,
+    "router_autostart": true,
     "enable_BLE": false,
     "serial_enabled": true,
     "BleMacAdd": 0,
@@ -40,7 +40,7 @@
     "pinGreen": 26,
     "pinBlue": 27,
     "anode_common": false,
-    "active": true
+    "active": false
   },
   "accelerometer": {
     "sdaPin": 19,
@@ -49,6 +49,8 @@
     "sampleRate": 100,
     "threshold": 500,
     "axisMap": "zyx",
-    "active": false
+    "active": true,
+    "type": "mpu6050",
+    "address": 104
   }
 }

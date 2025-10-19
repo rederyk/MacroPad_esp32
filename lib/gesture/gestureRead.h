@@ -22,7 +22,8 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <ADXL345.h>
+#include "configTypes.h"
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -48,13 +49,15 @@ struct SampleBuffer
     uint16_t sampleHZ;
 };
 
+class AccelerometerDriver;
+
 class GestureRead
 {
 public:
-    GestureRead(uint8_t i2cAddress = ADXL345_ALT, TwoWire *wire = &Wire);
+    GestureRead(TwoWire *wire = &Wire);
     ~GestureRead(); // Destructor declaration
 
-    bool begin();
+    bool begin(const AccelerometerConfig &config);
     bool calibrate(uint16_t calibrationSamples = 5);
 
     // Power management methods
@@ -78,7 +81,14 @@ public:
     void updateSampling(); // Call this regularly from main loop
 
 private:
-    ADXL345 _accelerometer;
+    float getAxisValue(uint8_t axisIndex);
+    void applyAxisMap(const String &axisMap);
+
+    std::unique_ptr<AccelerometerDriver> _driver;
+    AccelerometerConfig _config;
+    bool _configLoaded;
+    TwoWire *_wire;
+
     Offset _calibrationOffset;
     bool _isCalibrated;
     String _axisMap;

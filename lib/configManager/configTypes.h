@@ -58,6 +58,8 @@ struct AccelerometerConfig
     int threshold;
     String axisMap;
     bool active;
+    String type;
+    uint8_t address;
 };
 
 struct WifiConfig
