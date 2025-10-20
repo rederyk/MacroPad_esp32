@@ -20,12 +20,32 @@
   "keypad": {
     "rows": 3,
     "cols": 3,
-    "rowPins": [0, 4, 16],
-    "colPins": [17, 5, 18],
+    "rowPins": [
+      0,
+      4,
+      16
+    ],
+    "colPins": [
+      17,
+      5,
+      18
+    ],
     "keys": [
-      ["1", "2", "3"],
-      ["4", "5", "6"],
-      ["7", "8", "9"]
+      [
+        "1",
+        "2",
+        "3"
+      ],
+      [
+        "4",
+        "5",
+        "6"
+      ],
+      [
+        "7",
+        "8",
+        "9"
+      ]
     ],
     "invertDirection": true
   },
@@ -41,6 +61,15 @@
     "pinBlue": 27,
     "anode_common": false,
     "active": false
+  },
+  "irLed": {
+    "pin": 33,
+    "anodeGpio": true,
+    "active": true
+  },
+  "irSensor": {
+    "pin": 14,
+    "active": true
   },
   "accelerometer": {
     "sdaPin": 19,

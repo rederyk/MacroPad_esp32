@@ -84,5 +84,5 @@ struct SystemConfig
     unsigned long sleep_timeout_ms; // Timeout di inattività in millisecondi
     gpio_num_t wakeup_pin;                 // Pin GPIO per il wakeup
 };
-
+// TODO add config for ir from json in all class
 #endif
