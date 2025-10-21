@@ -914,13 +914,19 @@ bool GestureRead::stopSampling()
 
     _isSampling = false;
 
-    if (_sampleBuffer.sampleCount >= _maxSamples)
+    const bool bufferWasFull = _sampleBuffer.sampleCount >= _maxSamples;
+    if (bufferWasFull)
     {
         Logger::getInstance().log("Stopped sampling - buffer full (" + String(_maxSamples) + " samples collected)");
-        return true;
     }
 
-    return standby();
+    if (!standby())
+    {
+        Logger::getInstance().log("Failed to enter accelerometer standby after sampling stop");
+        return false;
+    }
+
+    return true;
 }
 
 SampleBuffer &GestureRead::getCollectedSamples()
@@ -953,7 +959,19 @@ bool GestureRead::standby()
     {
         return false;
     }
-    return _driver->stop();
+
+    if (!enableLowPowerMode())
+    {
+        Logger::getInstance().log("Failed to configure accelerometer low power mode");
+    }
+
+    if (!_driver->stop())
+    {
+        return false;
+    }
+
+    lastSampleTime = 0;
+    return true;
 }
 
 bool GestureRead::wakeup()
