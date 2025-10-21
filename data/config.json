@@ -15,7 +15,7 @@
     "BleName": "Macropad_esp32",
     "sleep_enabled": true,
     "sleep_timeout_ms": 50000,
-    "wakeup_pin": 2
+    "wakeup_pin": 32
   },
   "keypad": {
     "rows": 3,
@@ -60,7 +60,7 @@
     "pinGreen": 26,
     "pinBlue": 27,
     "anode_common": false,
-    "active": false
+    "active": true
   },
   "irLed": {
     "pin": 33,
