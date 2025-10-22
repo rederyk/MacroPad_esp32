@@ -128,7 +128,10 @@ bool GestureRead::begin(const AccelerometerConfig &config)
             duration = std::max<uint8_t>(duration, static_cast<uint8_t>(5));
         }
 
-        if (!_sensor->configureMotionWakeup(threshold, duration, highPass, cycle))
+        const bool wakeConfigured = _sensor->configureMotionWakeup(threshold, duration, highPass, cycle);
+        _motionWakeEnabled = wakeConfigured;
+
+        if (!wakeConfigured)
         {
             Logger::getInstance().log("Motion wakeup not supported by accelerometer driver");
         }
@@ -140,6 +143,7 @@ bool GestureRead::begin(const AccelerometerConfig &config)
     else
     {
         _sensor->disableMotionWakeup();
+        _motionWakeEnabled = false;
     }
 
     return standby();
