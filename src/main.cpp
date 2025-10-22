@@ -113,7 +113,7 @@ void setup()
 
     logger.setSerialEnabled(serialEnabled);
     // Inizializza il PowerManager con la configurazione
-    powerManager.begin(configManager.getSystemConfig(), configManager.getKeypadConfig());
+    powerManager.begin(configManager.getSystemConfig(), configManager.getKeypadConfig(), configManager.getEncoderConfig());
 
     // Load combinations
     if (!comboManager.loadCombinations(configManager.getSystemConfig().BleMacAdd))

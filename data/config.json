@@ -80,6 +80,11 @@
     "axisMap": "zyx",
     "active": true,
     "type": "mpu6050",
-    "address": 104
+    "address": 104,
+    "motionWakeEnabled": true,
+    "motionWakeThreshold": 5,
+    "motionWakeDuration": 10,
+    "motionWakeHighPass": 10,
+    "motionWakeCycleRate": 0
   }
 }

@@ -65,6 +65,11 @@ bool ConfigurationManager::loadConfig()
     keypadConfig = KeypadConfig();
     encoderConfig = EncoderConfig();
     accelerometerConfig = AccelerometerConfig();
+    accelerometerConfig.motionWakeEnabled = false;
+    accelerometerConfig.motionWakeThreshold = 1;
+    accelerometerConfig.motionWakeDuration = 20;
+    accelerometerConfig.motionWakeHighPass = 4; // default to MPU6050_HIGHPASS_0_63_HZ
+    accelerometerConfig.motionWakeCycleRate = 1; // default to MPU6050_CYCLE_5_HZ
     wifiConfig = WifiConfig();
     ledConfig = LedConfig();
 
@@ -220,6 +225,16 @@ bool ConfigurationManager::loadConfig()
             this->accelerometerConfig.type = accelerometerConfig["type"].as<const char *>();
         if (accelerometerConfig.containsKey("address"))
             this->accelerometerConfig.address = accelerometerConfig["address"];
+        if (accelerometerConfig.containsKey("motionWakeEnabled"))
+            this->accelerometerConfig.motionWakeEnabled = accelerometerConfig["motionWakeEnabled"];
+        if (accelerometerConfig.containsKey("motionWakeThreshold"))
+            this->accelerometerConfig.motionWakeThreshold = accelerometerConfig["motionWakeThreshold"];
+        if (accelerometerConfig.containsKey("motionWakeDuration"))
+            this->accelerometerConfig.motionWakeDuration = accelerometerConfig["motionWakeDuration"];
+        if (accelerometerConfig.containsKey("motionWakeHighPass"))
+            this->accelerometerConfig.motionWakeHighPass = accelerometerConfig["motionWakeHighPass"];
+        if (accelerometerConfig.containsKey("motionWakeCycleRate"))
+            this->accelerometerConfig.motionWakeCycleRate = accelerometerConfig["motionWakeCycleRate"];
     }
 
     configFile.close();

@@ -66,6 +66,12 @@ public:
     bool standby();
     bool wakeup();
 
+    bool configureMotionWakeup(uint8_t threshold, uint8_t duration, uint8_t highPassCode, uint8_t cycleRateCode);
+    bool disableMotionWakeup();
+    bool isMotionWakeEnabled() const;
+    bool clearMotionWakeInterrupt();
+    bool isMotionWakeTriggered();
+
     // New methods for continuous sampling
     bool startSampling();
     bool stopSampling();
@@ -99,6 +105,7 @@ private:
     bool _isSampling;
     bool _bufferFull;
     unsigned long lastSampleTime;
+    bool _motionWakeEnabled;
 
     SampleBuffer _sampleBuffer;
     uint16_t _maxSamples;

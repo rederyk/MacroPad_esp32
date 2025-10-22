@@ -39,8 +39,17 @@ constexpr uint16_t kLowPowerSampleHz = 12;
 constexpr uint8_t MPU6050_REG_SMPLRT_DIV = 0x19;
 constexpr uint8_t MPU6050_REG_CONFIG = 0x1A;
 constexpr uint8_t MPU6050_REG_ACCEL_CONFIG = 0x1C;
+constexpr uint8_t MPU6050_REG_LP_ACCEL_ODR = 0x1E;
+constexpr uint8_t MPU6050_REG_MOT_THR = 0x1F;
+constexpr uint8_t MPU6050_REG_MOT_DUR = 0x20;
+constexpr uint8_t MPU6050_REG_INT_PIN_CFG = 0x37;
+constexpr uint8_t MPU6050_REG_INT_ENABLE = 0x38;
+constexpr uint8_t MPU6050_REG_INT_STATUS = 0x3A;
 constexpr uint8_t MPU6050_REG_PWR_MGMT_1 = 0x6B;
+constexpr uint8_t MPU6050_REG_PWR_MGMT_2 = 0x6C;
+constexpr uint8_t MPU6050_REG_MOT_DETECT_CTRL = 0x69;
 constexpr uint8_t MPU6050_REG_ACCEL_XOUT_H = 0x3B;
+constexpr uint8_t MPU6050_INT_MOTION_BIT = 0x40;
 
 class AccelerometerDriver
 {
@@ -56,6 +65,31 @@ public:
     virtual float readZ() const = 0;
     virtual bool setSampleRate(uint16_t hz, bool lowPower) = 0;
     virtual bool setRange(float g) = 0;
+    virtual bool configureMotionWakeup(uint8_t threshold, uint8_t duration, uint8_t highPassCode, uint8_t cycleRateCode)
+    {
+        (void)threshold;
+        (void)duration;
+        (void)highPassCode;
+        (void)cycleRateCode;
+        return false;
+    }
+    virtual bool disableMotionWakeup()
+    {
+        return true;
+    }
+    virtual bool isMotionWakeupConfigured() const
+    {
+        return false;
+    }
+    virtual bool clearMotionInterrupt()
+    {
+        return true;
+    }
+    virtual bool getMotionInterruptStatus(bool clear)
+    {
+        (void)clear;
+        return false;
+    }
 };
 
 namespace
@@ -283,7 +317,9 @@ namespace
     public:
         MPU6050Driver(TwoWire *wire, uint8_t address)
             : _wire(wire),
-              _address(address ? address : MPU6050_I2CADDR_DEFAULT)
+              _address(address ? address : MPU6050_I2CADDR_DEFAULT),
+              _motionWakeEnabled(false),
+              _motionWakeCycleCode(static_cast<uint8_t>(MPU6050_CYCLE_5_HZ))
         {
         }
 
@@ -318,6 +354,11 @@ namespace
 
         bool stop() override
         {
+            if (_motionWakeEnabled)
+            {
+                _sensor.enableSleep(false);
+                return true;
+            }
             return _sensor.enableSleep(true);
         }
 
@@ -354,7 +395,11 @@ namespace
             if (lowPower)
             {
                 _sensor.enableCycle(true);
-                if (hz <= 2)
+                if (_motionWakeEnabled)
+                {
+                    _sensor.setCycleRate(static_cast<mpu6050_cycle_rate_t>(_motionWakeCycleCode));
+                }
+                else if (hz <= 2)
                 {
                     _sensor.setCycleRate(MPU6050_CYCLE_1_25_HZ);
                 }
@@ -399,12 +444,73 @@ namespace
             }
             return true;
         }
+        bool configureMotionWakeup(uint8_t threshold, uint8_t duration, uint8_t highPassCode, uint8_t cycleRateCode) override
+        {
+            if (highPassCode > static_cast<uint8_t>(MPU6050_HIGHPASS_HOLD))
+            {
+                highPassCode = static_cast<uint8_t>(MPU6050_HIGHPASS_0_63_HZ);
+            }
+
+            if (cycleRateCode > static_cast<uint8_t>(MPU6050_CYCLE_40_HZ))
+            {
+                cycleRateCode = static_cast<uint8_t>(MPU6050_CYCLE_5_HZ);
+            }
+
+            mpu6050_highpass_t highPass = static_cast<mpu6050_highpass_t>(highPassCode);
+            mpu6050_cycle_rate_t cycleRate = static_cast<mpu6050_cycle_rate_t>(cycleRateCode);
+
+            _sensor.enableCycle(false);
+            _sensor.enableSleep(false);
+            _sensor.setMotionInterrupt(false);
+
+            _sensor.setHighPassFilter(highPass);
+            _sensor.setMotionDetectionThreshold(threshold);
+            _sensor.setMotionDetectionDuration(duration);
+            _sensor.setInterruptPinPolarity(true);
+            _sensor.setInterruptPinLatch(false);
+            _sensor.setMotionInterrupt(true);
+            _sensor.setCycleRate(cycleRate);
+            _sensor.enableCycle(true);
+            _sensor.getMotionInterruptStatus(); // clear any latched state
+
+            _motionWakeEnabled = true;
+            _motionWakeCycleCode = cycleRateCode;
+            return true;
+        }
+
+        bool disableMotionWakeup() override
+        {
+            _sensor.setMotionInterrupt(false);
+            _sensor.enableCycle(false);
+            _sensor.enableSleep(false);
+            _motionWakeEnabled = false;
+            return true;
+        }
+
+        bool isMotionWakeupConfigured() const override
+        {
+            return _motionWakeEnabled;
+        }
+
+        bool clearMotionInterrupt() override
+        {
+            _sensor.getMotionInterruptStatus();
+            return true;
+        }
+
+        bool getMotionInterruptStatus(bool clear) override
+        {
+            (void)clear;
+            return _sensor.getMotionInterruptStatus();
+        }
 
     private:
         TwoWire *_wire;
         uint8_t _address;
         Adafruit_MPU6050 _sensor;
         sensors_event_t _accelEvent{};
+        bool _motionWakeEnabled;
+        uint8_t _motionWakeCycleCode;
     };
 
     class MPU6050CloneDriver final : public AccelerometerDriver
@@ -417,7 +523,12 @@ namespace
               _sampleRate(kDefaultSampleHz),
               _accelX(0.0f),
               _accelY(0.0f),
-              _accelZ(0.0f)
+              _accelZ(0.0f),
+              _motionWakeEnabled(false),
+              _motionWakeThreshold(0),
+              _motionWakeDuration(0),
+              _motionWakeCycleCode(static_cast<uint8_t>(MPU6050_CYCLE_5_HZ)),
+              _motionWakeHighPassCode(static_cast<uint8_t>(MPU6050_HIGHPASS_0_63_HZ))
         {
         }
 
@@ -458,6 +569,10 @@ namespace
 
         bool stop() override
         {
+            if (_motionWakeEnabled)
+            {
+                return modifyRegister(_wire, _address, MPU6050_REG_PWR_MGMT_1, 0x40, 0x00);
+            }
             return modifyRegister(_wire, _address, MPU6050_REG_PWR_MGMT_1, 0x40, 0x40);
         }
 
@@ -547,6 +662,143 @@ namespace
             return true;
         }
 
+        bool configureMotionWakeup(uint8_t threshold, uint8_t duration, uint8_t highPassCode, uint8_t cycleRateCode) override
+        {
+            (void)cycleRateCode; // clone driver ignores cycle rate hints
+
+            _motionWakeEnabled = false;
+            threshold = std::max<uint8_t>(threshold, static_cast<uint8_t>(5));
+            duration = std::max<uint8_t>(duration, static_cast<uint8_t>(5));
+
+            highPassCode &= 0x07;
+            _motionWakeThreshold = threshold;
+            _motionWakeDuration = duration;
+            _motionWakeCycleCode = cycleRateCode & 0x0F;
+            _motionWakeHighPassCode = highPassCode;
+
+            if (!modifyRegister(_wire, _address, MPU6050_REG_PWR_MGMT_1, 0x40, 0x00)) // ensure awake
+            {
+                return false;
+            }
+
+            if (!modifyRegister(_wire, _address, MPU6050_REG_PWR_MGMT_1, 0x20, 0x00)) // disable cycle during config
+            {
+                return false;
+            }
+
+            if (!modifyRegister(_wire, _address, MPU6050_REG_ACCEL_CONFIG, 0x07, highPassCode))
+            {
+                return false;
+            }
+
+            if (!writeRegister(_wire, _address, MPU6050_REG_MOT_THR, threshold))
+            {
+                return false;
+            }
+
+            if (!writeRegister(_wire, _address, MPU6050_REG_MOT_DUR, duration))
+            {
+                return false;
+            }
+
+            if (!modifyRegister(_wire, _address, MPU6050_REG_INT_PIN_CFG, 0x80, 0x80)) // INT active low
+            {
+                return false;
+            }
+
+            if (!modifyRegister(_wire, _address, MPU6050_REG_INT_PIN_CFG, 0x40, 0x40)) // open drain
+            {
+                return false;
+            }
+
+            if (!modifyRegister(_wire, _address, MPU6050_REG_INT_PIN_CFG, 0x20, 0x20)) // latch until cleared
+            {
+                return false;
+            }
+
+            if (!modifyRegister(_wire, _address, MPU6050_REG_INT_ENABLE, MPU6050_INT_MOTION_BIT, MPU6050_INT_MOTION_BIT))
+            {
+                return false;
+            }
+
+            if (!writeRegister(_wire, _address, MPU6050_REG_MOT_DETECT_CTRL, 0x15))
+            {
+                return false;
+            }
+
+            if (!writeRegister(_wire, _address, MPU6050_REG_PWR_MGMT_2, 0x07)) // disable gyros
+            {
+                return false;
+            }
+
+            uint8_t lpRate = cycleRateCode & 0x0F;
+            if (!writeRegister(_wire, _address, MPU6050_REG_LP_ACCEL_ODR, lpRate))
+            {
+                return false;
+            }
+
+            if (!modifyRegister(_wire, _address, MPU6050_REG_PWR_MGMT_1, 0x20, 0x20)) // enable cycle
+            {
+                return false;
+            }
+
+            // Clear any pending interrupt
+            uint8_t status = 0;
+            readRegister(_wire, _address, MPU6050_REG_INT_STATUS, status);
+            vTaskDelay(pdMS_TO_TICKS(20));
+
+            _motionWakeEnabled = true;
+            return true;
+        }
+
+        bool disableMotionWakeup() override
+        {
+            if (!modifyRegister(_wire, _address, MPU6050_REG_INT_ENABLE, MPU6050_INT_MOTION_BIT, 0x00))
+            {
+                return false;
+            }
+            if (!modifyRegister(_wire, _address, MPU6050_REG_PWR_MGMT_1, 0x20, 0x00))
+            {
+                return false;
+            }
+            if (!writeRegister(_wire, _address, MPU6050_REG_MOT_DETECT_CTRL, 0x00))
+            {
+                return false;
+            }
+            if (!writeRegister(_wire, _address, MPU6050_REG_PWR_MGMT_2, 0x00))
+            {
+                return false;
+            }
+            if (!modifyRegister(_wire, _address, MPU6050_REG_INT_PIN_CFG, 0xE0, 0x00))
+            {
+                return false;
+            }
+            _motionWakeEnabled = false;
+            return true;
+        }
+
+        bool isMotionWakeupConfigured() const override
+        {
+            return _motionWakeEnabled;
+        }
+
+        bool clearMotionInterrupt() override
+        {
+            uint8_t status = 0;
+            return readRegister(_wire, _address, MPU6050_REG_INT_STATUS, status);
+        }
+
+        bool getMotionInterruptStatus(bool clear) override
+        {
+            (void)clear;
+            uint8_t status = 0;
+            if (!readRegister(_wire, _address, MPU6050_REG_INT_STATUS, status))
+            {
+                return false;
+            }
+            return (status & MPU6050_INT_MOTION_BIT) != 0;
+        }
+
     private:
         bool resetDevice()
         {
@@ -571,6 +823,11 @@ namespace
         float _accelX;
         float _accelY;
         float _accelZ;
+        bool _motionWakeEnabled;
+        uint8_t _motionWakeThreshold;
+        uint8_t _motionWakeDuration;
+        uint8_t _motionWakeCycleCode;
+        uint8_t _motionWakeHighPassCode;
     };
 
     std::unique_ptr<AccelerometerDriver> createDriver(const AccelerometerConfig &config, TwoWire *wire, bool useCloneDriver)
@@ -720,7 +977,8 @@ GestureRead::GestureRead(TwoWire *wire)
       _axisDir("++-"),
       _isSampling(false),
       _bufferFull(false),
-      lastSampleTime(0)
+      lastSampleTime(0),
+      _motionWakeEnabled(false)
 {
     _calibrationOffset = {0, 0, 0};
     _sampleHZ = kDefaultSampleHz;
@@ -815,6 +1073,42 @@ bool GestureRead::begin(const AccelerometerConfig &config)
     _driver->setSampleRate(_sampleHZ, false);
 
     Logger::getInstance().log("Accelerometer initialised: " + String(_driver->name()));
+
+    _motionWakeEnabled = false;
+    if (_config.motionWakeEnabled)
+    {
+        uint8_t threshold = _config.motionWakeThreshold > 0 ? _config.motionWakeThreshold : 1;
+        uint8_t duration = _config.motionWakeDuration > 0 ? _config.motionWakeDuration : 1;
+        uint8_t highPass = _config.motionWakeHighPass <= static_cast<uint8_t>(MPU6050_HIGHPASS_HOLD) ? _config.motionWakeHighPass : static_cast<uint8_t>(MPU6050_HIGHPASS_0_63_HZ);
+        uint8_t cycle = _config.motionWakeCycleRate <= static_cast<uint8_t>(MPU6050_CYCLE_40_HZ) ? _config.motionWakeCycleRate : static_cast<uint8_t>(MPU6050_CYCLE_5_HZ);
+
+        if (probeResult.isClone)
+        {
+            if (threshold < 5)
+            {
+                Logger::getInstance().log("Motion threshold raised for clone from " + String(threshold) + " to 5 to avoid false wakeups");
+                threshold = 5;
+            }
+            if (duration < 5)
+            {
+                Logger::getInstance().log("Motion duration raised for clone from " + String(duration) + " to 5 to avoid false wakeups");
+                duration = 5;
+            }
+        }
+
+        if (configureMotionWakeup(threshold, duration, highPass, cycle))
+        {
+            Logger::getInstance().log("Motion wakeup armed (thr=" + String(threshold) + ", dur=" + String(duration) + ")");
+        }
+        else
+        {
+            Logger::getInstance().log("Motion wakeup not supported by accelerometer driver");
+        }
+    }
+    else
+    {
+        disableMotionWakeup();
+    }
 
     return standby();
 }
@@ -960,6 +1254,8 @@ bool GestureRead::standby()
         return false;
     }
 
+    const bool motionWakeActive = isMotionWakeEnabled();
+
     if (!enableLowPowerMode())
     {
         Logger::getInstance().log("Failed to configure accelerometer low power mode");
@@ -969,6 +1265,8 @@ bool GestureRead::standby()
     {
         return false;
     }
+
+    _motionWakeEnabled = motionWakeActive && _driver->isMotionWakeupConfigured();
 
     lastSampleTime = 0;
     return true;
@@ -981,6 +1279,61 @@ bool GestureRead::wakeup()
         return false;
     }
     return _driver->start();
+}
+
+bool GestureRead::configureMotionWakeup(uint8_t threshold, uint8_t duration, uint8_t highPassCode, uint8_t cycleRateCode)
+{
+    if (!_driver)
+    {
+        return false;
+    }
+
+    if (!_driver->configureMotionWakeup(threshold, duration, highPassCode, cycleRateCode))
+    {
+        return false;
+    }
+
+    _motionWakeEnabled = _driver->isMotionWakeupConfigured();
+    return _motionWakeEnabled;
+}
+
+bool GestureRead::disableMotionWakeup()
+{
+    if (!_driver)
+    {
+        return false;
+    }
+
+    if (!_driver->disableMotionWakeup())
+    {
+        return false;
+    }
+
+    _motionWakeEnabled = false;
+    return true;
+}
+
+bool GestureRead::isMotionWakeEnabled() const
+{
+    return _motionWakeEnabled && _driver && _driver->isMotionWakeupConfigured();
+}
+
+bool GestureRead::clearMotionWakeInterrupt()
+{
+    if (!_driver || !_motionWakeEnabled)
+    {
+        return false;
+    }
+    return _driver->clearMotionInterrupt();
+}
+
+bool GestureRead::isMotionWakeTriggered()
+{
+    if (!_driver || !_motionWakeEnabled)
+    {
+        return false;
+    }
+    return _driver->getMotionInterruptStatus(true);
 }
 
 float GestureRead::getAxisValue(uint8_t index)

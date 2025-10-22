@@ -60,6 +60,11 @@ struct AccelerometerConfig
     bool active;
     String type;
     uint8_t address;
+    bool motionWakeEnabled;
+    uint8_t motionWakeThreshold;
+    uint8_t motionWakeDuration;
+    uint8_t motionWakeHighPass;
+    uint8_t motionWakeCycleRate;
 };
 
 struct WifiConfig
