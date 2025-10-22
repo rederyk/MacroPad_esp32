@@ -175,6 +175,14 @@ void setup()
         else
         {
             Logger::getInstance().log("Accelerometer initialised successfully.");
+            if (gestureSensor.calibrate())
+            {
+                Logger::getInstance().log("Accelerometer calibration completed at startup.");
+            }
+            else
+            {
+                Logger::getInstance().log("Accelerometer calibration failed at startup.");
+            }
         }
     }
     // Initialize hardware with configurations
@@ -343,6 +351,7 @@ void mainLoopTask(void *parameter)
 
         // Process buffered events
         processEvents();
+
 
         // --- Operazioni potenzialmente più lunghe ---
         bleController.checkConnection();

@@ -35,6 +35,11 @@
 constexpr float kGravity = 9.80665f;
 constexpr uint16_t kDefaultSampleHz = 100;
 constexpr uint16_t kLowPowerSampleHz = 12;
+constexpr uint32_t kGyroReadyTimeoutMs = 300;
+constexpr uint32_t kGyroReadyPollDelayMs = 5;
+constexpr float kGyroReadyMinAccelSum = 0.05f;
+constexpr float kGyroReadyNoiseFloor = 1e-4f;
+constexpr uint8_t kGyroReadyZeroTolerance = 5;
 
 constexpr uint8_t MPU6050_REG_SMPLRT_DIV = 0x19;
 constexpr uint8_t MPU6050_REG_CONFIG = 0x1A;
@@ -63,6 +68,30 @@ public:
     virtual float readX() const = 0;
     virtual float readY() const = 0;
     virtual float readZ() const = 0;
+    virtual bool hasGyroscope() const
+    {
+        return false;
+    }
+    virtual float readGyroX() const
+    {
+        return 0.0f;
+    }
+    virtual float readGyroY() const
+    {
+        return 0.0f;
+    }
+    virtual float readGyroZ() const
+    {
+        return 0.0f;
+    }
+    virtual bool hasTemperature() const
+    {
+        return false;
+    }
+    virtual float readTemperatureC() const
+    {
+        return 0.0f;
+    }
     virtual bool setSampleRate(uint16_t hz, bool lowPower) = 0;
     virtual bool setRange(float g) = 0;
     virtual bool configureMotionWakeup(uint8_t threshold, uint8_t duration, uint8_t highPassCode, uint8_t cycleRateCode)
@@ -318,6 +347,8 @@ namespace
         MPU6050Driver(TwoWire *wire, uint8_t address)
             : _wire(wire),
               _address(address ? address : MPU6050_I2CADDR_DEFAULT),
+              _hasGyro(false),
+              _hasTemp(false),
               _motionWakeEnabled(false),
               _motionWakeCycleCode(static_cast<uint8_t>(MPU6050_CYCLE_5_HZ))
         {
@@ -364,9 +395,17 @@ namespace
 
         bool update() override
         {
-            sensors_event_t gyro;
-            sensors_event_t temp;
-            return _sensor.getEvent(&_accelEvent, &gyro, &temp);
+            sensors_event_t gyro{};
+            sensors_event_t temp{};
+            bool ok = _sensor.getEvent(&_accelEvent, &gyro, &temp);
+            if (ok)
+            {
+                _gyroEvent = gyro;
+                _tempEvent = temp;
+            }
+            _hasGyro = ok;
+            _hasTemp = ok;
+            return ok;
         }
 
         float readX() const override
@@ -382,6 +421,36 @@ namespace
         float readZ() const override
         {
             return _accelEvent.acceleration.z / kGravity;
+        }
+
+        bool hasGyroscope() const override
+        {
+            return _hasGyro;
+        }
+
+        float readGyroX() const override
+        {
+            return _gyroEvent.gyro.x;
+        }
+
+        float readGyroY() const override
+        {
+            return _gyroEvent.gyro.y;
+        }
+
+        float readGyroZ() const override
+        {
+            return _gyroEvent.gyro.z;
+        }
+
+        bool hasTemperature() const override
+        {
+            return _hasTemp;
+        }
+
+        float readTemperatureC() const override
+        {
+            return _tempEvent.temperature;
         }
 
         bool setSampleRate(uint16_t hz, bool lowPower) override
@@ -509,6 +578,10 @@ namespace
         uint8_t _address;
         Adafruit_MPU6050 _sensor;
         sensors_event_t _accelEvent{};
+        sensors_event_t _gyroEvent{};
+        sensors_event_t _tempEvent{};
+        bool _hasGyro;
+        bool _hasTemp;
         bool _motionWakeEnabled;
         uint8_t _motionWakeCycleCode;
     };
@@ -524,6 +597,12 @@ namespace
               _accelX(0.0f),
               _accelY(0.0f),
               _accelZ(0.0f),
+              _gyroX(0.0f),
+              _gyroY(0.0f),
+              _gyroZ(0.0f),
+              _temperatureC(0.0f),
+              _hasGyro(false),
+              _hasTemperature(false),
               _motionWakeEnabled(false),
               _motionWakeThreshold(0),
               _motionWakeDuration(0),
@@ -564,7 +643,17 @@ namespace
 
         bool start() override
         {
-            return modifyRegister(_wire, _address, MPU6050_REG_PWR_MGMT_1, 0x40, 0x00);
+            if (!modifyRegister(_wire, _address, MPU6050_REG_PWR_MGMT_1, 0x40, 0x00))
+            {
+                return false;
+            }
+            // Ensure all axes are enabled when entering active mode
+            if (!writeRegister(_wire, _address, MPU6050_REG_PWR_MGMT_2, 0x00))
+            {
+                Logger::getInstance().log("MPU6050-Clone start: failed to enable gyro/accel axes");
+                return false;
+            }
+            return true;
         }
 
         bool stop() override
@@ -578,7 +667,7 @@ namespace
 
         bool update() override
         {
-            uint8_t data[6] = {0};
+            uint8_t data[14] = {0};
             if (!readRegisters(_wire, _address, MPU6050_REG_ACCEL_XOUT_H, data, sizeof(data)))
             {
                 return false;
@@ -587,10 +676,24 @@ namespace
             int16_t rawX = static_cast<int16_t>((data[0] << 8) | data[1]);
             int16_t rawY = static_cast<int16_t>((data[2] << 8) | data[3]);
             int16_t rawZ = static_cast<int16_t>((data[4] << 8) | data[5]);
+            int16_t rawTemp = static_cast<int16_t>((data[6] << 8) | data[7]);
+            int16_t rawGyroX = static_cast<int16_t>((data[8] << 8) | data[9]);
+            int16_t rawGyroY = static_cast<int16_t>((data[10] << 8) | data[11]);
+            int16_t rawGyroZ = static_cast<int16_t>((data[12] << 8) | data[13]);
 
             _accelX = static_cast<float>(rawX) / _scale;
             _accelY = static_cast<float>(rawY) / _scale;
             _accelZ = static_cast<float>(rawZ) / _scale;
+
+            constexpr float gyroScale = 131.0f; // LSB/deg/s at +/-250 deg/s
+            _gyroX = (static_cast<float>(rawGyroX) / gyroScale) * DEG_TO_RAD;
+            _gyroY = (static_cast<float>(rawGyroY) / gyroScale) * DEG_TO_RAD;
+            _gyroZ = (static_cast<float>(rawGyroZ) / gyroScale) * DEG_TO_RAD;
+            _hasGyro = true;
+
+            _temperatureC = (static_cast<float>(rawTemp) / 340.0f) + 36.53f;
+            _hasTemperature = true;
+
             return true;
         }
 
@@ -607,6 +710,38 @@ namespace
         float readZ() const override
         {
             return _accelZ;
+        }
+
+        bool hasGyroscope() const override
+        {
+            return _hasGyro;
+        }
+
+        float readGyroX() const override
+        {
+            return _gyroX;
+        }
+
+        float readGyroY() const override
+        {
+
+            return _gyroY;
+
+        }
+
+        float readGyroZ() const override
+        {
+            return _gyroZ;
+        }
+
+        bool hasTemperature() const override
+        {
+            return _hasTemperature;
+        }
+
+        float readTemperatureC() const override
+        {
+            return _temperatureC;
         }
 
         bool setSampleRate(uint16_t hz, bool lowPower) override
@@ -823,6 +958,12 @@ namespace
         float _accelX;
         float _accelY;
         float _accelZ;
+        float _gyroX;
+        float _gyroY;
+        float _gyroZ;
+        float _temperatureC;
+        bool _hasGyro;
+        bool _hasTemperature;
         bool _motionWakeEnabled;
         uint8_t _motionWakeThreshold;
         uint8_t _motionWakeDuration;
@@ -959,7 +1100,6 @@ namespace
             if (normalizedType == "mpu6050" && whoAmIOk)
             {
                 result.whoAmI = whoAmI;
-                result.whoAmI = whoAmI;
                 result.isClone = (whoAmI == 0x70);
             }
         }
@@ -973,12 +1113,14 @@ GestureRead::GestureRead(TwoWire *wire)
       _configLoaded(false),
       _wire(wire),
       _isCalibrated(false),
-      _axisMap("zyx"),
-      _axisDir("++-"),
+      _axisMap("xyz"),
+      _axisDir("+++"),
+      // TODO questa parte e decisamente complessa ,includere le foto dei sonsori supportati e tutte le combinazioni possibili delle loro posizioni o un piccolo scrpit che ruota in 3d un rettangolo con la texture del sensore e indica le axismap e axisdir 
       _isSampling(false),
       _bufferFull(false),
       lastSampleTime(0),
-      _motionWakeEnabled(false)
+      _motionWakeEnabled(false),
+      _expectGyro(false)
 {
     _calibrationOffset = {0, 0, 0};
     _sampleHZ = kDefaultSampleHz;
@@ -994,6 +1136,12 @@ GestureRead::GestureRead(TwoWire *wire)
     _sampleBuffer.sampleCount = 0;
     _sampleBuffer.maxSamples = _maxSamples;
     _sampleBuffer.sampleHZ = _sampleHZ;
+
+    _autoCalib.enabled = true;
+    _autoCalib.gyroStillThreshold = 0.12f; // ~7 deg/s
+    _autoCalib.minStableSamples = 15;       // ~150 ms at 100 Hz
+    _autoCalib.smoothingFactor = 0.05f;
+    resetAutoCalibrationState();
 }
 
 GestureRead::~GestureRead()
@@ -1014,11 +1162,20 @@ bool GestureRead::begin(const AccelerometerConfig &config)
 {
     _config = config;
     _configLoaded = true;
+    String normalizedType = _config.type;
+    normalizedType.toLowerCase();
+    _expectGyro = (normalizedType == "mpu6050");
 
-    applyAxisMap(config.axisMap);
+    applyAxisMap(config.axisMap, config.axisDir);
 
     _sampleHZ = clampSampleRate(config.sampleRate > 0 ? config.sampleRate : kDefaultSampleHz);
     _sampleBuffer.sampleHZ = _sampleHZ;
+    const uint16_t defaultStableSamples = std::max<uint16_t>(static_cast<uint16_t>(_sampleHZ / 6), static_cast<uint16_t>(5));
+    const uint16_t stableSamples = _config.autoCalibrateStableSamples > 0 ? _config.autoCalibrateStableSamples : defaultStableSamples;
+    const float gyroThreshold = _config.autoCalibrateGyroThreshold > 0.0f ? _config.autoCalibrateGyroThreshold : _autoCalib.gyroStillThreshold;
+    const float smoothing = (_config.autoCalibrateSmoothing > 0.0f && _config.autoCalibrateSmoothing <= 1.0f) ? _config.autoCalibrateSmoothing : _autoCalib.smoothingFactor;
+    setAutoCalibrationParameters(gyroThreshold, stableSamples, smoothing);
+    setAutoCalibrationEnabled(_config.autoCalibrateEnabled);
 
     float desiredSeconds = 3.0f;
     uint16_t desiredSamples = static_cast<uint16_t>(_sampleHZ * desiredSeconds);
@@ -1188,6 +1345,14 @@ bool GestureRead::startSampling()
         return false;
     }
 
+    if (!waitForGyroReady(kGyroReadyTimeoutMs))
+    {
+        Logger::getInstance().log("Aborting sampling start: gyro not ready.");
+        standby();
+        return false;
+    }
+
+    resetAutoCalibrationState();
     clearMemory();
     _isSampling = true;
     return true;
@@ -1207,6 +1372,7 @@ bool GestureRead::stopSampling()
     }
 
     _isSampling = false;
+    resetAutoCalibrationState();
 
     const bool bufferWasFull = _sampleBuffer.sampleCount >= _maxSamples;
     if (bufferWasFull)
@@ -1369,6 +1535,46 @@ float GestureRead::getAxisValue(uint8_t index)
     return value;
 }
 
+float GestureRead::getGyroAxisValue(uint8_t index)
+{
+    if (!_driver || _axisMap.length() < 3 || _axisDir.length() < 3)
+    {
+        return 0.0f;
+    }
+
+    char axis = tolower(_axisMap[index]);
+    float value = 0.0f;
+
+    switch (axis)
+    {
+    case 'x':
+        value = _driver->readGyroX();
+        break;
+    case 'y':
+        value = _driver->readGyroY();
+        break;
+    case 'z':
+        value = _driver->readGyroZ();
+        break;
+    default:
+        return 0.0f;
+    }
+
+    if (_axisDir[index] == '-')
+    {
+        value = -value;
+    }
+
+    return value;
+}
+
+void GestureRead::getMappedGyro(float &x, float &y, float &z)
+{
+    x = getGyroAxisValue(0);
+    y = getGyroAxisValue(1);
+    z = getGyroAxisValue(2);
+}
+
 float GestureRead::getMappedX()
 {
     return getAxisValue(0);
@@ -1384,7 +1590,7 @@ float GestureRead::getMappedZ()
     return getAxisValue(2);
 }
 
-void GestureRead::applyAxisMap(const String &axisMap)
+void GestureRead::applyAxisMap(const String &axisMap, const String &axisDir)
 {
     char axes[4] = {'z', 'y', 'x', '\0'};
     char dirs[4] = {'+', '+', '-', '\0'};
@@ -1410,16 +1616,138 @@ void GestureRead::applyAxisMap(const String &axisMap)
         }
     }
 
+    if (axisDir.length() >= 3)
+    {
+        for (uint8_t i = 0; i < 3; ++i)
+        {
+            char dirChar = axisDir.charAt(i);
+            if (dirChar == '+' || dirChar == '-')
+            {
+                dirs[i] = dirChar;
+            }
+        }
+    }
+
     if (axisCount == 3)
     {
         _axisMap = String(axes);
-        _axisDir = String(dirs);
     }
     else
     {
         _axisMap = "zyx";
-        _axisDir = "++-";
+        dirs[0] = '+';
+        dirs[1] = '+';
+        dirs[2] = '-';
     }
+
+    _axisDir = String(dirs);
+}
+
+void GestureRead::resetAutoCalibrationState()
+{
+    _autoCalib.stableCount = 0;
+}
+
+void GestureRead::updateAutoCalibration(const float rawAccel[3], const float mappedGyro[3], bool gyroValid)
+{
+    if (!_autoCalib.enabled || !gyroValid)
+    {
+        _autoCalib.stableCount = 0;
+        return;
+    }
+
+    const float gyroMagnitudeSq = (mappedGyro[0] * mappedGyro[0]) +
+                                  (mappedGyro[1] * mappedGyro[1]) +
+                                  (mappedGyro[2] * mappedGyro[2]);
+    const float gyroMagnitude = sqrtf(gyroMagnitudeSq);
+
+    if (!isfinite(gyroMagnitude) || gyroMagnitude > _autoCalib.gyroStillThreshold)
+    {
+        _autoCalib.stableCount = 0;
+        return;
+    }
+
+    if (_autoCalib.stableCount < 0xFFFF)
+    {
+        _autoCalib.stableCount++;
+    }
+
+    if (_autoCalib.stableCount < _autoCalib.minStableSamples)
+    {
+        return;
+    }
+
+    const float alpha = _autoCalib.smoothingFactor;
+    _calibrationOffset.x = (1.0f - alpha) * _calibrationOffset.x + alpha * rawAccel[0];
+    _calibrationOffset.y = (1.0f - alpha) * _calibrationOffset.y + alpha * rawAccel[1];
+    _calibrationOffset.z = (1.0f - alpha) * _calibrationOffset.z + alpha * rawAccel[2];
+}
+
+bool GestureRead::waitForGyroReady(uint32_t timeoutMs)
+{
+    if (!_driver)
+    {
+        return false;
+    }
+
+    if (!_expectGyro)
+    {
+        return true;
+    }
+
+    const unsigned long start = millis();
+    bool seenGyroData = false;
+    uint8_t zeroGyroSamples = 0;
+
+    while (millis() - start < timeoutMs)
+    {
+        if (_driver->update() && _driver->hasGyroscope())
+        {
+            seenGyroData = true;
+
+            const float rawX = getMappedX();
+            const float rawY = getMappedY();
+            const float rawZ = getMappedZ();
+
+            float mappedGyroX = 0.0f;
+            float mappedGyroY = 0.0f;
+            float mappedGyroZ = 0.0f;
+            getMappedGyro(mappedGyroX, mappedGyroY, mappedGyroZ);
+
+            const float accelSum = fabsf(rawX) + fabsf(rawY) + fabsf(rawZ);
+            const float gyroSum = fabsf(mappedGyroX) + fabsf(mappedGyroY) + fabsf(mappedGyroZ);
+
+            if (!isfinite(accelSum) || !isfinite(gyroSum))
+            {
+                zeroGyroSamples = 0;
+            }
+            else if (accelSum >= kGyroReadyMinAccelSum && gyroSum > kGyroReadyNoiseFloor)
+            {
+                return true;
+            }
+            else if (accelSum >= kGyroReadyMinAccelSum)
+            {
+                if (++zeroGyroSamples >= kGyroReadyZeroTolerance)
+                {
+                    Logger::getInstance().log("Gyro warmup: readings remain near zero, proceeding after " + String(zeroGyroSamples) + " attempts.");
+                    return true;
+                }
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(kGyroReadyPollDelayMs));
+    }
+
+    if (!seenGyroData)
+    {
+        Logger::getInstance().log("Gyro failed to report data within " + String(timeoutMs) + " ms");
+    }
+    else
+    {
+        Logger::getInstance().log("Gyro data stayed at zero for " + String(timeoutMs) + " ms");
+    }
+
+    return false;
 }
 
 void GestureRead::updateSampling()
@@ -1446,15 +1774,82 @@ void GestureRead::updateSampling()
     {
         if (_driver->update())
         {
-            _sampleBuffer.samples[count].x = getMappedX() - _calibrationOffset.x;
-            _sampleBuffer.samples[count].y = getMappedY() - _calibrationOffset.y;
-            _sampleBuffer.samples[count].z = getMappedZ() - _calibrationOffset.z;
+            Sample &sample = _sampleBuffer.samples[count];
+            const float rawX = getMappedX();
+            const float rawY = getMappedY();
+            const float rawZ = getMappedZ();
+
+            float mappedGyroX = 0.0f;
+            float mappedGyroY = 0.0f;
+            float mappedGyroZ = 0.0f;
+            const bool gyroAvailable = _driver->hasGyroscope();
+            if (gyroAvailable)
+            {
+                getMappedGyro(mappedGyroX, mappedGyroY, mappedGyroZ);
+            }
+
+            const float rawAccel[3] = {rawX, rawY, rawZ};
+            const float mappedGyro[3] = {mappedGyroX, mappedGyroY, mappedGyroZ};
+            updateAutoCalibration(rawAccel, mappedGyro, gyroAvailable);
+
+            sample.x = rawX - _calibrationOffset.x;
+            sample.y = rawY - _calibrationOffset.y;
+            sample.z = rawZ - _calibrationOffset.z;
+
+            sample.gyroValid = gyroAvailable;
+            if (sample.gyroValid)
+            {
+                sample.gyroX = mappedGyroX;
+                sample.gyroY = mappedGyroY;
+                sample.gyroZ = mappedGyroZ;
+            }
+            else
+            {
+                sample.gyroX = 0.0f;
+                sample.gyroY = 0.0f;
+                sample.gyroZ = 0.0f;
+            }
+
+            sample.temperatureValid = _driver->hasTemperature();
+            sample.temperature = sample.temperatureValid ? _driver->readTemperatureC() : 0.0f;
+
             _sampleBuffer.sampleCount = count + 1;
             lastSampleTime = currentTime;
 
-            float x = fabsf(_sampleBuffer.samples[count].x);
-            float y = fabsf(_sampleBuffer.samples[count].y);
-            float z = fabsf(_sampleBuffer.samples[count].z);
+            static uint16_t debugLogEmitted = 0;
+            if (count == 0)
+            {
+                debugLogEmitted = 0;
+            }
+
+            if (debugLogEmitted < 5)
+            {
+                String logMsg = "gesture_sample idx=" + String(count) +
+                                " raw=[" + String(rawX, 4) + "," + String(rawY, 4) + "," + String(rawZ, 4) + "]" +
+                                " offset=[" + String(_calibrationOffset.x, 4) + "," + String(_calibrationOffset.y, 4) + "," + String(_calibrationOffset.z, 4) + "]" +
+                                " accel=[" + String(sample.x, 4) + "," + String(sample.y, 4) + "," + String(sample.z, 4) + "]";
+
+                if (sample.gyroValid)
+                {
+                    logMsg += " gyro=[" + String(sample.gyroX, 4) + "," + String(sample.gyroY, 4) + "," + String(sample.gyroZ, 4) + "]";
+                }
+                else
+                {
+                    logMsg += " gyro=NA";
+                }
+
+                if (sample.temperatureValid)
+                {
+                    logMsg += " temp=" + String(sample.temperature, 2) + "C";
+                }
+
+                Logger::getInstance().log(logMsg);
+                debugLogEmitted++;
+            }
+
+            float x = fabsf(sample.x);
+            float y = fabsf(sample.y);
+            float z = fabsf(sample.z);
 
             x = x > 4.0f ? 4.0f : x;
             y = y > 4.0f ? 4.0f : y;
@@ -1478,4 +1873,35 @@ void GestureRead::updateSampling()
         Led::getInstance().setColor(true);
         stopSampling();
     }
+}
+
+void GestureRead::setAutoCalibrationEnabled(bool enable)
+{
+    _autoCalib.enabled = enable;
+    if (!enable)
+    {
+        resetAutoCalibrationState();
+    }
+}
+
+void GestureRead::setAutoCalibrationParameters(float gyroStillThresholdRad, uint16_t minStableSamples, float smoothingFactor)
+{
+    if (gyroStillThresholdRad > 0.0f)
+    {
+        _autoCalib.gyroStillThreshold = gyroStillThresholdRad;
+    }
+    if (minStableSamples > 0)
+    {
+        _autoCalib.minStableSamples = minStableSamples;
+    }
+    if (smoothingFactor > 0.0f && smoothingFactor <= 1.0f)
+    {
+        _autoCalib.smoothingFactor = smoothingFactor;
+    }
+    resetAutoCalibrationState();
+}
+
+bool GestureRead::isAutoCalibrationEnabled() const
+{
+    return _autoCalib.enabled;
 }

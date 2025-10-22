@@ -39,6 +39,12 @@ struct Sample
     float x;
     float y;
     float z;
+    float gyroX;
+    float gyroY;
+    float gyroZ;
+    float temperature;
+    bool gyroValid;
+    bool temperatureValid;
 };
 
 struct SampleBuffer
@@ -86,9 +92,19 @@ public:
 
     void updateSampling(); // Call this regularly from main loop
 
+    // Auto-calibration controls
+    void setAutoCalibrationEnabled(bool enable);
+    void setAutoCalibrationParameters(float gyroStillThresholdRad, uint16_t minStableSamples, float smoothingFactor);
+    bool isAutoCalibrationEnabled() const;
+
 private:
     float getAxisValue(uint8_t axisIndex);
-    void applyAxisMap(const String &axisMap);
+    float getGyroAxisValue(uint8_t axisIndex);
+    void getMappedGyro(float &x, float &y, float &z);
+    void applyAxisMap(const String &axisMap, const String &axisDir);
+    void resetAutoCalibrationState();
+    void updateAutoCalibration(const float rawAccel[3], const float mappedGyro[3], bool gyroValid);
+    bool waitForGyroReady(uint32_t timeoutMs);
 
     std::unique_ptr<AccelerometerDriver> _driver;
     AccelerometerConfig _config;
@@ -106,10 +122,20 @@ private:
     bool _bufferFull;
     unsigned long lastSampleTime;
     bool _motionWakeEnabled;
+    bool _expectGyro;
 
     SampleBuffer _sampleBuffer;
     uint16_t _maxSamples;
     uint16_t _sampleHZ;
+
+    struct AutoCalibrationState
+    {
+        bool enabled;
+        float gyroStillThreshold;
+        uint16_t minStableSamples;
+        float smoothingFactor;
+        uint16_t stableCount;
+    } _autoCalib;
 };
 
 extern GestureRead gestureSensor; // Dichiarazione extern per l'istanza globale

@@ -95,11 +95,27 @@ bool GestureStorage::saveGestureFeature(uint8_t gestureID, const float *features
 
     // Create new feature array
     JsonArray newSample = gestureArray.createNestedArray();
-    for (size_t i = 0; i < featureCount; i++)
+    size_t count = featureCount > MAX_FEATURES ? MAX_FEATURES : featureCount;
+    if (featureCount > MAX_FEATURES)
+    {
+        Logger::getInstance().log("Warning: featureCount " + String(featureCount) + " exceeds MAX_FEATURES, truncating to " + String(MAX_FEATURES));
+    }
+
+    for (size_t i = 0; i < count; i++)
     {
         if (!newSample.add(features[i]))
         {
             Logger::getInstance().log("Failed to add feature to array");
+            return false;
+        }
+    }
+
+    // Pad with zeros if fewer features than MAX_FEATURES to keep array length uniform
+    for (size_t i = count; i < MAX_FEATURES; i++)
+    {
+        if (!newSample.add(0.0f))
+        {
+            Logger::getInstance().log("Failed to pad feature array");
             return false;
         }
     }
@@ -392,7 +408,7 @@ float ***GestureStorage::convertJsonToMatrix3D(size_t &numGestures, size_t &numS
     // Use fixed matrix dimensions based on MAX_GESTURES
     numGestures = MAX_GESTURES;
     numSamples = SIZE_MAX;
-    numFeatures = 0;
+    size_t detectedFeatures = 0;
 
     // First pass: validate structure and calculate samples/features
     for (JsonPair kv : doc.as<JsonObject>())
@@ -423,26 +439,26 @@ float ***GestureStorage::convertJsonToMatrix3D(size_t &numGestures, size_t &numS
             }
 
             JsonArray features = sample.as<JsonArray>();
-            if (numFeatures == 0)
+            if (features.size() > detectedFeatures)
             {
-                numFeatures = features.size();
-            }
-            else if (features.size() != numFeatures)
-            {
-
-                Logger::getInstance().log(String("Feature count mismatch in gesture") + String(kv.key().c_str()), false);
-
-
-                return nullptr;
+                detectedFeatures = features.size();
             }
         }
     }
 
-    if (numSamples == 0 || numGestures == 0 || numFeatures == 0)
+    if (numSamples == 0 || numGestures == 0)
     {
-        Logger::getInstance().log("Error: Invalid dimensions - G:" + String(numGestures) + " S:" + String(numSamples) + " F:" + String(numFeatures));
+        Logger::getInstance().log("Error: Invalid dimensions - G:" + String(numGestures) + " S:" + String(numSamples));
         return nullptr;
     }
+
+    if (detectedFeatures > MAX_FEATURES)
+    {
+        Logger::getInstance().log("Detected feature count (" + String(detectedFeatures) + ") exceeds MAX_FEATURES (" + String(MAX_FEATURES) + "), truncating on load");
+        detectedFeatures = MAX_FEATURES;
+    }
+
+    numFeatures = MAX_FEATURES;
 
     Logger::getInstance().log("Allocating 3D matrix - Gestures:" + String(numGestures) + " Samples:" + String(numSamples) + " Features:" + String(numFeatures));
 
@@ -478,17 +494,29 @@ float ***GestureStorage::convertJsonToMatrix3D(size_t &numGestures, size_t &numS
 
         for (size_t i = 0; i < numSamples; i++)
         {
-            JsonArray featureArray = samples[i];
-
-            for (size_t j = 0; j < numFeatures; j++)
+            if (i >= samples.size())
             {
-                if (!featureArray[j].is<float>())
+                break;
+            }
+
+            JsonArray featureArray = samples[i];
+            size_t availableFeatures = featureArray.size();
+            size_t copyCount = availableFeatures < MAX_FEATURES ? availableFeatures : MAX_FEATURES;
+
+            for (size_t j = 0; j < copyCount; j++)
+            {
+                if (!featureArray[j].is<float>() && !featureArray[j].is<double>() && !featureArray[j].is<int>() && !featureArray[j].is<long>())
                 {
                     Logger::getInstance().log("Invalid feature type at gesture " + String(gestureID) + " sample " + String(i) + " feature " + String(j));
                     clearMatrix3D(matrix, numGestures, numSamples);
                     return nullptr;
                 }
                 matrix[gestureID][i][j] = featureArray[j].as<float>();
+            }
+
+            for (size_t j = copyCount; j < MAX_FEATURES; j++)
+            {
+                matrix[gestureID][i][j] = 0.0f;
             }
         }
 

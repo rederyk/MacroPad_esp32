@@ -77,7 +77,8 @@
     "sensitivity": 2.0,
     "sampleRate": 100,
     "threshold": 500,
-    "axisMap": "zyx",
+    "axisMap": "yzx",
+    "axisDir": "+++",
     "active": true,
     "type": "mpu6050",
     "address": 104,
@@ -85,6 +86,10 @@
     "motionWakeThreshold": 5,
     "motionWakeDuration": 10,
     "motionWakeHighPass": 10,
-    "motionWakeCycleRate": 0
+    "motionWakeCycleRate": 0,
+    "autoCalibrate": true,
+    "autoCalibrateGyroThreshold": 0.12,
+    "autoCalibrateStableSamples": 0,
+    "autoCalibrateSmoothing": 0.05
   }
 }

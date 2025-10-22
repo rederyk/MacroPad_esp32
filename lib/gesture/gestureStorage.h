@@ -27,7 +27,7 @@
 #define GESTURE_STORAGE_FILE "/gesture_features.json"
 #define MAX_GESTURES 9
 #define MAX_SAMPLES 10
-#define MAX_FEATURES 15 // Number of features per sample (x, y, z)
+#define MAX_FEATURES 20 // Accelerometer (15) + gyro magnitude (5)
 
 class GestureStorage {
 public:
@@ -46,7 +46,7 @@ public:
 private:
     bool initializeFileSystem();
     bool ensureFileExists();
-    StaticJsonDocument<8192> doc; // Increased size for more gesture data
+    StaticJsonDocument<12288> doc; // Increased size for gyro-augmented gesture data
 };
 
 extern GestureStorage gestureStorage;

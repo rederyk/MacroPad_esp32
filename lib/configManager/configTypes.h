@@ -57,6 +57,7 @@ struct AccelerometerConfig
     int sampleRate;
     int threshold;
     String axisMap;
+    String axisDir;
     bool active;
     String type;
     uint8_t address;
@@ -65,6 +66,10 @@ struct AccelerometerConfig
     uint8_t motionWakeDuration;
     uint8_t motionWakeHighPass;
     uint8_t motionWakeCycleRate;
+    bool autoCalibrateEnabled;
+    float autoCalibrateGyroThreshold;
+    uint16_t autoCalibrateStableSamples;
+    float autoCalibrateSmoothing;
 };
 
 struct WifiConfig
