@@ -23,6 +23,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include "configTypes.h"
+#include "MotionSensor.h"
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -54,8 +55,6 @@ struct SampleBuffer
     uint16_t maxSamples;
     uint16_t sampleHZ;
 };
-
-class AccelerometerDriver;
 
 class GestureRead
 {
@@ -98,24 +97,18 @@ public:
     bool isAutoCalibrationEnabled() const;
 
 private:
-    float getAxisValue(uint8_t axisIndex);
-    float getGyroAxisValue(uint8_t axisIndex);
     void getMappedGyro(float &x, float &y, float &z);
-    void applyAxisMap(const String &axisMap, const String &axisDir);
     void resetAutoCalibrationState();
     void updateAutoCalibration(const float rawAccel[3], const float mappedGyro[3], bool gyroValid);
     bool waitForGyroReady(uint32_t timeoutMs);
 
-    std::unique_ptr<AccelerometerDriver> _driver;
+    std::unique_ptr<MotionSensor> _sensor;
     AccelerometerConfig _config;
     bool _configLoaded;
     TwoWire *_wire;
 
     Offset _calibrationOffset;
     bool _isCalibrated;
-    String _axisMap;
-    String _axisDir;
-
     // New members for continuous sampling
     std::mutex _bufferMutex;
     bool _isSampling;
