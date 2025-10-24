@@ -198,93 +198,107 @@ void setup()
         }
     }
 
-    // Initialize IR Remote Control components
-    const IRSensorConfig &irSensorConfig = configManager.getIrSensorConfig();
-    Logger::getInstance().log("IR Sensor Config: pin=" + String(irSensorConfig.pin) +
-                              ", active=" + String(irSensorConfig.active ? "true" : "false"));
-    if (irSensorConfig.active && irSensorConfig.pin >= 0)
+    // Initialize IR Remote Control components (ONLY when BLE is disabled)
+    // REASON: IRremoteESP8266 conflicts with BLE due to timer/RMT hardware sharing and memory constraints
+    const SystemConfig &irSystemConfig = configManager.getSystemConfig();
+    if (!irSystemConfig.enable_BLE)
     {
-        Logger::getInstance().log("Initializing IR Sensor on pin " + String(irSensorConfig.pin));
-        irSensor = new IRSensor(irSensorConfig.pin);
-        if (irSensor && irSensor->begin())
-        {
-            Logger::getInstance().log("IR Sensor initialized successfully");
-        }
-        else
-        {
-            Logger::getInstance().log("Failed to initialize IR Sensor");
-            if (irSensor)
-            {
-                delete irSensor;
-                irSensor = nullptr;
-            }
-        }
-    }
-    else
-    {
-        Logger::getInstance().log("IR Sensor NOT initialized (disabled or invalid pin)");
-    }
+        Logger::getInstance().log("BLE disabled - IR components will be initialized");
 
-    const IRLedConfig &irLedConfig = configManager.getIrLedConfig();
-    Logger::getInstance().log("IR LED Config: pin=" + String(irLedConfig.pin) +
-                              ", active=" + String(irLedConfig.active ? "true" : "false") +
-                              ", anodeGpio=" + String(irLedConfig.anodeGpio ? "true" : "false"));
-    if (irLedConfig.active && irLedConfig.pin >= 0)
-    {
-        Logger::getInstance().log("Initializing IR Sender on pin " + String(irLedConfig.pin));
-        irSender = new IRSender(irLedConfig.pin, irLedConfig.anodeGpio);
-        if (irSender && irSender->begin())
+        const IRSensorConfig &irSensorConfig = configManager.getIrSensorConfig();
+        Logger::getInstance().log("IR Sensor Config: pin=" + String(irSensorConfig.pin) +
+                                  ", active=" + String(irSensorConfig.active ? "true" : "false"));
+        if (irSensorConfig.active && irSensorConfig.pin >= 0)
         {
-            Logger::getInstance().log("IR Sender initialized successfully");
-        }
-        else
-        {
-            Logger::getInstance().log("Failed to initialize IR Sender");
-            if (irSender)
+            Logger::getInstance().log("Initializing IR Sensor on pin " + String(irSensorConfig.pin));
+            irSensor = new IRSensor(irSensorConfig.pin);
+            if (irSensor && irSensor->begin())
             {
-                delete irSender;
-                irSender = nullptr;
-            }
-        }
-    }
-    else
-    {
-        Logger::getInstance().log("IR Sender NOT initialized (disabled or invalid pin)");
-    }
-
-    // Initialize IR Storage (always initialize if either sensor or sender is active)
-    Logger::getInstance().log("Checking IR Storage initialization: irSensor=" +
-                              String(irSensor != nullptr ? "OK" : "NULL") +
-                              ", irSender=" + String(irSender != nullptr ? "OK" : "NULL"));
-    if ((irSensor != nullptr) || (irSender != nullptr))
-    {
-        Logger::getInstance().log("Initializing IR Storage");
-        irStorage = new IRStorage();
-        if (irStorage && irStorage->begin())
-        {
-            Logger::getInstance().log("IR Storage initialized successfully");
-            if (irStorage->loadIRData())
-            {
-                Logger::getInstance().log("IR data loaded from file");
+                Logger::getInstance().log("IR Sensor initialized successfully");
             }
             else
             {
-                Logger::getInstance().log("No existing IR data file (this is normal on first run)");
+                Logger::getInstance().log("Failed to initialize IR Sensor");
+                if (irSensor)
+                {
+                    delete irSensor;
+                    irSensor = nullptr;
+                }
             }
         }
         else
         {
-            Logger::getInstance().log("Failed to initialize IR Storage (LittleFS error?)");
-            if (irStorage)
+            Logger::getInstance().log("IR Sensor NOT initialized (disabled or invalid pin)");
+        }
+
+        const IRLedConfig &irLedConfig = configManager.getIrLedConfig();
+        Logger::getInstance().log("IR LED Config: pin=" + String(irLedConfig.pin) +
+                                  ", active=" + String(irLedConfig.active ? "true" : "false") +
+                                  ", anodeGpio=" + String(irLedConfig.anodeGpio ? "true" : "false"));
+        if (irLedConfig.active && irLedConfig.pin >= 0)
+        {
+            Logger::getInstance().log("Initializing IR Sender on pin " + String(irLedConfig.pin));
+            irSender = new IRSender(irLedConfig.pin, irLedConfig.anodeGpio);
+            if (irSender && irSender->begin())
             {
-                delete irStorage;
-                irStorage = nullptr;
+                Logger::getInstance().log("IR Sender initialized successfully");
+            }
+            else
+            {
+                Logger::getInstance().log("Failed to initialize IR Sender");
+                if (irSender)
+                {
+                    delete irSender;
+                    irSender = nullptr;
+                }
             }
         }
+        else
+        {
+            Logger::getInstance().log("IR Sender NOT initialized (disabled or invalid pin)");
+        }
+
+        // Initialize IR Storage (always initialize if either sensor or sender is active)
+        Logger::getInstance().log("Checking IR Storage initialization: irSensor=" +
+                                  String(irSensor != nullptr ? "OK" : "NULL") +
+                                  ", irSender=" + String(irSender != nullptr ? "OK" : "NULL"));
+        if ((irSensor != nullptr) || (irSender != nullptr))
+        {
+            Logger::getInstance().log("Initializing IR Storage");
+            irStorage = new IRStorage();
+            if (irStorage && irStorage->begin())
+            {
+                Logger::getInstance().log("IR Storage initialized successfully");
+                if (irStorage->loadIRData())
+                {
+                    Logger::getInstance().log("IR data loaded from file");
+                }
+                else
+                {
+                    Logger::getInstance().log("No existing IR data file (this is normal on first run)");
+                }
+            }
+            else
+            {
+                Logger::getInstance().log("Failed to initialize IR Storage (LittleFS error?)");
+                if (irStorage)
+                {
+                    delete irStorage;
+                    irStorage = nullptr;
+                }
+            }
+        }
+        else
+        {
+            Logger::getInstance().log("IR Storage NOT initialized (no IR sensor or sender available)");
+        }
+
+        Logger::getInstance().log("Free heap after IR initialization: " + String(ESP.getFreeHeap()) + " bytes");
     }
     else
     {
-        Logger::getInstance().log("IR Storage NOT initialized (no IR sensor or sender available)");
+        Logger::getInstance().log("BLE enabled - IR components DISABLED to avoid memory/hardware conflicts");
+        Logger::getInstance().log("To use IR: disable BLE in config.json (enable_BLE: false) and restart");
     }
 
     // Initialize hardware with configurations
@@ -318,6 +332,18 @@ void setup()
     // autostart stuff
     if (systemConfig.enable_BLE)
     {
+        // Release Bluetooth Classic memory (frees ~30KB for BLE/IR compatibility)
+        Logger::getInstance().log("Releasing Bluetooth Classic memory...");
+        esp_err_t ret = esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
+        if (ret == ESP_OK)
+        {
+            Logger::getInstance().log("Bluetooth Classic memory released successfully");
+        }
+        else
+        {
+            Logger::getInstance().log("Failed to release BT Classic memory: " + String(ret));
+        }
+        Logger::getInstance().log("Free heap after BT Classic release: " + String(ESP.getFreeHeap()) + " bytes");
 
         bleController.storeOriginalMAC();
         //        Keyboard.deviceName = systemConfig.BleName.c_str();
