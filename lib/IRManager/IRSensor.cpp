@@ -68,6 +68,27 @@ bool IRSensor::isEnabled() const
     return (_irrecv != nullptr);
 }
 
+// Pulisce buffer IR e _results per rimuovere segnali precedenti
+void IRSensor::clearBuffer()
+{
+    if (_irrecv)
+    {
+        // Svuota il buffer hardware del ricevitore IR
+        _irrecv->resume();
+
+        // Pulisce eventuali segnali decodificati nel buffer
+        while (_irrecv->decode(&_results))
+        {
+            _irrecv->resume();
+        }
+    }
+
+    // Reset della struttura _results
+    memset(&_results, 0, sizeof(_results));
+    _lastDecodedValue = 0;
+    _lastDecodeTime = 0;
+}
+
 // Controllo e decodifica segnale
 bool IRSensor::checkAndDecodeSignal()
 {

@@ -783,6 +783,8 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
         Logger::getInstance().log("Exiting IR Scan mode for DEV" + String(deviceId));
         scanningMode = false;
         currentDeviceId = -1;
+        // Pulisce buffer IR quando si esce
+        irSensor->clearBuffer();
         // Restore LED color
         Led::getInstance().setColor(savedRed, savedGreen, savedBlue, false);
         return;
@@ -802,6 +804,9 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
     currentDeviceId = deviceId;
     deviceName = "dev" + String(deviceId);
 
+    // IMPORTANTE: Pulisce buffer IR prima di iniziare la scansione
+    irSensor->clearBuffer();
+
     String exitMsg = "IR Scan DEV" + String(deviceId) + " ACTIVE - Point remote and press button now!";
     if (exitCombo.length() > 0)
     {
@@ -817,8 +822,13 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
     const unsigned long blinkInterval = 500; // Slow blink: 500ms
     bool ledState = false;
     bool signalCaptured = false;
+    bool exitRequested = false;
 
-    while (millis() - startTime < scanTimeout && scanningMode)
+    // Track pressed keys for exit combo detection
+    uint16_t pressedKeys = 0;
+    uint16_t lastPressedKeys = 0;
+
+    while (millis() - startTime < scanTimeout && scanningMode && !exitRequested)
     {
         // Slow red blink
         if (millis() - lastBlinkTime >= blinkInterval)
@@ -835,22 +845,69 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
             lastBlinkTime = millis();
         }
 
+        // Check for exit combo input
+        if (exitCombo.length() > 0 && keypad->processInput())
+        {
+            InputEvent event = keypad->getEvent();
+            if (event.type == InputEvent::EventType::KEY_PRESS)
+            {
+                if (event.state) // Key pressed
+                {
+                    pressedKeys |= (1 << event.value1);
+                    lastPressedKeys = pressedKeys;
+                }
+                else // Key released
+                {
+                    pressedKeys &= ~(1 << event.value1);
+
+                    // When all keys are released, check what was pressed
+                    if (pressedKeys == 0 && lastPressedKeys != 0)
+                    {
+                        // Build the combo string from lastPressedKeys
+                        String pressedCombo = "";
+                        for (int i = 0; i < 9; i++)
+                        {
+                            if (lastPressedKeys & (1 << i))
+                            {
+                                if (pressedCombo.length() > 0) pressedCombo += "+";
+                                pressedCombo += String(i + 1);
+                            }
+                        }
+
+                        // Check if it matches the exit combo
+                        if (pressedCombo == exitCombo)
+                        {
+                            Logger::getInstance().log("Exit combo detected - cancelling scan");
+                            exitRequested = true;
+                            lastPressedKeys = 0;
+                            break;
+                        }
+
+                        lastPressedKeys = 0;
+                    }
+                }
+            }
+        }
+
         if (irSensor->checkAndDecodeSignal())
         {
             signalCaptured = true;
             break;
         }
-        vTaskDelay(pdMS_TO_TICKS(50)); // Check every 50ms
-
-        // Allow user to cancel by checking for exit command
-        // This is handled by the toggle being called again
+        vTaskDelay(pdMS_TO_TICKS(10)); // Check every 10ms for better responsiveness
     }
 
-    if (!signalCaptured)
+    // Handle exit cases: no signal captured OR exit combo pressed
+    if (!signalCaptured || exitRequested)
     {
-        Logger::getInstance().log("No IR signal captured - scan cancelled");
+        if (!signalCaptured && !exitRequested)
+        {
+            Logger::getInstance().log("No IR signal captured - scan cancelled");
+        }
         scanningMode = false;
         currentDeviceId = -1;
+        // Pulisce buffer IR quando si esce
+        irSensor->clearBuffer();
         // Restore LED color
         Led::getInstance().setColor(savedRed, savedGreen, savedBlue, false);
         return;
@@ -861,6 +918,25 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
 
     if (res.value != 0 || res.rawlen > 0)
     {
+        // Lampeggiamento rosso/verde per segnalare cattura segnale
+        const unsigned long celebrationDuration = 1000; // 1 secondo di lampeggiamento
+        const unsigned long celebrationInterval = 100; // Cambio colore ogni 100ms
+        unsigned long celebrationStart = millis();
+        bool greenRed = false;
+
+        while (millis() - celebrationStart < celebrationDuration)
+        {
+            if ((millis() - celebrationStart) % celebrationInterval < (celebrationInterval / 2))
+            {
+                Led::getInstance().setColor(255, 0, 0, false); // Rosso
+            }
+            else
+            {
+                Led::getInstance().setColor(0, 255, 0, false); // Verde
+            }
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+
         Logger::getInstance().log("IR captured! Press key (1-9), combo (e.g., 1+2), gesture, or encoder (CW/CCW/BUTTON) to name it");
         Logger::getInstance().processBuffer();
 
@@ -870,6 +946,8 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
             Logger::getInstance().log("Timeout or invalid input - IR not saved");
             scanningMode = false;
             currentDeviceId = -1;
+            // Pulisce buffer IR quando si esce
+            irSensor->clearBuffer();
             return;
         }
 
@@ -879,6 +957,8 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
             Logger::getInstance().log("Exit combo pressed - cancelling IR save");
             scanningMode = false;
             currentDeviceId = -1;
+            // Pulisce buffer IR quando si esce
+            irSensor->clearBuffer();
             return;
         }
 
@@ -888,6 +968,8 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
             Logger::getInstance().log("Cannot save exit combo as IR command - choose different combo");
             scanningMode = false;
             currentDeviceId = -1;
+            // Pulisce buffer IR quando si esce
+            irSensor->clearBuffer();
             return;
         }
 
@@ -933,6 +1015,8 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
 
     scanningMode = false;
     currentDeviceId = -1;
+    // Pulisce buffer IR quando si esce
+    irSensor->clearBuffer();
     // Restore LED color
     Led::getInstance().setColor(savedRed, savedGreen, savedBlue, false);
     powerManager.registerActivity();

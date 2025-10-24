@@ -34,6 +34,7 @@ public:
   //  String getIRSignalAsJson() const;
     void end();             // Disabilita il sensore
     bool isEnabled() const; // Verifica se il sensore è attivo
+    void clearBuffer();     // Pulisce buffer IR e _results
     const decode_results& getRawSignalObject() const;
     decode_results interceptCommand(int numRepetitions, bool protocolRequired=true);
     String getProtocolName(decode_type_t protocol);
