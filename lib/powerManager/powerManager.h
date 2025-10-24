@@ -26,6 +26,7 @@
 #include "Logger.h"
 #include "configManager.h"
 #include <vector>
+#include <driver/gpio.h>
 
 class PowerManager
 {
@@ -35,11 +36,13 @@ private:
     bool sleepEnabled;
     bool isBleMode;
     gpio_num_t wakeupPin;
+    gpio_num_t fallbackWakePin;
+    bool fallbackWakePinValid;
 
 public:
     PowerManager();
 
-    void begin(const SystemConfig &sysConfig, const KeypadConfig &keypadConfig);
+    void begin(const SystemConfig &sysConfig, const KeypadConfig &keypadConfig, const EncoderConfig &encoderConfig);
     void resetActivityTimer();
     void registerActivity();
     bool checkInactivity();

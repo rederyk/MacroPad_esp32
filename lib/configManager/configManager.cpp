@@ -1,21 +1,20 @@
 /*
  * ESP32 MacroPad Project
  * Copyright (C) [2025] [Enrico Mori]
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 
 #include "configManager.h"
 #include <LittleFS.h>
@@ -50,6 +49,8 @@ bool ConfigurationManager::loadConfig()
     filter["accelerometer"] = true;
     filter["system"] = true;
     filter["led"] = true;
+    filter["irSensor"] = true;
+    filter["irLed"] = true;
 
     // Increase buffer size and add error handling
     StaticJsonDocument<4096> doc;
@@ -66,6 +67,17 @@ bool ConfigurationManager::loadConfig()
     keypadConfig = KeypadConfig();
     encoderConfig = EncoderConfig();
     accelerometerConfig = AccelerometerConfig();
+    accelerometerConfig.axisMap = "zyx";
+    accelerometerConfig.axisDir = "++-";
+    accelerometerConfig.motionWakeEnabled = false;
+    accelerometerConfig.motionWakeThreshold = 1;
+    accelerometerConfig.motionWakeDuration = 20;
+    accelerometerConfig.motionWakeHighPass = 4; // default to MPU6050_HIGHPASS_0_63_HZ
+    accelerometerConfig.motionWakeCycleRate = 1; // default to MPU6050_CYCLE_5_HZ
+    accelerometerConfig.autoCalibrateEnabled = true;
+    accelerometerConfig.autoCalibrateGyroThreshold = 0.12f;
+    accelerometerConfig.autoCalibrateStableSamples = 0;
+    accelerometerConfig.autoCalibrateSmoothing = 0.05f;
     wifiConfig = WifiConfig();
     ledConfig = LedConfig();
 
@@ -199,6 +211,58 @@ bool ConfigurationManager::loadConfig()
             this->ledConfig.active = ledConfig["active"];
     }
 
+    // Load IR Sensor configuration if it exists
+    JsonVariant irSensorConfig = doc["irSensor"];
+    if (!irSensorConfig.isNull() && irSensorConfig.is<JsonObject>())
+    {
+        if (irSensorConfig.containsKey("pin"))
+            this->irSensorConfig.pin = irSensorConfig["pin"];
+        else
+            this->irSensorConfig.pin = -1; // Default: disabled
+        if (irSensorConfig.containsKey("active"))
+            this->irSensorConfig.active = irSensorConfig["active"];
+        else
+            this->irSensorConfig.active = false;
+
+        Logger::getInstance().log("Loaded IR Sensor config: pin=" + String(this->irSensorConfig.pin) +
+                                  ", active=" + String(this->irSensorConfig.active ? "true" : "false"));
+    }
+    else
+    {
+        this->irSensorConfig.pin = -1;
+        this->irSensorConfig.active = false;
+        Logger::getInstance().log("IR Sensor config not found in JSON, using defaults (disabled)");
+    }
+
+    // Load IR LED configuration if it exists
+    JsonVariant irLedConfig = doc["irLed"];
+    if (!irLedConfig.isNull() && irLedConfig.is<JsonObject>())
+    {
+        if (irLedConfig.containsKey("pin"))
+            this->irLedConfig.pin = irLedConfig["pin"];
+        else
+            this->irLedConfig.pin = -1; // Default: disabled
+        if (irLedConfig.containsKey("anodeGpio"))
+            this->irLedConfig.anodeGpio = irLedConfig["anodeGpio"];
+        else
+            this->irLedConfig.anodeGpio = false;
+        if (irLedConfig.containsKey("active"))
+            this->irLedConfig.active = irLedConfig["active"];
+        else
+            this->irLedConfig.active = false;
+
+        Logger::getInstance().log("Loaded IR LED config: pin=" + String(this->irLedConfig.pin) +
+                                  ", active=" + String(this->irLedConfig.active ? "true" : "false") +
+                                  ", anodeGpio=" + String(this->irLedConfig.anodeGpio ? "true" : "false"));
+    }
+    else
+    {
+        this->irLedConfig.pin = -1;
+        this->irLedConfig.anodeGpio = false;
+        this->irLedConfig.active = false;
+        Logger::getInstance().log("IR LED config not found in JSON, using defaults (disabled)");
+    }
+
     // Load accelerometer configuration if it exists
     JsonVariant accelerometerConfig = doc["accelerometer"];
     if (!accelerometerConfig.isNull() && accelerometerConfig.is<JsonObject>())
@@ -215,8 +279,32 @@ bool ConfigurationManager::loadConfig()
             this->accelerometerConfig.threshold = accelerometerConfig["threshold"];
         if (accelerometerConfig.containsKey("axisMap"))
             this->accelerometerConfig.axisMap = accelerometerConfig["axisMap"].as<const char *>();
+        if (accelerometerConfig.containsKey("axisDir"))
+            this->accelerometerConfig.axisDir = accelerometerConfig["axisDir"].as<const char *>();
         if (accelerometerConfig.containsKey("active"))
             this->accelerometerConfig.active = accelerometerConfig["active"];
+        if (accelerometerConfig.containsKey("type"))
+            this->accelerometerConfig.type = accelerometerConfig["type"].as<const char *>();
+        if (accelerometerConfig.containsKey("address"))
+            this->accelerometerConfig.address = accelerometerConfig["address"];
+        if (accelerometerConfig.containsKey("motionWakeEnabled"))
+            this->accelerometerConfig.motionWakeEnabled = accelerometerConfig["motionWakeEnabled"];
+        if (accelerometerConfig.containsKey("motionWakeThreshold"))
+            this->accelerometerConfig.motionWakeThreshold = accelerometerConfig["motionWakeThreshold"];
+        if (accelerometerConfig.containsKey("motionWakeDuration"))
+            this->accelerometerConfig.motionWakeDuration = accelerometerConfig["motionWakeDuration"];
+        if (accelerometerConfig.containsKey("motionWakeHighPass"))
+            this->accelerometerConfig.motionWakeHighPass = accelerometerConfig["motionWakeHighPass"];
+        if (accelerometerConfig.containsKey("motionWakeCycleRate"))
+            this->accelerometerConfig.motionWakeCycleRate = accelerometerConfig["motionWakeCycleRate"];
+        if (accelerometerConfig.containsKey("autoCalibrate"))
+            this->accelerometerConfig.autoCalibrateEnabled = accelerometerConfig["autoCalibrate"];
+        if (accelerometerConfig.containsKey("autoCalibrateGyroThreshold"))
+            this->accelerometerConfig.autoCalibrateGyroThreshold = accelerometerConfig["autoCalibrateGyroThreshold"];
+        if (accelerometerConfig.containsKey("autoCalibrateStableSamples"))
+            this->accelerometerConfig.autoCalibrateStableSamples = accelerometerConfig["autoCalibrateStableSamples"];
+        if (accelerometerConfig.containsKey("autoCalibrateSmoothing"))
+            this->accelerometerConfig.autoCalibrateSmoothing = accelerometerConfig["autoCalibrateSmoothing"];
     }
 
     configFile.close();
@@ -246,6 +334,16 @@ const WifiConfig &ConfigurationManager::getWifiConfig() const
 const LedConfig &ConfigurationManager::getLedConfig() const
 {
     return ledConfig;
+}
+
+const IRSensorConfig &ConfigurationManager::getIrSensorConfig() const
+{
+    return irSensorConfig;
+}
+
+const IRLedConfig &ConfigurationManager::getIrLedConfig() const
+{
+    return irLedConfig;
 }
 
 const SystemConfig &ConfigurationManager::getSystemConfig() const

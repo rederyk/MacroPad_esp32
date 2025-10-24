@@ -136,7 +136,10 @@ The `config.json` file is used to configure the MacroPad. It includes settings f
     "sensitivity": 2.0,
     "sampleRate": 100,
     "threshold": 500,
-    "axisMap": "zyx"
+    "axisMap": "zyx",
+    "active": true,
+    "type": "mpu6050",
+    "address": 104
   }
 }
 ```
@@ -147,6 +150,9 @@ The `config.json` file is used to configure the MacroPad. It includes settings f
 *   `sampleRate`: Sample rate of the accelerometer.
 *   `threshold`: Threshold for gesture detection.
 *   `axisMap`: Axis mapping for the accelerometer.
+*   `active`: Enables (`true`) or disables (`false`) the accelerometer logic.
+*   `type`: Sensor driver to use. Supported values: `adxl345`, `mpu6050`.
+*   `address`: I2C address in decimal form (e.g., 104 for `0x68`). Leave `0` to use the library default.
 
 ### Combinations Configuration 
 
@@ -292,4 +298,3 @@ Hold the BUTTON and perform your gesture. The log panel on the System Actions pa
 ##  **FAQ**
 ### **connection problem**
  - attenzione a rimuovere i device duplicati da windows ,esempio esp_macropad_1 non si connettera se windows ha gia assiociato esp_macropad_0 o altri,
-

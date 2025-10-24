@@ -48,6 +48,19 @@ struct LedConfig
     bool active;
 };
 
+struct IRSensorConfig
+{
+    int pin;
+    bool active;
+};
+
+struct IRLedConfig
+{
+    int pin;
+    bool anodeGpio;
+    bool active;
+};
+
 struct AccelerometerConfig
 {
 
@@ -57,7 +70,19 @@ struct AccelerometerConfig
     int sampleRate;
     int threshold;
     String axisMap;
+    String axisDir;
     bool active;
+    String type;
+    uint8_t address;
+    bool motionWakeEnabled;
+    uint8_t motionWakeThreshold;
+    uint8_t motionWakeDuration;
+    uint8_t motionWakeHighPass;
+    uint8_t motionWakeCycleRate;
+    bool autoCalibrateEnabled;
+    float autoCalibrateGyroThreshold;
+    uint16_t autoCalibrateStableSamples;
+    float autoCalibrateSmoothing;
 };
 
 struct WifiConfig
@@ -82,5 +107,5 @@ struct SystemConfig
     unsigned long sleep_timeout_ms; // Timeout di inattività in millisecondi
     gpio_num_t wakeup_pin;                 // Pin GPIO per il wakeup
 };
-
+// TODO add config for ir from json in all class
 #endif

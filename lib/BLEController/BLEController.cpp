@@ -117,10 +117,10 @@ void BLEController::checkConnection()
     }
     statoPrecedente = statoAttuale;
   }
-  if (connectionLost && bluetoothEnabled)
-  {
-    ESP.restart();
-  }
+  // if (connectionLost && bluetoothEnabled)
+  // {
+  //    ESP.restart();
+  // }
 }
 
 void BLEController::incrementMacAddress(int increment)

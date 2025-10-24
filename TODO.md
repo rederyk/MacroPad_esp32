@@ -9,6 +9,11 @@ The following improvements have been identified in the code:
 
 # TODO
 
+- memoria si riempie con le gesture , migliora la gestione del buffer senza farlo crashare
+
+- accelerometro mpu implementato e testato ma,  necessita di aggiunta feature esclusive gyro e temp ,perche ce la temp a quanto pare, inoltre dovremmo ritestare adxl per sapere se va ancora dopo le modifiche
+
+
 ## impostare combo_timout dalle config[]
 
 
@@ -39,7 +44,7 @@ The following improvements have been identified in the code:
 - implementato sistema di log Led RGB con metodi di save ripristino e colori effimeri [V]
 - mappato sampling xyz delle gesture al led rgb CI STA....[V]
 - impostati pin e opt dal config.json [V]
-* creare funzioni utili ai pattern fade blink rainbow eccetera 
+* creare funzioni utili ai pattern fade blink rainbow eccetera e renderle avviabili da macro
 * impostare colori impostabili nel config per le modalita BLE AP STA 
 
 ## cerca di usare il keypad per il wakeup meglio su pressioni ripetute...
@@ -47,6 +52,8 @@ The following improvements have been identified in the code:
 * necessaria modifica hardware pin dedidacato con diodo collegato a tutto il keypad 
 
 ### Possibili soluzioni 
+
+ - wake on gyro con mnpu6050 con fallback a pin dell encoder [v]
 
  
 2. **Metodo “singolo pin” (ext0) + diodo/OR:** 
@@ -78,7 +85,7 @@ Usare ext1 con `ANY_HIGH`**
 
   - È il sistema più flessibile, ma anche il più complesso da implementare, perché devi scrivere un piccolo programma in “assembly ULP” o usare una libreria apposita.
 
-
+ - wake on gyro con mnpu6050 con fallback a pin dell encoder [v]
 
 # DOIT
 * nel ble, sevono caratteri di escape ","e "+" , e i CAPS per tutti INDAGARE cilco perss per singoli caratteri stringhe
@@ -92,7 +99,23 @@ Usare ext1 con `ANY_HIGH`**
 - metti una spacial action per andare in sleep oltre al timeout..
   "1+2+3+4+5+6+7+8+9": ["ENTER_SLEEP"] [V]
 
-- sostituiti delay  e timing con xtaskdealay [V]
+- sostituiti delay  e timing con xtaskdealay [V] rifallo
 
 * comuqnue va...
 
+###
+* special action per controllare colore e iintesita del led dal keypad con combo, esempio cw+1 rosso++ ccw+1 red-- , 3+6+button red255 green255 blue255 per la torcia [V]
+
+* pagina html per tutti i json
+
+* mouse gyro mode con combo separate
+
+
+
+### problemi
+* l ordine dei tasti in odalita non ordinata ,impone di salvare le vonfig in ordine numerico, dovrebbe ignorare l ordine sia nei config che nelle combo nella modalita disordinata 
+* ir scan parte con gia l ir ricevuto perche usa quello precedente , svuotarlo prima di scansioanare
+### miglioramenti
+
+* sposta il reactive lighting direttamente in keypad ed encoder o crea un warpper di tutti gli input che sarebbe il top ,cosi da renderlo disponibile altre modalita
+*dare piu tempo per selezioanre la combo per la modalita ir riguardo al keypad ,mentre ml encoder o altro va processato subito

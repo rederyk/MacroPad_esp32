@@ -25,6 +25,7 @@
 #include <WIFIManager.h>
 #include <Logger.h>
 #include <BLEController.h>
+#include "Led.h"
 
 extern WIFIManager wifiManager;
 extern BLEController bleController;
@@ -292,6 +293,281 @@ void MacroManager::pressAction(const std::string &action)
         specialAction.actionDelay(totalDelayMs);
     }
 
+    // IR Remote Control Commands (toggle pattern)
+    else if (action.rfind("SCAN_IR_DEV_", 0) == 0)
+    {
+        // Extract device ID from "SCAN_IR_DEV_X"
+        std::string devStr = action.substr(12); // After "SCAN_IR_DEV_"
+        int deviceId = std::stoi(devStr);
+
+        // Pass the activation combo as exit combo
+        String exitCombo = String(currentActivationCombo.c_str());
+        specialAction.toggleScanIR(deviceId, exitCombo);
+
+        // Clean up state after IR mode exits
+        clearActiveKeys();
+    }
+    else if (action.rfind("SEND_IR_", 0) == 0)
+    {
+        // Hierarchical IR send command handling
+        // Extract the part after "SEND_IR_" (8 characters)
+        std::string remainder = action.substr(8);
+
+        // 1. Check for interactive mode: SEND_IR_DEV_<deviceId>
+        if (remainder.rfind("DEV_", 0) == 0)
+        {
+            // Interactive send mode
+            std::string devStr = remainder.substr(4); // After "DEV_"
+            try
+            {
+                int deviceId = std::stoi(devStr);
+                String exitCombo = String(currentActivationCombo.c_str());
+                specialAction.toggleSendIR(deviceId, exitCombo);
+                clearActiveKeys();
+            }
+            catch (const std::exception &e)
+            {
+                Logger::getInstance().log("Invalid SEND_IR_DEV format: " + String(action.c_str()));
+            }
+        }
+        // 2. Check for numeric direct send: SEND_IR_CMD_<deviceId>_CMD<commandId>
+        else if (remainder.rfind("CMD_", 0) == 0)
+        {
+            std::string numericPart = remainder.substr(4); // After "CMD_"
+            size_t cmdPos = numericPart.find("_CMD");
+
+            if (cmdPos != std::string::npos)
+            {
+                std::string devStr = numericPart.substr(0, cmdPos);
+                std::string cmdStr = numericPart.substr(cmdPos + 4);
+
+                try
+                {
+                    int deviceId = std::stoi(devStr);
+                    int commandId = std::stoi(cmdStr);
+                    String deviceName = String("dev") + String(deviceId);
+                    String commandName = String("cmd") + String(commandId);
+                    specialAction.sendIRCommand(deviceName, commandName);
+                }
+                catch (const std::exception &e)
+                {
+                    Logger::getInstance().log("Invalid SEND_IR_CMD format: " + String(action.c_str()));
+                }
+            }
+        }
+        // 3. Descriptive direct send: SEND_IR_<deviceName>_<commandName>
+        else
+        {
+            size_t underscorePos = remainder.find('_');
+            if (underscorePos != std::string::npos)
+            {
+                String deviceName = String(remainder.substr(0, underscorePos).c_str());
+                String commandName = String(remainder.substr(underscorePos + 1).c_str());
+                specialAction.sendIRCommand(deviceName, commandName);
+            }
+            else
+            {
+                Logger::getInstance().log("Invalid SEND_IR format (missing underscore): " + String(action.c_str()));
+            }
+        }
+    }
+    else if (action == "IR_CHECK")
+    {
+        specialAction.checkIRSignal();
+    }
+
+    // LED RGB Control Commands
+    else if (action.rfind("LED_RGB_", 0) == 0)
+    {
+        // Extract parameters after "LED_RGB_"
+        std::string params = action.substr(8); // Skip "LED_RGB_"
+
+        // Parse the three color components separated by underscores
+        std::vector<std::string> components;
+        size_t start = 0;
+        size_t end = params.find('_');
+
+        // Split by underscores
+        while (end != std::string::npos)
+        {
+            components.push_back(params.substr(start, end - start));
+            start = end + 1;
+            end = params.find('_', start);
+        }
+        // Add last component
+        components.push_back(params.substr(start));
+
+        if (components.size() == 3)
+        {
+            int values[3] = {0, 0, 0};           // Absolute values
+            int deltas[3] = {0, 0, 0};           // Relative adjustments
+            bool hasRelative = false;
+            bool hasAbsolute = false;
+
+            // Parse each component
+            for (int i = 0; i < 3; i++)
+            {
+                std::string comp = components[i];
+
+                // Check for PLUS/MINUS modifiers
+                if (comp == "PLUS_PLUS")
+                {
+                    deltas[i] = specialAction.ledAdjustmentStep * 2;
+                    hasRelative = true;
+                }
+                else if (comp == "PLUS")
+                {
+                    deltas[i] = specialAction.ledAdjustmentStep;
+                    hasRelative = true;
+                }
+                else if (comp == "MINUS_MINUS")
+                {
+                    deltas[i] = -specialAction.ledAdjustmentStep * 2;
+                    hasRelative = true;
+                }
+                else if (comp == "MINUS")
+                {
+                    deltas[i] = -specialAction.ledAdjustmentStep;
+                    hasRelative = true;
+                }
+                else
+                {
+                    // Try to parse as number (absolute value)
+                    try
+                    {
+                        values[i] = std::stoi(comp);
+                        hasAbsolute = true;
+                    }
+                    catch (const std::exception &e)
+                    {
+                        Logger::getInstance().log("Invalid LED component: " + String(comp.c_str()));
+                        return;
+                    }
+                }
+            }
+
+            // Execute the command based on what we parsed
+            if (hasRelative && !hasAbsolute)
+            {
+                // Pure relative adjustment
+                specialAction.adjustLedColor(deltas[0], deltas[1], deltas[2]);
+            }
+            else if (hasAbsolute && !hasRelative)
+            {
+                // Pure absolute set
+                specialAction.setLedColor(values[0], values[1], values[2], false);
+            }
+            else if (hasAbsolute && hasRelative)
+            {
+                // Mixed: first get current color, apply deltas, then set absolutes
+                int currentRed, currentGreen, currentBlue;
+                Led::getInstance().getColor(currentRed, currentGreen, currentBlue);
+
+                // Start with current values
+                int finalRed = currentRed;
+                int finalGreen = currentGreen;
+                int finalBlue = currentBlue;
+
+                // Apply deltas where specified
+                if (deltas[0] != 0) finalRed += deltas[0];
+                else if (values[0] != 0 || components[0] == "0") finalRed = values[0];
+
+                if (deltas[1] != 0) finalGreen += deltas[1];
+                else if (values[1] != 0 || components[1] == "0") finalGreen = values[1];
+
+                if (deltas[2] != 0) finalBlue += deltas[2];
+                else if (values[2] != 0 || components[2] == "0") finalBlue = values[2];
+
+                specialAction.setLedColor(finalRed, finalGreen, finalBlue, false);
+            }
+        }
+        else
+        {
+            Logger::getInstance().log("Invalid LED_RGB format: expected 3 components");
+        }
+    }
+    else if (action == "LED_OFF")
+    {
+        specialAction.turnOffLed();
+    }
+    else if (action == "LED_SAVE")
+    {
+        specialAction.saveLedColor();
+    }
+    else if (action == "LED_RESTORE")
+    {
+        specialAction.restoreLedColor();
+    }
+    else if (action == "LED_INFO")
+    {
+        specialAction.showLedInfo();
+    }
+
+    // LED Brightness Control Commands
+    else if (action.rfind("LED_BRIGHTNESS_", 0) == 0)
+    {
+        // Extract parameter after "LED_BRIGHTNESS_"
+        std::string param = action.substr(15); // Skip "LED_BRIGHTNESS_"
+
+        if (param == "PLUS_PLUS")
+        {
+            specialAction.adjustBrightness(specialAction.brightnessAdjustmentStep * 2);
+        }
+        else if (param == "PLUS")
+        {
+            specialAction.adjustBrightness(specialAction.brightnessAdjustmentStep);
+        }
+        else if (param == "MINUS_MINUS")
+        {
+            specialAction.adjustBrightness(-specialAction.brightnessAdjustmentStep * 2);
+        }
+        else if (param == "MINUS")
+        {
+            specialAction.adjustBrightness(-specialAction.brightnessAdjustmentStep);
+        }
+        else if (param == "INFO")
+        {
+            specialAction.showBrightnessInfo();
+        }
+        else
+        {
+            // Try to parse as absolute value (0-100)
+            try
+            {
+                int brightness = std::stoi(param);
+                specialAction.setBrightness(brightness);
+            }
+            catch (const std::exception &e)
+            {
+                Logger::getInstance().log("Invalid LED_BRIGHTNESS format: " + String(param.c_str()));
+            }
+        }
+    }
+
+    // Flashlight Command - Toggle white LED full brightness
+    else if (action == "FLASHLIGHT")
+    {
+        if (!flashlightActive)
+        {
+            // Save current LED state
+            Led::getInstance().getColor(savedLedColor[0], savedLedColor[1], savedLedColor[2]);
+            // Turn on white LED at full brightness
+            Led::getInstance().setColor(255, 255, 255, false);
+            flashlightActive = true;
+            Logger::getInstance().log("Flashlight ON - LED set to white (255,255,255)");
+        }
+        else
+        {
+            // Restore previous LED state
+            Led::getInstance().setColor(savedLedColor[0], savedLedColor[1], savedLedColor[2], false);
+            flashlightActive = false;
+            Logger::getInstance().log("Flashlight OFF - LED restored to RGB(" + 
+                                    String(savedLedColor[0]) + "," + 
+                                    String(savedLedColor[1]) + "," + 
+                                    String(savedLedColor[2]) + ")");
+        }
+    }
+
     // Is useless now??
     else if (action == "AP_MODE")
     {
@@ -346,6 +622,8 @@ void MacroManager::releaseAction(const std::string &action)
         newKeyPressed = true;
     }
 
+    // IR Remote Control no longer needs release actions (now using toggle pattern)
+
     else if (action == "TOGGLE_SAMPLING")
     {
         specialAction.toggleSampling(false);
@@ -376,6 +654,10 @@ void MacroManager::releaseAction(const std::string &action)
             setUseKeyPressOrder(true);
         }
     }
+    else if (action == "REACTIVE_LIGHTING")
+    {
+        enableReactiveLighting(!reactiveLightingEnabled);
+    }
 
     Logger::getInstance().log(logMessage);
     return;
@@ -402,6 +684,9 @@ void MacroManager::handleInputEvent(const InputEvent &event)
 
         if (event.state)
         {
+            // Handle reactive lighting for key press
+            handleReactiveLighting(event.value1, false, 0);
+
             // Quando un tasto viene premuto, aggiungilo alla lista dell'ordine di pressione
             if (useKeyPressOrder)
             {
@@ -465,6 +750,9 @@ void MacroManager::handleInputEvent(const InputEvent &event)
         // Gestione completa di un impulso di encoder (atomica)
         if (event.state)
         {
+            // Handle reactive lighting for encoder rotation
+            handleReactiveLighting(0, true, event.value1);
+
             // Determina la direzione
             std::string encoderAction = (event.value1 > 0) ? "CW" : "CCW";
             std::string fullCombo = "";
@@ -490,6 +778,9 @@ void MacroManager::handleInputEvent(const InputEvent &event)
             }
 
             Logger::getInstance().log("Encoder pulse: " + String(encoderAction.c_str()) + " combo: " + String(fullCombo.c_str()));
+
+            // Save the activation combo for IR commands
+            currentActivationCombo = fullCombo;
 
             // Rilascia l'azione precedente se esiste
             if (!lastExecutedAction.empty())
@@ -536,6 +827,9 @@ void MacroManager::handleInputEvent(const InputEvent &event)
     case InputEvent::EventType::BUTTON:
         if (event.state)
         {
+            // Handle reactive lighting for encoder button
+            handleReactiveLighting(0, true, 0);
+
             lastAction = "BUTTON";
             pendingCombination = getCurrentCombination();
             lastCombinationTime = millis();
@@ -752,6 +1046,9 @@ void MacroManager::processKeyCombination()
         // Check if there is a valid combination
         if (combinations.find(pendingCombination) != combinations.end())
         {
+            // Save the activation combo for IR commands
+            currentActivationCombo = pendingCombination;
+
             // Release previous action if exists
             if (!lastExecutedAction.empty())
             {
@@ -866,6 +1163,13 @@ void MacroManager::update()
         encoderReleaseScheduled = false;
     }
 
+    // Reactive lighting timeout - restore original color
+    if (ledReactiveActive && currentTime >= ledReactiveTime)
+    {
+        Led::getInstance().setColor(savedLedColor[0], savedLedColor[1], savedLedColor[2], false);
+        ledReactiveActive = false;
+    }
+
     // Logger::getInstance().processBuffer();
 }
 
@@ -876,4 +1180,87 @@ void MacroManager::releaseGestureActions()
         releaseAction(lastExecutedAction);
         lastExecutedAction.clear();
     }
+}
+
+// ==================== REACTIVE LIGHTING FUNCTIONS ====================
+
+void MacroManager::enableReactiveLighting(bool enable)
+{
+    reactiveLightingEnabled = enable;
+
+    if (enable)
+    {
+        // Save current LED color when enabling
+        Led::getInstance().getColor(savedLedColor[0], savedLedColor[1], savedLedColor[2]);
+        Logger::getInstance().log("Reactive Lighting ENABLED - LED will respond to key/encoder input");
+    }
+    else
+    {
+        // Restore original LED color when disabling
+        if (ledReactiveActive)
+        {
+            Led::getInstance().setColor(savedLedColor[0], savedLedColor[1], savedLedColor[2], false);
+            ledReactiveActive = false;
+        }
+        Logger::getInstance().log("Reactive Lighting DISABLED");
+    }
+}
+
+void MacroManager::handleReactiveLighting(uint8_t keyIndex, bool isEncoder, int encoderDirection)
+{
+    if (!reactiveLightingEnabled)
+        return;
+
+    // Save the current LED color if not already in reactive mode
+    if (!ledReactiveActive)
+    {
+        Led::getInstance().getColor(savedLedColor[0], savedLedColor[1], savedLedColor[2]);
+    }
+
+    // Choose color based on input type
+    int red, green, blue;
+
+    if (isEncoder)
+    {
+        // Encoder handling: direction determines color
+        if (encoderDirection > 0) // CW
+        {
+            red = encoderCWColor[0];
+            green = encoderCWColor[1];
+            blue = encoderCWColor[2];
+        }
+        else if (encoderDirection < 0) // CCW
+        {
+            red = encoderCCWColor[0];
+            green = encoderCCWColor[1];
+            blue = encoderCCWColor[2];
+        }
+        else // Button (direction == 0)
+        {
+            red = encoderButtonColor[0];
+            green = encoderButtonColor[1];
+            blue = encoderButtonColor[2];
+        }
+    }
+    else
+    {
+        // Key press - use key color mapping
+        if (keyIndex >= 0 && keyIndex < 9)
+        {
+            red = keyColors[keyIndex][0];
+            green = keyColors[keyIndex][1];
+            blue = keyColors[keyIndex][2];
+        }
+        else
+        {
+            return; // Invalid key index
+        }
+    }
+
+    // Set the LED to the reactive color
+    Led::getInstance().setColor(red, green, blue, false);
+
+    // Mark reactive mode as active and set timeout
+    ledReactiveActive = true;
+    ledReactiveTime = millis() + LED_REACTIVE_DURATION;
 }

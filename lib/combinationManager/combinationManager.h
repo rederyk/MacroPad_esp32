@@ -25,7 +25,7 @@
 
 class CombinationManager {
 private:
-    StaticJsonDocument<4096> doc;
+    StaticJsonDocument<8192> doc;
     JsonObject combinations;
     
 public:

@@ -37,6 +37,9 @@
 #include "WIFIManager.h"
 #include "specialAction.h"
 #include "powerManager.h"
+#include "IRSensor.h"
+#include "IRSender.h"
+#include "IRStorage.h"
 
 WIFIManager wifiManager; // Create an instance of WIFIManager
 
@@ -58,6 +61,11 @@ BLEController bleController("Macropad_esp32"); // prendere nome dal config in qu
 MacroManager macroManager(nullptr, nullptr);
 Keypad *keypad;
 RotaryEncoder *rotaryEncoder;
+
+// IR Remote Control components (pointers for optional initialization)
+IRSensor *irSensor = nullptr;
+IRSender *irSender = nullptr;
+IRStorage *irStorage = nullptr;
 
 // Event buffer
 std::queue<TimedEvent> eventBuffer;
@@ -100,7 +108,11 @@ void setup()
     if (ledConfig.active)
     {
         Led::getInstance().begin(ledConfig.pinRed, ledConfig.pinGreen, ledConfig.pinBlue, ledConfig.anodeCommon);
-        Led::getInstance().setColor(255, 0, 255); // Magenta
+
+        // Load saved brightness before setting any colors
+        specialAction.loadBrightness();
+
+        specialAction.setSystemLedColor(255, 0, 255, false); // Magenta with loaded brightness (system notification)
         Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
     }
     // Set serial enabled based on config
@@ -113,7 +125,7 @@ void setup()
 
     logger.setSerialEnabled(serialEnabled);
     // Inizializza il PowerManager con la configurazione
-    powerManager.begin(configManager.getSystemConfig(), configManager.getKeypadConfig());
+    powerManager.begin(configManager.getSystemConfig(), configManager.getKeypadConfig(), configManager.getEncoderConfig());
 
     // Load combinations
     if (!comboManager.loadCombinations(configManager.getSystemConfig().BleMacAdd))
@@ -150,22 +162,147 @@ void setup()
     Logger::getInstance().log("Loaded " + String(macroManager.combinations.size()) + " combinations");
 
     // Initialize I2C with configured pins
-    // TODO make optional
+
     const AccelerometerConfig &accelConfig = configManager.getAccelerometerConfig();
     if (accelConfig.active)
     {
         Wire.begin(accelConfig.sdaPin, accelConfig.sclPin);
 
-        // Start the sensor
-        if (!gestureSensor.begin())
+        String accelType = accelConfig.type.length() > 0 ? accelConfig.type : "adxl345";
+        accelType.toLowerCase();
+        String message = "Initialising accelerometer type: " + accelType;
+        if (accelConfig.address)
         {
-            Logger::getInstance().log("Could not find ADXL345 sensor. Check wiring!");
-            // TODO rendere acceleroemtro opzionale
+            message += " (0x";
+            message += String(accelConfig.address, HEX);
+            message += ")";
+        }
+        Logger::getInstance().log(message);
 
-            while (1)
-                ;
+        // Start the sensor
+        if (!gestureSensor.begin(accelConfig))
+        {
+            Logger::getInstance().log("Accelerometer init failed, continuing without gesture support.");
+        }
+        else
+        {
+            Logger::getInstance().log("Accelerometer initialised successfully.");
+            if (gestureSensor.calibrate())
+            {
+                Logger::getInstance().log("Accelerometer calibration completed at startup.");
+            }
+            else
+            {
+                Logger::getInstance().log("Accelerometer calibration failed at startup.");
+            }
         }
     }
+
+    // Initialize IR Remote Control components
+    // REASON: IRrecv (IRSensor) conflicts with BLE due to RMT hardware sharing
+    // IRsend (IRSender) can work with BLE enabled with minimal RMT usage
+    const SystemConfig &irSystemConfig = configManager.getSystemConfig();
+
+    // IR Sensor: ONLY initialize when BLE is DISABLED (RMT conflict)
+    if (!irSystemConfig.enable_BLE)
+    {
+        const IRSensorConfig &irSensorConfig = configManager.getIrSensorConfig();
+        Logger::getInstance().log("IR Sensor Config: pin=" + String(irSensorConfig.pin) +
+                                  ", active=" + String(irSensorConfig.active ? "true" : "false"));
+        if (irSensorConfig.active && irSensorConfig.pin >= 0)
+        {
+            Logger::getInstance().log("Initializing IR Sensor on pin " + String(irSensorConfig.pin));
+            irSensor = new IRSensor(irSensorConfig.pin);
+            if (irSensor && irSensor->begin())
+            {
+                Logger::getInstance().log("IR Sensor initialized successfully");
+            }
+            else
+            {
+                Logger::getInstance().log("Failed to initialize IR Sensor");
+                if (irSensor)
+                {
+                    delete irSensor;
+                    irSensor = nullptr;
+                }
+            }
+        }
+        else
+        {
+            Logger::getInstance().log("IR Sensor NOT initialized (disabled or invalid pin)");
+        }
+    }
+    else
+    {
+        Logger::getInstance().log("IR Sensor DISABLED (BLE enabled - RMT conflict)");
+    }
+
+    // IR Sender: Can be initialized EVEN with BLE enabled (minimal RMT usage)
+    const IRLedConfig &irLedConfig = configManager.getIrLedConfig();
+    Logger::getInstance().log("IR LED Config: pin=" + String(irLedConfig.pin) +
+                              ", active=" + String(irLedConfig.active ? "true" : "false") +
+                              ", anodeGpio=" + String(irLedConfig.anodeGpio ? "true" : "false"));
+    if (irLedConfig.active && irLedConfig.pin >= 0)
+    {
+        Logger::getInstance().log("Initializing IR Sender on pin " + String(irLedConfig.pin) +
+                                  (irSystemConfig.enable_BLE ? " (BLE mode - IR receive disabled)" : ""));
+        irSender = new IRSender(irLedConfig.pin, irLedConfig.anodeGpio);
+        if (irSender && irSender->begin())
+        {
+            Logger::getInstance().log("IR Sender initialized successfully");
+        }
+        else
+        {
+            Logger::getInstance().log("Failed to initialize IR Sender");
+            if (irSender)
+            {
+                delete irSender;
+                irSender = nullptr;
+            }
+        }
+    }
+    else
+    {
+        Logger::getInstance().log("IR Sender NOT initialized (disabled or invalid pin)");
+    }
+
+    // Initialize IR Storage (if either sensor or sender is active)
+    Logger::getInstance().log("Checking IR Storage initialization: irSensor=" +
+                              String(irSensor != nullptr ? "OK" : "NULL") +
+                              ", irSender=" + String(irSender != nullptr ? "OK" : "NULL"));
+    if ((irSensor != nullptr) || (irSender != nullptr))
+    {
+        Logger::getInstance().log("Initializing IR Storage");
+        irStorage = new IRStorage();
+        if (irStorage && irStorage->begin())
+        {
+            Logger::getInstance().log("IR Storage initialized successfully");
+            if (irStorage->loadIRData())
+            {
+                Logger::getInstance().log("IR data loaded from file");
+            }
+            else
+            {
+                Logger::getInstance().log("No existing IR data file (this is normal on first run)");
+            }
+        }
+        else
+        {
+            Logger::getInstance().log("Failed to initialize IR Storage (LittleFS error?)");
+            if (irStorage)
+            {
+                delete irStorage;
+                irStorage = nullptr;
+            }
+        }
+    }
+    else
+    {
+        Logger::getInstance().log("IR Storage NOT initialized (no IR sensor or sender available)");
+    }
+
+    Logger::getInstance().log("Free heap after IR initialization: " + String(ESP.getFreeHeap()) + " bytes");
+
     // Initialize hardware with configurations
     keypad = new Keypad(&configManager.getKeypadConfig());
     rotaryEncoder = new RotaryEncoder(&configManager.getEncoderConfig());
@@ -197,6 +334,18 @@ void setup()
     // autostart stuff
     if (systemConfig.enable_BLE)
     {
+        // Release Bluetooth Classic memory (frees ~30KB for BLE/IR compatibility)
+        Logger::getInstance().log("Releasing Bluetooth Classic memory...");
+        esp_err_t ret = esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
+        if (ret == ESP_OK)
+        {
+            Logger::getInstance().log("Bluetooth Classic memory released successfully");
+        }
+        else
+        {
+            Logger::getInstance().log("Failed to release BT Classic memory: " + String(ret));
+        }
+        Logger::getInstance().log("Free heap after BT Classic release: " + String(ESP.getFreeHeap()) + " bytes");
 
         bleController.storeOriginalMAC();
         //        Keyboard.deviceName = systemConfig.BleName.c_str();
@@ -210,7 +359,7 @@ void setup()
         vTaskDelay(pdMS_TO_TICKS(50)); // Dai tempo al BLE
 
         Logger::getInstance().log("Free heap after Bluetooth start: " + String(ESP.getFreeHeap()) + " bytes");
-        Led::getInstance().setColor(0, 0, 255); // Blu
+        specialAction.setSystemLedColor(0, 0, 255, false); // Blu with saved brightness (BLE notification)
         Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
     }
     else
@@ -248,7 +397,7 @@ void setup()
                 if (!systemConfig.ap_autostart)
                 {
 
-                    Led::getInstance().setColor(255, 0, 0); // Rosso
+                    specialAction.setSystemLedColor(255, 0, 0, false); // Rosso with saved brightness (WiFi failed notification)
                     Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
                     Logger::getInstance().log("Starting AP BACKUP MODE...");
                     wifiManager.beginAP(configManager.getWifiConfig().ap_ssid.c_str(), configManager.getWifiConfig().ap_password.c_str());
@@ -256,7 +405,7 @@ void setup()
             }
             else
             {
-                Led::getInstance().setColor(0, 255, 0); // Verde
+                specialAction.setSystemLedColor(0, 255, 0, false); // Verde with saved brightness (WiFi connected notification)
                 Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
                 Logger::getInstance().log("connesso a " + configManager.getWifiConfig().router_ssid);
             }
@@ -264,7 +413,7 @@ void setup()
 
         if (systemConfig.ap_autostart)
         {
-            Led::getInstance().setColor(255, 0, 0); // Rosso
+            specialAction.setSystemLedColor(255, 0, 0, false); // Rosso with saved brightness (AP mode notification)
             Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
             Logger::getInstance().log("Starting AP mode...");
             wifiManager.beginAP(configManager.getWifiConfig().ap_ssid.c_str(), configManager.getWifiConfig().ap_password.c_str());
@@ -332,6 +481,7 @@ void mainLoopTask(void *parameter)
 
         // Process buffered events
         processEvents();
+
 
         // --- Operazioni potenzialmente più lunghe ---
         bleController.checkConnection();

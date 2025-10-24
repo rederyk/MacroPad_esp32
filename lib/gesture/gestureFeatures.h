@@ -22,9 +22,13 @@
 
 #include "gestureRead.h"
 
-// Number of features per axis
+// Number of features per axis (mean, stddev, energy, max, min)
 #define FEATURES_PER_AXIS 5
-#define TOTAL_FEATURES (FEATURES_PER_AXIS * 3) // x, y, z axes
+
+// Accelerometer contributes 3 axes; gyroscope uses a magnitude summary
+#define TOTAL_ACCEL_FEATURES (FEATURES_PER_AXIS * 3)
+#define GYRO_MAG_FEATURES FEATURES_PER_AXIS
+#define TOTAL_FEATURES (TOTAL_ACCEL_FEATURES + GYRO_MAG_FEATURES)
 
 void extractFeatures(SampleBuffer *buffer, float *features);
 

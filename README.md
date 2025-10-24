@@ -6,7 +6,7 @@ A versatile, customizable macro pad built on the ESP32 platform, featuring gestu
 ## 🌟 Features 
  
 - **Gesture Recognition** 
-  - Record and execute custom gestures using the ADXL345 accelerometer
+  - Record and execute custom gestures using ADXL345 or MPU6050 accelerometers
 
   - Intuitive gesture learning system
 
@@ -43,7 +43,7 @@ A versatile, customizable macro pad built on the ESP32 platform, featuring gestu
 
 - ESP32 development board (tested on lolin32_lite)
 
-- ADXL345 accelerometer
+- ADXL345 or MPU6050 accelerometer
 
 - Mechanical switches/keypad
 

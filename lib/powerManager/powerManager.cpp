@@ -19,15 +19,19 @@
 
 #include "powerManager.h"
 #include <vector>
+#include "gestureRead.h"
+#include <driver/rtc_io.h>
 PowerManager::PowerManager() : lastActivityTime(0),
                                inactivityTimeout(300000), // Default 5 minutes
                                sleepEnabled(true),
                                isBleMode(false),
-                               wakeupPin(GPIO_NUM_0) // Default pin
+                               wakeupPin(GPIO_NUM_0), // Default pin
+                               fallbackWakePin(GPIO_NUM_NC),
+                               fallbackWakePinValid(false)
 {
 }
 
-void PowerManager::begin(const SystemConfig &sysConfig, const KeypadConfig &keypadConfig)
+void PowerManager::begin(const SystemConfig &sysConfig, const KeypadConfig &keypadConfig, const EncoderConfig &encoderConfig)
 {
     // Initialize with config values
     sleepEnabled = sysConfig.sleep_enabled;
@@ -35,6 +39,8 @@ void PowerManager::begin(const SystemConfig &sysConfig, const KeypadConfig &keyp
     isBleMode = sysConfig.enable_BLE;
 
     wakeupPin = sysConfig.wakeup_pin;
+    fallbackWakePin = static_cast<gpio_num_t>(encoderConfig.buttonPin);
+    fallbackWakePinValid = rtc_gpio_is_valid_gpio(fallbackWakePin);
 
     // Reset activity timer
     resetActivityTimer();
@@ -75,8 +81,80 @@ void PowerManager::enterDeepSleep(bool force)
         return;
     }
 
+    bool motionWakeActive = gestureSensor.isMotionWakeEnabled();
+    gpio_num_t effectiveWakePin = wakeupPin;
+    bool usingFallback = false;
+
+    if (!motionWakeActive && fallbackWakePinValid)
+    {
+        effectiveWakePin = fallbackWakePin;
+        usingFallback = true;
+    }
+
+    if (!rtc_gpio_is_valid_gpio(effectiveWakePin))
+    {
+        Logger::getInstance().log("⚠️ No valid wake pin configured for deep sleep ext0 (motionWake=" + String(motionWakeActive ? "true" : "false") + ")");
+    }
+    else
+    {
+        pinMode(static_cast<uint8_t>(effectiveWakePin), INPUT_PULLUP);
+        int wakeLevel = digitalRead(static_cast<uint8_t>(effectiveWakePin));
+        String pinLog = "Wake pin (" + String(static_cast<int>(effectiveWakePin)) + (usingFallback ? ", fallback" : "") + ") level before sleep: ";
+        Logger::getInstance().log(pinLog + String(wakeLevel == LOW ? "LOW" : "HIGH"));
+
+        if (motionWakeActive && !usingFallback)
+        {
+            Logger::getInstance().log("Motion wake enabled on GPIO " + String(static_cast<int>(wakeupPin)));
+            if (!gestureSensor.standby())
+            {
+                Logger::getInstance().log("Failed to rearm accelerometer motion wake before sleep");
+            }
+            else
+            {
+                wakeLevel = digitalRead(static_cast<uint8_t>(effectiveWakePin));
+                Logger::getInstance().log("Wake pin level after standby: " + String(wakeLevel == LOW ? "LOW" : "HIGH"));
+                if (wakeLevel == LOW)
+                {
+                    Logger::getInstance().log("Motion interrupt already active: clearing before sleep");
+                    if (!gestureSensor.clearMotionWakeInterrupt())
+                    {
+                        Logger::getInstance().log("Failed to clear motion interrupt before sleep");
+                    }
+                    vTaskDelay(pdMS_TO_TICKS(10));
+                    wakeLevel = digitalRead(static_cast<uint8_t>(effectiveWakePin));
+                    Logger::getInstance().log("Wake pin level after clear: " + String(wakeLevel == LOW ? "LOW" : "HIGH"));
+                }
+                if (wakeLevel == LOW)
+                {
+                    Logger::getInstance().log("⚠️ Wake pin still LOW; motion wake may fire immediately");
+                }
+            }
+        }
+        else
+        {
+            if (usingFallback)
+            {
+                Logger::getInstance().log("Motion wake disabled; using fallback wake pin " + String(static_cast<int>(effectiveWakePin)));
+            }
+            else
+            {
+                Logger::getInstance().log("Motion wake not active; relying on standard wake sources");
+            }
+
+            if (!gestureSensor.standby())
+            {
+                Logger::getInstance().log("Gesture sensor standby failed before sleep");
+            }
+        }
+
+        esp_err_t wakeErr = esp_sleep_enable_ext0_wakeup(effectiveWakePin, LOW);
+        if (wakeErr != ESP_OK)
+        {
+            Logger::getInstance().log("Failed to enable EXT0 wakeup on pin " + String(static_cast<int>(effectiveWakePin)) + ": err " + String(wakeErr));
+        }
+    }
+
     // Configure wakeup sources first (before animation)
-    esp_sleep_enable_ext0_wakeup(wakeupPin, LOW);
     esp_sleep_enable_timer_wakeup(28800000000ULL); // 8h backup
     // Comprehensive sleep parameters table
     Logger::getInstance().log("╔═════════════════════════════════════════════════╗");

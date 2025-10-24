@@ -37,6 +37,8 @@ private:
     KeypadConfig keypadConfig;
     EncoderConfig encoderConfig;
     LedConfig ledConfig;
+    IRSensorConfig irSensorConfig;
+    IRLedConfig irLedConfig;
     AccelerometerConfig accelerometerConfig;
     SystemConfig systemConfig;
 
@@ -49,6 +51,8 @@ public:
     const WifiConfig &getWifiConfig() const;
     const SystemConfig &getSystemConfig() const;
     const LedConfig &getLedConfig() const;
+    const IRSensorConfig &getIrSensorConfig() const;
+    const IRLedConfig &getIrLedConfig() const;
 
 private:
     WifiConfig wifiConfig;

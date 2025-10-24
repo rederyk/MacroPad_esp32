@@ -22,7 +22,9 @@
 
 #include <Arduino.h>
 #include <Wire.h>
-#include <ADXL345.h>
+#include "configTypes.h"
+#include "MotionSensor.h"
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -38,6 +40,12 @@ struct Sample
     float x;
     float y;
     float z;
+    float gyroX;
+    float gyroY;
+    float gyroZ;
+    float temperature;
+    bool gyroValid;
+    bool temperatureValid;
 };
 
 struct SampleBuffer
@@ -51,10 +59,10 @@ struct SampleBuffer
 class GestureRead
 {
 public:
-    GestureRead(uint8_t i2cAddress = ADXL345_ALT, TwoWire *wire = &Wire);
+    GestureRead(TwoWire *wire = &Wire);
     ~GestureRead(); // Destructor declaration
 
-    bool begin();
+    bool begin(const AccelerometerConfig &config);
     bool calibrate(uint16_t calibrationSamples = 5);
 
     // Power management methods
@@ -62,6 +70,12 @@ public:
     bool disableLowPowerMode();
     bool standby();
     bool wakeup();
+
+    bool configureMotionWakeup(uint8_t threshold, uint8_t duration, uint8_t highPassCode, uint8_t cycleRateCode);
+    bool disableMotionWakeup();
+    bool isMotionWakeEnabled() const;
+    bool clearMotionWakeInterrupt();
+    bool isMotionWakeTriggered();
 
     // New methods for continuous sampling
     bool startSampling();
@@ -77,22 +91,44 @@ public:
 
     void updateSampling(); // Call this regularly from main loop
 
+    // Auto-calibration controls
+    void setAutoCalibrationEnabled(bool enable);
+    void setAutoCalibrationParameters(float gyroStillThresholdRad, uint16_t minStableSamples, float smoothingFactor);
+    bool isAutoCalibrationEnabled() const;
+
 private:
-    ADXL345 _accelerometer;
+    void getMappedGyro(float &x, float &y, float &z);
+    void resetAutoCalibrationState();
+    void updateAutoCalibration(const float rawAccel[3], const float mappedGyro[3], bool gyroValid);
+    bool waitForGyroReady(uint32_t timeoutMs);
+
+    std::unique_ptr<MotionSensor> _sensor;
+    AccelerometerConfig _config;
+    bool _configLoaded;
+    TwoWire *_wire;
+
     Offset _calibrationOffset;
     bool _isCalibrated;
-    String _axisMap;
-    String _axisDir;
-
     // New members for continuous sampling
     std::mutex _bufferMutex;
     bool _isSampling;
     bool _bufferFull;
     unsigned long lastSampleTime;
+    bool _motionWakeEnabled;
+    bool _expectGyro;
 
     SampleBuffer _sampleBuffer;
     uint16_t _maxSamples;
     uint16_t _sampleHZ;
+
+    struct AutoCalibrationState
+    {
+        bool enabled;
+        float gyroStillThreshold;
+        uint16_t minStableSamples;
+        float smoothingFactor;
+        uint16_t stableCount;
+    } _autoCalib;
 };
 
 extern GestureRead gestureSensor; // Dichiarazione extern per l'istanza globale

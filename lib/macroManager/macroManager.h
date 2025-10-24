@@ -70,6 +70,7 @@ private:
     std::string pendingCombination;
     std::string lastAction;
     std::string lastExecutedAction;
+    std::string currentActivationCombo; // Combo che ha attivato l'azione corrente
     std::string encoderPendingAction; // Azione dell'encoder in attesa di rilascio
     const KeypadConfig *keypadConfig;
     const WifiConfig *wifiConfig;
@@ -95,6 +96,38 @@ private:
     std::string getCurrentKeyCombination(); // Get only key combination without encoder/button actions
     void processKeyCombination();
     void releaseGestureActions();
+
+    // Reactive lighting system
+    bool reactiveLightingEnabled = false;
+    void enableReactiveLighting(bool enable);
+    void handleReactiveLighting(uint8_t keyIndex, bool isEncoder, int encoderDirection);
+
+    // Color mapping for reactive lighting (RGB values for each key 0-8)
+    int keyColors[9][3] = {
+        {255, 0, 0},     // Key 0: Red
+        {255, 127, 0},   // Key 1: Orange
+        {255, 255, 0},   // Key 2: Yellow
+        {0, 255, 0},     // Key 3: Green
+        {0, 255, 255},   // Key 4: Cyan
+        {0, 0, 255},     // Key 5: Blue
+        {127, 0, 255},   // Key 6: Purple
+        {255, 0, 255},   // Key 7: Magenta
+        {255, 255, 255}  // Key 8: White
+    };
+
+    // Encoder colors
+    int encoderCWColor[3] = {0, 255, 127};   // Cyan-Green for clockwise
+    int encoderCCWColor[3] = {255, 127, 0};  // Orange for counter-clockwise
+    int encoderButtonColor[3] = {255, 0, 127}; // Pink for button
+
+    // LED state management for reactive lighting
+    int savedLedColor[3] = {0, 0, 0};
+    unsigned long ledReactiveTime = 0;
+    static constexpr unsigned long LED_REACTIVE_DURATION = 300; // milliseconds
+    bool ledReactiveActive = false;
+
+    // Flashlight mode state
+    bool flashlightActive = false;
 };
 
 #endif // MACRO_MANAGER_H
