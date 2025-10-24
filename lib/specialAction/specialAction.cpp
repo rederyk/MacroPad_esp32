@@ -30,8 +30,10 @@
 #include "IRSender.h"
 #include "IRStorage.h"
 #include <ArduinoJson.h>
+#include "rotaryEncoder.h"
 
 extern Keypad *keypad;
+extern RotaryEncoder *rotaryEncoder;
 extern IRSensor *irSensor;
 extern IRSender *irSender;
 extern IRStorage *irStorage;
@@ -209,9 +211,15 @@ String SpecialAction::getInputWithEncoder(unsigned long timeout, bool allowGestu
                     break;
                 }
             }
+        }
+
+        // Check encoder input
+        if (allowEncoder && rotaryEncoder->processInput())
+        {
+            InputEvent event = rotaryEncoder->getEvent();
 
             // Handle encoder rotation
-            if (allowEncoder && event.type == InputEvent::EventType::ROTATION && event.state)
+            if (event.type == InputEvent::EventType::ROTATION && event.state)
             {
                 result = (event.value1 > 0) ? "CW" : "CCW";
                 Logger::getInstance().log("Input from encoder: " + result);
@@ -219,7 +227,7 @@ String SpecialAction::getInputWithEncoder(unsigned long timeout, bool allowGestu
             }
 
             // Handle encoder button press
-            if (allowEncoder && event.type == InputEvent::EventType::BUTTON && event.state)
+            if (event.type == InputEvent::EventType::BUTTON && event.state)
             {
                 result = "BUTTON";
                 Logger::getInstance().log("Input from encoder button: " + result);
@@ -755,7 +763,7 @@ void SpecialAction::toggleScanIR(int deviceId)
         Logger::getInstance().log("IR captured! Use keypad (1-9), gesture, or encoder (CW/CCW/BUTTON) to select slot");
         Logger::getInstance().processBuffer();
 
-        String commandName = getInputWithEncoder(15000, true, true); // Allow keypad, gesture, and encoder
+        String commandName = getInputWithEncoder(15000, false, true); // Allow keypad, gesture, and encoder
         if (commandName == "")
         {
             Logger::getInstance().log("Timeout or invalid input - IR not saved");

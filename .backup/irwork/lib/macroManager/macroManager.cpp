@@ -1,21 +1,20 @@
 /*
  * ESP32 MacroPad Project
  * Copyright (C) [2025] [Enrico Mori]
- * 
+ *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 
 #include "macroManager.h"
 #include <Arduino.h>
@@ -25,6 +24,7 @@
 #include <WIFIManager.h>
 #include <Logger.h>
 #include <BLEController.h>
+#include <specialAction.h>
 
 extern WIFIManager wifiManager;
 extern BLEController bleController;
@@ -298,14 +298,14 @@ void MacroManager::pressAction(const std::string &action)
         // Extract device ID from "SCAN_IR_DEV_X"
         std::string devStr = action.substr(12); // After "SCAN_IR_DEV_"
         int deviceId = std::stoi(devStr);
-        specialAction.scanIR(true, deviceId);
+        specialAction.toggleScanIR(deviceId);
     }
-    else if (action.rfind("SEND_IR_MOD_", 0) == 0)
+    else if (action.rfind("SEND_IR_DEV_", 0) == 0)
     {
-        // Extract device ID from "SEND_IR_MOD_X"
-        std::string devStr = action.substr(12); // After "SEND_IR_MOD_"
+        // Extract device ID from "SEND_IR_DEV_X"
+        std::string devStr = action.substr(12); // After "SEND_IR_DEV_"
         int deviceId = std::stoi(devStr);
-        specialAction.sendIR(true, deviceId);
+        specialAction.toggleSendIR(deviceId);
     }
     else if (action == "IR_CHECK")
     {
@@ -365,23 +365,6 @@ void MacroManager::releaseAction(const std::string &action)
         gestureExecutionTime = millis();
         newKeyPressed = true;
     }
-
-    // IR Remote Control release actions
-    else if (action.rfind("SCAN_IR_DEV_", 0) == 0)
-    {
-        // Extract device ID from "SCAN_IR_DEV_X"
-        std::string devStr = action.substr(12);
-        int deviceId = std::stoi(devStr);
-        specialAction.scanIR(false, deviceId);
-    }
-    else if (action.rfind("SEND_IR_MOD_", 0) == 0)
-    {
-        // Extract device ID from "SEND_IR_MOD_X"
-        std::string devStr = action.substr(12);
-        int deviceId = std::stoi(devStr);
-        specialAction.sendIR(false, deviceId);
-    }
-
     else if (action == "TOGGLE_SAMPLING")
     {
         specialAction.toggleSampling(false);
@@ -423,6 +406,12 @@ void MacroManager::handleInputEvent(const InputEvent &event)
     switch (event.type)
     {
     case InputEvent::EventType::KEY_PRESS:
+        // Ignore key events during locked actions to prevent ghost combinations
+        if (is_action_locked)
+        {
+            return;
+        }
+
         // Salva lo stato precedente prima dell'aggiornamento
         previousKeysMask = activeKeysMask;
         wasPartOfCombo = false;
@@ -864,6 +853,22 @@ void MacroManager::clearActiveKeys()
 void MacroManager::update()
 {
     unsigned long currentTime = millis();
+
+    // Track if action was locked in previous cycle
+    static bool wasActionLocked = false;
+
+    // When exiting from a locked action, clear all key states
+    // This prevents ghost combinations from keys pressed during the locked period
+    if (wasActionLocked && !is_action_locked)
+    {
+        activeKeysMask = 0;
+        previousKeysMask = 0;
+        pendingCombination.clear();
+        newKeyPressed = false;
+        keyPressOrder.clear();
+        Logger::getInstance().log("Exiting locked action - cleared all key states");
+    }
+    wasActionLocked = is_action_locked;
 
     // Process command queue if active
     if (processingCommandQueue)

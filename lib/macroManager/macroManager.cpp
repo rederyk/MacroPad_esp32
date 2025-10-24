@@ -300,10 +300,10 @@ void MacroManager::pressAction(const std::string &action)
         int deviceId = std::stoi(devStr);
         specialAction.toggleScanIR(deviceId);
     }
-    else if (action.rfind("SEND_IR_MOD_", 0) == 0)
+    else if (action.rfind("SEND_IR_DEV_", 0) == 0)
     {
-        // Extract device ID from "SEND_IR_MOD_X"
-        std::string devStr = action.substr(12); // After "SEND_IR_MOD_"
+        // Extract device ID from "SEND_IR_DEV_X"
+        std::string devStr = action.substr(12); // After "SEND_IR_DEV_"
         int deviceId = std::stoi(devStr);
         specialAction.toggleSendIR(deviceId);
     }

@@ -108,3 +108,7 @@ Usare ext1 con `ANY_HIGH`**
 
 * mouse gyro mode con combo separate
 
+### problemi
+* il cw ccw button non e funziona per scan send ir 
+
+* ho un problema spesso i tasti rimangono premuti dopo sver eseguito un comando e si sommano alle combo fivhe non lo ripremo , credo che salti il rilascio , credi di poter migliorare il codice per renderlo piu robusto ?
