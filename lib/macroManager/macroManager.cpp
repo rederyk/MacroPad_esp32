@@ -298,14 +298,26 @@ void MacroManager::pressAction(const std::string &action)
         // Extract device ID from "SCAN_IR_DEV_X"
         std::string devStr = action.substr(12); // After "SCAN_IR_DEV_"
         int deviceId = std::stoi(devStr);
-        specialAction.toggleScanIR(deviceId);
+
+        // Pass the activation combo as exit combo
+        String exitCombo = String(currentActivationCombo.c_str());
+        specialAction.toggleScanIR(deviceId, exitCombo);
+
+        // Clean up state after IR mode exits
+        clearActiveKeys();
     }
     else if (action.rfind("SEND_IR_DEV_", 0) == 0)
     {
         // Extract device ID from "SEND_IR_DEV_X"
         std::string devStr = action.substr(12); // After "SEND_IR_DEV_"
         int deviceId = std::stoi(devStr);
-        specialAction.toggleSendIR(deviceId);
+
+        // Pass the activation combo as exit combo
+        String exitCombo = String(currentActivationCombo.c_str());
+        specialAction.toggleSendIR(deviceId, exitCombo);
+
+        // Clean up state after IR mode exits
+        clearActiveKeys();
     }
     else if (action.rfind("SEND_IR_CMD_", 0) == 0)
     {
@@ -531,6 +543,9 @@ void MacroManager::handleInputEvent(const InputEvent &event)
             }
 
             Logger::getInstance().log("Encoder pulse: " + String(encoderAction.c_str()) + " combo: " + String(fullCombo.c_str()));
+
+            // Save the activation combo for IR commands
+            currentActivationCombo = fullCombo;
 
             // Rilascia l'azione precedente se esiste
             if (!lastExecutedAction.empty())
@@ -793,6 +808,9 @@ void MacroManager::processKeyCombination()
         // Check if there is a valid combination
         if (combinations.find(pendingCombination) != combinations.end())
         {
+            // Save the activation combo for IR commands
+            currentActivationCombo = pendingCombination;
+
             // Release previous action if exists
             if (!lastExecutedAction.empty())
             {

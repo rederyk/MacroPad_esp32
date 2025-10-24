@@ -70,6 +70,7 @@ private:
     std::string pendingCombination;
     std::string lastAction;
     std::string lastExecutedAction;
+    std::string currentActivationCombo; // Combo che ha attivato l'azione corrente
     std::string encoderPendingAction; // Azione dell'encoder in attesa di rilascio
     const KeypadConfig *keypadConfig;
     const WifiConfig *wifiConfig;

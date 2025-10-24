@@ -188,10 +188,15 @@ int SpecialAction::getInput(unsigned long timeout, bool allowGesture)
     return value;
 }
 
-String SpecialAction::getInputWithEncoder(unsigned long timeout, bool allowGesture, bool allowEncoder)
+String SpecialAction::getInputWithEncoder(unsigned long timeout, bool allowGesture, bool allowEncoder, const String &exitCombo)
 {
     unsigned long startTime = millis();
     String result = "";
+
+    // Track pressed keys for exit combo detection
+    uint16_t pressedKeys = 0; // Bitmask for keys 0-15
+    uint16_t lastPressedKeys = 0; // Remember what was pressed before release
+    bool checkingExitCombo = (exitCombo.length() > 0);
 
     while (result == "")
     {
@@ -200,10 +205,74 @@ String SpecialAction::getInputWithEncoder(unsigned long timeout, bool allowGestu
         {
             InputEvent event = keypad->getEvent();
 
-            // Handle keypad key press
-            if (event.type == InputEvent::EventType::KEY_PRESS && event.state)
+            // Track key presses/releases for exit combo
+            if (checkingExitCombo && event.type == InputEvent::EventType::KEY_PRESS)
             {
-                int key = event.value1; // Get key code (0-8)
+                if (event.state) // Key pressed
+                {
+                    pressedKeys |= (1 << event.value1);
+                    lastPressedKeys = pressedKeys; // Save current combo
+                }
+                else // Key released
+                {
+                    pressedKeys &= ~(1 << event.value1);
+
+                    // When all keys are released, check what was pressed
+                    if (pressedKeys == 0 && lastPressedKeys != 0)
+                    {
+                        // Build the combo string from lastPressedKeys
+                        String pressedCombo = "";
+                        for (int i = 0; i < 9; i++)
+                        {
+                            if (lastPressedKeys & (1 << i))
+                            {
+                                if (pressedCombo.length() > 0) pressedCombo += "+";
+                                pressedCombo += String(i + 1);
+                            }
+                        }
+
+                        // FIRST: Check if it was the exit combo (highest priority)
+                        if (pressedCombo == exitCombo || pressedCombo + ",BUTTON" == exitCombo)
+                        {
+                            Logger::getInstance().log("Exit combo detected: " + exitCombo);
+                            return "EXIT_COMBO";
+                        }
+
+                        // Check if it was a single key
+                        int keyCount = 0;
+                        int singleKey = -1;
+                        for (int i = 0; i < 9; i++)
+                        {
+                            if (lastPressedKeys & (1 << i))
+                            {
+                                keyCount++;
+                                singleKey = i;
+                            }
+                        }
+
+                        if (keyCount == 1)
+                        {
+                            // Single key: return as "cmd#" format
+                            result = "cmd" + String(singleKey + 1);
+                            Logger::getInstance().log("Input from keypad: " + result);
+                            lastPressedKeys = 0;
+                            break;
+                        }
+                        else
+                        {
+                            // Multi-key combo (but not exit combo): use combo as command name
+                            result = pressedCombo;
+                            Logger::getInstance().log("Input combo: " + result);
+                            lastPressedKeys = 0;
+                            break;
+                        }
+                    }
+                }
+            }
+            // Handle keypad when not checking for exit combo
+            else if (!checkingExitCombo && event.type == InputEvent::EventType::KEY_PRESS && event.state)
+            {
+                int key = event.value1;
                 if (key >= 0 && key <= 8)
                 {
                     result = "cmd" + String(key + 1);
@@ -689,7 +758,7 @@ void SpecialAction::trainGesture(bool pressed, int key)
 // ==================== IR REMOTE CONTROL FUNCTIONS ====================
 // Toggle pattern: activation starts immediate scan, waits for IR signal, then saves
 
-void SpecialAction::toggleScanIR(int deviceId)
+void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
 {
     vTaskDelay(pdMS_TO_TICKS(10));
 
@@ -726,7 +795,12 @@ void SpecialAction::toggleScanIR(int deviceId)
     currentDeviceId = deviceId;
     deviceName = "dev" + String(deviceId);
 
-    Logger::getInstance().log("IR Scan DEV" + String(deviceId) + " ACTIVE - Point remote and press button now!");
+    String exitMsg = "IR Scan DEV" + String(deviceId) + " ACTIVE - Point remote and press button now!";
+    if (exitCombo.length() > 0)
+    {
+        exitMsg += " (Press " + exitCombo + " to exit)";
+    }
+    Logger::getInstance().log(exitMsg);
     Logger::getInstance().processBuffer();
 
     // Wait for IR signal with timeout
@@ -760,13 +834,31 @@ void SpecialAction::toggleScanIR(int deviceId)
 
     if (res.value != 0 || res.rawlen > 0)
     {
-        Logger::getInstance().log("IR captured! Use keypad (1-9), gesture, or encoder (CW/CCW/BUTTON) to select slot");
+        Logger::getInstance().log("IR captured! Press key (1-9), combo (e.g., 1+2), gesture, or encoder (CW/CCW/BUTTON) to name it");
         Logger::getInstance().processBuffer();
 
-        String commandName = getInputWithEncoder(15000, false, true); // Allow keypad, gesture, and encoder
+        String commandName = getInputWithEncoder(15000, false, true, exitCombo); // Allow keypad, gesture, and encoder
         if (commandName == "")
         {
             Logger::getInstance().log("Timeout or invalid input - IR not saved");
+            scanningMode = false;
+            currentDeviceId = -1;
+            return;
+        }
+
+        // Check if user pressed exit combo
+        if (commandName == "EXIT_COMBO")
+        {
+            Logger::getInstance().log("Exit combo pressed - cancelling IR save");
+            scanningMode = false;
+            currentDeviceId = -1;
+            return;
+        }
+
+        // Safety check: prevent saving exitCombo as a command name
+        if (commandName == exitCombo)
+        {
+            Logger::getInstance().log("Cannot save exit combo as IR command - choose different combo");
             scanningMode = false;
             currentDeviceId = -1;
             return;
@@ -817,7 +909,7 @@ void SpecialAction::toggleScanIR(int deviceId)
     powerManager.registerActivity();
 }
 
-void SpecialAction::toggleSendIR(int deviceId)
+void SpecialAction::toggleSendIR(int deviceId, const String &exitCombo)
 {
     vTaskDelay(pdMS_TO_TICKS(10));
 
@@ -859,22 +951,36 @@ void SpecialAction::toggleSendIR(int deviceId)
     sendingMode = true;
     currentDeviceId = deviceId;
     deviceName = "dev" + String(deviceId);
-    Logger::getInstance().log("IR Send DEV" + String(deviceId) + " ACTIVE - Use keypad (1-9), gesture, or encoder (CW/CCW/BUTTON) to send");
-    Logger::getInstance().log("Press combo again to exit send mode");
+
+    String exitMsg = "IR Send DEV" + String(deviceId) + " ACTIVE - Press key, combo, gesture, or encoder to send";
+    if (exitCombo.length() > 0)
+    {
+        exitMsg += " (Press " + exitCombo + " to exit)";
+    }
+    Logger::getInstance().log(exitMsg);
     Logger::getInstance().processBuffer();
 
     // Loop to continuously send commands until mode is exited
     while (sendingMode && currentDeviceId == deviceId)
     {
-        Logger::getInstance().log("Ready to send - select command slot...");
+        Logger::getInstance().log("Ready to send - select command (key/combo/gesture/encoder)...");
         Logger::getInstance().processBuffer();
 
-        String commandName = getInputWithEncoder(5000, false, true); // Allow keypad, gesture, and encoder
+        String commandName = getInputWithEncoder(5000, false, true, exitCombo); // Allow keypad, gesture, and encoder
         if (commandName == "")
         {
             Logger::getInstance().log("Timeout - waiting for next input or exit");
             powerManager.registerActivity();
             continue;
+        }
+
+        // Check if user pressed exit combo
+        if (commandName == "EXIT_COMBO")
+        {
+            Logger::getInstance().log("Exit combo pressed - exiting send mode");
+            sendingMode = false;
+            currentDeviceId = -1;
+            break;
         }
 
         JsonObject commandObj = irStorage->getCommand(deviceName, commandName);

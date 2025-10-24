@@ -55,15 +55,15 @@ public:
     void toggleAP(bool toogle);
 
     /// IR remote control management (toggle pattern)
-    void toggleScanIR(int deviceId);             // Toggle IR scan mode (auto-switches between devices)
-    void toggleSendIR(int deviceId);             // Toggle IR send mode (auto-switches between devices)
+    void toggleScanIR(int deviceId, const String &exitCombo = "");             // Toggle IR scan mode (auto-switches between devices)
+    void toggleSendIR(int deviceId, const String &exitCombo = "");             // Toggle IR send mode (auto-switches between devices)
     void sendIRCommand(int deviceId, int commandId); // Send specific IR command immediately (for encoder bindings)
     void checkIRSignal();                        // Check current IR signal (for debugging)
 
 private:
     int getKeypadInput(unsigned long timeout);
     int getInput(unsigned long timeout, bool allowGesture = false); // Keypad + optional gesture input
-    String getInputWithEncoder(unsigned long timeout, bool allowGesture = false, bool allowEncoder = true); // Keypad + gesture + encoder (CW/CCW/BUTTON)
+    String getInputWithEncoder(unsigned long timeout, bool allowGesture = false, bool allowEncoder = true, const String &exitCombo = ""); // Keypad + gesture + encoder (CW/CCW/BUTTON)
 };
 
 #endif
