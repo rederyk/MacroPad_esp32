@@ -630,6 +630,10 @@ void MacroManager::releaseAction(const std::string &action)
             setUseKeyPressOrder(true);
         }
     }
+    else if (action == "REACTIVE_LIGHTING")
+    {
+        enableReactiveLighting(!reactiveLightingEnabled);
+    }
 
     Logger::getInstance().log(logMessage);
     return;
@@ -656,6 +660,9 @@ void MacroManager::handleInputEvent(const InputEvent &event)
 
         if (event.state)
         {
+            // Handle reactive lighting for key press
+            handleReactiveLighting(event.value1, false, 0);
+
             // Quando un tasto viene premuto, aggiungilo alla lista dell'ordine di pressione
             if (useKeyPressOrder)
             {
@@ -719,6 +726,9 @@ void MacroManager::handleInputEvent(const InputEvent &event)
         // Gestione completa di un impulso di encoder (atomica)
         if (event.state)
         {
+            // Handle reactive lighting for encoder rotation
+            handleReactiveLighting(0, true, event.value1);
+
             // Determina la direzione
             std::string encoderAction = (event.value1 > 0) ? "CW" : "CCW";
             std::string fullCombo = "";
@@ -793,6 +803,9 @@ void MacroManager::handleInputEvent(const InputEvent &event)
     case InputEvent::EventType::BUTTON:
         if (event.state)
         {
+            // Handle reactive lighting for encoder button
+            handleReactiveLighting(0, true, 0);
+
             lastAction = "BUTTON";
             pendingCombination = getCurrentCombination();
             lastCombinationTime = millis();
@@ -1126,6 +1139,13 @@ void MacroManager::update()
         encoderReleaseScheduled = false;
     }
 
+    // Reactive lighting timeout - restore original color
+    if (ledReactiveActive && currentTime >= ledReactiveTime)
+    {
+        Led::getInstance().setColor(savedLedColor[0], savedLedColor[1], savedLedColor[2], false);
+        ledReactiveActive = false;
+    }
+
     // Logger::getInstance().processBuffer();
 }
 
@@ -1136,4 +1156,87 @@ void MacroManager::releaseGestureActions()
         releaseAction(lastExecutedAction);
         lastExecutedAction.clear();
     }
+}
+
+// ==================== REACTIVE LIGHTING FUNCTIONS ====================
+
+void MacroManager::enableReactiveLighting(bool enable)
+{
+    reactiveLightingEnabled = enable;
+
+    if (enable)
+    {
+        // Save current LED color when enabling
+        Led::getInstance().getColor(savedLedColor[0], savedLedColor[1], savedLedColor[2]);
+        Logger::getInstance().log("Reactive Lighting ENABLED - LED will respond to key/encoder input");
+    }
+    else
+    {
+        // Restore original LED color when disabling
+        if (ledReactiveActive)
+        {
+            Led::getInstance().setColor(savedLedColor[0], savedLedColor[1], savedLedColor[2], false);
+            ledReactiveActive = false;
+        }
+        Logger::getInstance().log("Reactive Lighting DISABLED");
+    }
+}
+
+void MacroManager::handleReactiveLighting(uint8_t keyIndex, bool isEncoder, int encoderDirection)
+{
+    if (!reactiveLightingEnabled)
+        return;
+
+    // Save the current LED color if not already in reactive mode
+    if (!ledReactiveActive)
+    {
+        Led::getInstance().getColor(savedLedColor[0], savedLedColor[1], savedLedColor[2]);
+    }
+
+    // Choose color based on input type
+    int red, green, blue;
+
+    if (isEncoder)
+    {
+        // Encoder handling: direction determines color
+        if (encoderDirection > 0) // CW
+        {
+            red = encoderCWColor[0];
+            green = encoderCWColor[1];
+            blue = encoderCWColor[2];
+        }
+        else if (encoderDirection < 0) // CCW
+        {
+            red = encoderCCWColor[0];
+            green = encoderCCWColor[1];
+            blue = encoderCCWColor[2];
+        }
+        else // Button (direction == 0)
+        {
+            red = encoderButtonColor[0];
+            green = encoderButtonColor[1];
+            blue = encoderButtonColor[2];
+        }
+    }
+    else
+    {
+        // Key press - use key color mapping
+        if (keyIndex >= 0 && keyIndex < 9)
+        {
+            red = keyColors[keyIndex][0];
+            green = keyColors[keyIndex][1];
+            blue = keyColors[keyIndex][2];
+        }
+        else
+        {
+            return; // Invalid key index
+        }
+    }
+
+    // Set the LED to the reactive color
+    Led::getInstance().setColor(red, green, blue, false);
+
+    // Mark reactive mode as active and set timeout
+    ledReactiveActive = true;
+    ledReactiveTime = millis() + LED_REACTIVE_DURATION;
 }

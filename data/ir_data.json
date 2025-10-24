@@ -38,6 +38,66 @@
                 "address": 247,
                 "command": 16575
             }
+        },
+        "dev1": {
+            "cmd5": {
+                "protocol": "SAMSUNG",
+                "value": "e0e040bf",
+                "bits": 32,
+                "address": 57568,
+                "command": 16575
+            },
+            "CW": {
+                "protocol": "SAMSUNG",
+                "value": "e0e0d02f",
+                "bits": 32,
+                "address": 57568,
+                "command": 53295
+            },
+            "CCW": {
+                "protocol": "SAMSUNG",
+                "value": "e0e0e01f",
+                "bits": 32,
+                "address": 57568,
+                "command": 57375
+            },
+            "cmd4": {
+                "protocol": "SAMSUNG",
+                "value": "e0e09768",
+                "bits": 32,
+                "address": 57568,
+                "command": 38760
+            },
+            "cmd7": {
+                "protocol": "SAMSUNG",
+                "value": "e0e043bc",
+                "bits": 32,
+                "address": 57568,
+                "command": 17340
+            },
+            "cmd9": {
+                "protocol": "SAMSUNG",
+                "value": "e0e07d82",
+                "bits": 32,
+                "address": 57568,
+                "command": 32130
+            },
+            "cmd8": {
+                "protocol": "SAMSUNG",
+                "value": "e0e09768",
+                "bits": 32,
+                "address": 57568,
+                "command": 38760
+            }
+        },
+        "dev2": {
+            "1+3": {
+                "protocol": "SAMSUNG",
+                "value": "e0e043bc",
+                "bits": 32,
+                "address": 57568,
+                "command": 17340
+            }
         }
     }
 }

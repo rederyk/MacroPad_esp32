@@ -1046,6 +1046,80 @@ void SpecialAction::checkIRSignal()
         return;
     }
 
+    // Print IR Settings
+    Logger::getInstance().log("=== IR Settings ===");
+    Logger::getInstance().log("IR Sensor: " + String(irSensor ? "Initialized" : "Not initialized"));
+    Logger::getInstance().log("IR Sender: " + String(irSender ? (irSender->isEnabled() ? "Enabled" : "Disabled") : "Not initialized"));
+    
+    // Print stored IR data
+    if (irStorage)
+    {
+        Logger::getInstance().log("=== IR Data (Stored Commands) ===");
+        String jsonData = irStorage->getJsonString();
+        
+        // Log raw JSON
+        Logger::getInstance().log("Raw JSON: " + jsonData);
+        
+        if (jsonData.length() > 0 && jsonData != "{\"devices\":{}}")
+        {
+            // Parse and display in a readable format
+            const JsonDocument& doc = irStorage->getJsonObject();
+            JsonObjectConst devices = doc["devices"];
+            
+            if (devices.size() > 0)
+            {
+                for (JsonPairConst devicePair : devices)
+                {
+                    String deviceName = devicePair.key().c_str();
+                    JsonObjectConst commands = devicePair.value();
+                    
+                    Logger::getInstance().log("Device: " + deviceName + " (" + String(commands.size()) + " commands)");
+                    
+                    for (JsonPairConst cmdPair : commands)
+                    {
+                        String cmdName = cmdPair.key().c_str();
+                        JsonObjectConst cmdData = cmdPair.value();
+                        
+                        String cmdInfo = "  - " + cmdName + ": ";
+                        if (cmdData.containsKey("protocol"))
+                        {
+                            cmdInfo += "Protocol=" + String(cmdData["protocol"].as<const char*>());
+                        }
+                        if (cmdData.containsKey("value"))
+                        {
+                            cmdInfo += " Value=0x" + String(cmdData["value"].as<const char*>());
+                        }
+                        if (cmdData.containsKey("bits"))
+                        {
+                            cmdInfo += " Bits=" + String(cmdData["bits"].as<int>());
+                        }
+                        if (cmdData.containsKey("raw"))
+                        {
+                            JsonArrayConst raw = cmdData["raw"];
+                            cmdInfo += " Raw[" + String(raw.size()) + "]";
+                        }
+                        
+                        Logger::getInstance().log(cmdInfo);
+                    }
+                }
+            }
+            else
+            {
+                Logger::getInstance().log("No devices stored");
+            }
+        }
+        else
+        {
+            Logger::getInstance().log("No IR data stored");
+        }
+    }
+    else
+    {
+        Logger::getInstance().log("IR Storage not initialized");
+    }
+    
+    // Check for incoming IR signal
+    Logger::getInstance().log("=== Checking for IR Signal ===");
     if (irSensor->checkAndDecodeSignal())
     {
         const decode_results &rawSignal = irSensor->getRawSignalObject();
