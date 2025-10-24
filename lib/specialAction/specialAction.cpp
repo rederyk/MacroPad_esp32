@@ -775,6 +775,7 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
     static bool scanningMode = false;
     static int currentDeviceId = -1;
     static String deviceName = "";
+    static int savedRed = 0, savedGreen = 0, savedBlue = 0; // Save LED state
 
     // If already scanning with same device, exit scan mode
     if (scanningMode && currentDeviceId == deviceId)
@@ -782,6 +783,8 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
         Logger::getInstance().log("Exiting IR Scan mode for DEV" + String(deviceId));
         scanningMode = false;
         currentDeviceId = -1;
+        // Restore LED color
+        Led::getInstance().setColor(savedRed, savedGreen, savedBlue, false);
         return;
     }
 
@@ -790,6 +793,9 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
     {
         Logger::getInstance().log("Switching from DEV" + String(currentDeviceId) + " to DEV" + String(deviceId));
     }
+
+    // Save current LED color
+    Led::getInstance().getColor(savedRed, savedGreen, savedBlue);
 
     // Enter scan mode and start immediate capture
     scanningMode = true;
@@ -806,11 +812,29 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
 
     // Wait for IR signal with timeout
     unsigned long startTime = millis();
+    unsigned long lastBlinkTime = millis();
     const unsigned long scanTimeout = 10000; // 10 seconds to capture signal
+    const unsigned long blinkInterval = 500; // Slow blink: 500ms
+    bool ledState = false;
     bool signalCaptured = false;
 
     while (millis() - startTime < scanTimeout && scanningMode)
     {
+        // Slow red blink
+        if (millis() - lastBlinkTime >= blinkInterval)
+        {
+            ledState = !ledState;
+            if (ledState)
+            {
+                Led::getInstance().setColor(255, 0, 0, false); // Red ON
+            }
+            else
+            {
+                Led::getInstance().setColor(0, 0, 0, false); // LED OFF
+            }
+            lastBlinkTime = millis();
+        }
+
         if (irSensor->checkAndDecodeSignal())
         {
             signalCaptured = true;
@@ -827,6 +851,8 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
         Logger::getInstance().log("No IR signal captured - scan cancelled");
         scanningMode = false;
         currentDeviceId = -1;
+        // Restore LED color
+        Led::getInstance().setColor(savedRed, savedGreen, savedBlue, false);
         return;
     }
 
@@ -907,6 +933,8 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
 
     scanningMode = false;
     currentDeviceId = -1;
+    // Restore LED color
+    Led::getInstance().setColor(savedRed, savedGreen, savedBlue, false);
     powerManager.registerActivity();
 }
 
@@ -932,6 +960,7 @@ void SpecialAction::toggleSendIR(int deviceId, const String &exitCombo)
     static bool sendingMode = false;
     static int currentDeviceId = -1;
     static String deviceName = "";
+    static int savedRed = 0, savedGreen = 0, savedBlue = 0; // Save LED state
 
     // If already in sending mode with the same device ID, exit sending mode
     if (sendingMode && currentDeviceId == deviceId)
@@ -939,6 +968,8 @@ void SpecialAction::toggleSendIR(int deviceId, const String &exitCombo)
         Logger::getInstance().log("Exiting IR Send mode for DEV" + String(deviceId));
         sendingMode = false;
         currentDeviceId = -1;
+        // Restore LED color
+        Led::getInstance().setColor(savedRed, savedGreen, savedBlue, false);
         return;
     }
 
@@ -948,10 +979,16 @@ void SpecialAction::toggleSendIR(int deviceId, const String &exitCombo)
         Logger::getInstance().log("Switching from DEV" + String(currentDeviceId) + " to DEV" + String(deviceId));
     }
 
+    // Save current LED color
+    Led::getInstance().getColor(savedRed, savedGreen, savedBlue);
+
     // Enter or switch sending mode
     sendingMode = true;
     currentDeviceId = deviceId;
     deviceName = "dev" + String(deviceId);
+
+    // Set LED to red when entering send mode
+    Led::getInstance().setColor(255, 0, 0, false);
 
     String exitMsg = "IR Send DEV" + String(deviceId) + " ACTIVE - Press key, combo, gesture, or encoder to send";
     if (exitCombo.length() > 0)
@@ -981,6 +1018,8 @@ void SpecialAction::toggleSendIR(int deviceId, const String &exitCombo)
             Logger::getInstance().log("Exit combo pressed - exiting send mode");
             sendingMode = false;
             currentDeviceId = -1;
+            // Restore LED color
+            Led::getInstance().setColor(savedRed, savedGreen, savedBlue, false);
             break;
         }
 
@@ -989,6 +1028,25 @@ void SpecialAction::toggleSendIR(int deviceId, const String &exitCombo)
         {
             Logger::getInstance().log("Not found: " + deviceName + "/" + commandName);
             continue;
+        }
+
+        // Fast blink during IR send
+        unsigned long sendStartTime = millis();
+        const unsigned long fastBlinkInterval = 100; // Fast blink: 100ms
+        bool blinkLedState = false;
+
+        // Start fast blink
+        while (millis() - sendStartTime < 100)
+        {
+            if ((millis() - sendStartTime) % fastBlinkInterval < (fastBlinkInterval / 2))
+            {
+                Led::getInstance().setColor(255, 0, 0, false); // Red ON
+            }
+            else
+            {
+                Led::getInstance().setColor(0, 0, 0, false); // LED OFF
+            }
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
 
         if (irSender->sendCommand(commandObj))
@@ -1000,8 +1058,14 @@ void SpecialAction::toggleSendIR(int deviceId, const String &exitCombo)
             Logger::getInstance().log("Failed to send IR");
         }
 
+        // Restore red LED after sending
+        Led::getInstance().setColor(255, 0, 0, false);
+
         powerManager.registerActivity();
     }
+
+    // Restore LED color when exiting loop
+    Led::getInstance().setColor(savedRed, savedGreen, savedBlue, false);
 }
 
 void SpecialAction::sendIRCommand(const String &deviceName, const String &commandName)
@@ -1028,14 +1092,47 @@ void SpecialAction::sendIRCommand(const String &deviceName, const String &comman
         return;
     }
 
-    if (irSender->sendCommand(commandObj))
+    // Save current LED state
+    int savedRed, savedGreen, savedBlue;
+    Led::getInstance().getColor(savedRed, savedGreen, savedBlue);
+
+    // Fast blink during IR send
+    unsigned long sendStartTime = millis();
+    const unsigned long fastBlinkInterval = 100; // Fast blink: 100ms
+    const unsigned long blinkDuration = 200; // Blink for 200ms total
+
+    // Send command with fast blink effect
+    bool commandSent = false;
+    while (millis() - sendStartTime < blinkDuration)
     {
-        Logger::getInstance().log("IR sent: " + deviceName + "/" + commandName);
+        if ((millis() - sendStartTime) % fastBlinkInterval < (fastBlinkInterval / 2))
+        {
+            Led::getInstance().setColor(255, 0, 0, false); // Red ON
+        }
+        else
+        {
+            Led::getInstance().setColor(0, 0, 0, false); // LED OFF
+        }
+
+        // Send command at the beginning
+        if (!commandSent)
+        {
+            if (irSender->sendCommand(commandObj))
+            {
+                Logger::getInstance().log("IR sent: " + deviceName + "/" + commandName);
+            }
+            else
+            {
+                Logger::getInstance().log("Failed to send IR: " + deviceName + "/" + commandName);
+            }
+            commandSent = true;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
-    else
-    {
-        Logger::getInstance().log("Failed to send IR: " + deviceName + "/" + commandName);
-    }
+
+    // Restore LED color
+    Led::getInstance().setColor(savedRed, savedGreen, savedBlue, false);
 }
 
 void SpecialAction::checkIRSignal()
