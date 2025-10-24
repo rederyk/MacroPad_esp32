@@ -125,6 +125,9 @@ private:
     unsigned long ledReactiveTime = 0;
     static constexpr unsigned long LED_REACTIVE_DURATION = 300; // milliseconds
     bool ledReactiveActive = false;
+
+    // Flashlight mode state
+    bool flashlightActive = false;
 };
 
 #endif // MACRO_MANAGER_H
