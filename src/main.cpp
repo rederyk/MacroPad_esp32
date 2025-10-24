@@ -198,13 +198,14 @@ void setup()
         }
     }
 
-    // Initialize IR Remote Control components (ONLY when BLE is disabled)
-    // REASON: IRremoteESP8266 conflicts with BLE due to timer/RMT hardware sharing and memory constraints
+    // Initialize IR Remote Control components
+    // REASON: IRrecv (IRSensor) conflicts with BLE due to RMT hardware sharing
+    // IRsend (IRSender) can work with BLE enabled with minimal RMT usage
     const SystemConfig &irSystemConfig = configManager.getSystemConfig();
+
+    // IR Sensor: ONLY initialize when BLE is DISABLED (RMT conflict)
     if (!irSystemConfig.enable_BLE)
     {
-        Logger::getInstance().log("BLE disabled - IR components will be initialized");
-
         const IRSensorConfig &irSensorConfig = configManager.getIrSensorConfig();
         Logger::getInstance().log("IR Sensor Config: pin=" + String(irSensorConfig.pin) +
                                   ", active=" + String(irSensorConfig.active ? "true" : "false"));
@@ -230,76 +231,77 @@ void setup()
         {
             Logger::getInstance().log("IR Sensor NOT initialized (disabled or invalid pin)");
         }
-
-        const IRLedConfig &irLedConfig = configManager.getIrLedConfig();
-        Logger::getInstance().log("IR LED Config: pin=" + String(irLedConfig.pin) +
-                                  ", active=" + String(irLedConfig.active ? "true" : "false") +
-                                  ", anodeGpio=" + String(irLedConfig.anodeGpio ? "true" : "false"));
-        if (irLedConfig.active && irLedConfig.pin >= 0)
-        {
-            Logger::getInstance().log("Initializing IR Sender on pin " + String(irLedConfig.pin));
-            irSender = new IRSender(irLedConfig.pin, irLedConfig.anodeGpio);
-            if (irSender && irSender->begin())
-            {
-                Logger::getInstance().log("IR Sender initialized successfully");
-            }
-            else
-            {
-                Logger::getInstance().log("Failed to initialize IR Sender");
-                if (irSender)
-                {
-                    delete irSender;
-                    irSender = nullptr;
-                }
-            }
-        }
-        else
-        {
-            Logger::getInstance().log("IR Sender NOT initialized (disabled or invalid pin)");
-        }
-
-        // Initialize IR Storage (always initialize if either sensor or sender is active)
-        Logger::getInstance().log("Checking IR Storage initialization: irSensor=" +
-                                  String(irSensor != nullptr ? "OK" : "NULL") +
-                                  ", irSender=" + String(irSender != nullptr ? "OK" : "NULL"));
-        if ((irSensor != nullptr) || (irSender != nullptr))
-        {
-            Logger::getInstance().log("Initializing IR Storage");
-            irStorage = new IRStorage();
-            if (irStorage && irStorage->begin())
-            {
-                Logger::getInstance().log("IR Storage initialized successfully");
-                if (irStorage->loadIRData())
-                {
-                    Logger::getInstance().log("IR data loaded from file");
-                }
-                else
-                {
-                    Logger::getInstance().log("No existing IR data file (this is normal on first run)");
-                }
-            }
-            else
-            {
-                Logger::getInstance().log("Failed to initialize IR Storage (LittleFS error?)");
-                if (irStorage)
-                {
-                    delete irStorage;
-                    irStorage = nullptr;
-                }
-            }
-        }
-        else
-        {
-            Logger::getInstance().log("IR Storage NOT initialized (no IR sensor or sender available)");
-        }
-
-        Logger::getInstance().log("Free heap after IR initialization: " + String(ESP.getFreeHeap()) + " bytes");
     }
     else
     {
-        Logger::getInstance().log("BLE enabled - IR components DISABLED to avoid memory/hardware conflicts");
-        Logger::getInstance().log("To use IR: disable BLE in config.json (enable_BLE: false) and restart");
+        Logger::getInstance().log("IR Sensor DISABLED (BLE enabled - RMT conflict)");
     }
+
+    // IR Sender: Can be initialized EVEN with BLE enabled (minimal RMT usage)
+    const IRLedConfig &irLedConfig = configManager.getIrLedConfig();
+    Logger::getInstance().log("IR LED Config: pin=" + String(irLedConfig.pin) +
+                              ", active=" + String(irLedConfig.active ? "true" : "false") +
+                              ", anodeGpio=" + String(irLedConfig.anodeGpio ? "true" : "false"));
+    if (irLedConfig.active && irLedConfig.pin >= 0)
+    {
+        Logger::getInstance().log("Initializing IR Sender on pin " + String(irLedConfig.pin) +
+                                  (irSystemConfig.enable_BLE ? " (BLE mode - IR receive disabled)" : ""));
+        irSender = new IRSender(irLedConfig.pin, irLedConfig.anodeGpio);
+        if (irSender && irSender->begin())
+        {
+            Logger::getInstance().log("IR Sender initialized successfully");
+        }
+        else
+        {
+            Logger::getInstance().log("Failed to initialize IR Sender");
+            if (irSender)
+            {
+                delete irSender;
+                irSender = nullptr;
+            }
+        }
+    }
+    else
+    {
+        Logger::getInstance().log("IR Sender NOT initialized (disabled or invalid pin)");
+    }
+
+    // Initialize IR Storage (if either sensor or sender is active)
+    Logger::getInstance().log("Checking IR Storage initialization: irSensor=" +
+                              String(irSensor != nullptr ? "OK" : "NULL") +
+                              ", irSender=" + String(irSender != nullptr ? "OK" : "NULL"));
+    if ((irSensor != nullptr) || (irSender != nullptr))
+    {
+        Logger::getInstance().log("Initializing IR Storage");
+        irStorage = new IRStorage();
+        if (irStorage && irStorage->begin())
+        {
+            Logger::getInstance().log("IR Storage initialized successfully");
+            if (irStorage->loadIRData())
+            {
+                Logger::getInstance().log("IR data loaded from file");
+            }
+            else
+            {
+                Logger::getInstance().log("No existing IR data file (this is normal on first run)");
+            }
+        }
+        else
+        {
+            Logger::getInstance().log("Failed to initialize IR Storage (LittleFS error?)");
+            if (irStorage)
+            {
+                delete irStorage;
+                irStorage = nullptr;
+            }
+        }
+    }
+    else
+    {
+        Logger::getInstance().log("IR Storage NOT initialized (no IR sensor or sender available)");
+    }
+
+    Logger::getInstance().log("Free heap after IR initialization: " + String(ESP.getFreeHeap()) + " bytes");
 
     // Initialize hardware with configurations
     keypad = new Keypad(&configManager.getKeypadConfig());
