@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ESP32 Config</title>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+  </head>
+  <body class="container mt-5">
+    <h1 class="text-center">ESP32 Configuration</h1>
+    <form id="configForm">
+      <h2>WiFi Settings</h2>
+      <div class="mb-3">
+        <label class="form-label">AP SSID:</label>
+        <input type="text" id="ap_ssid" class="form-control" />
+      </div>
+      <div class="mb-3">
+        <label class="form-label">AP Password:</label>
+        <input type="password" id="ap_password" class="form-control" />
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Router SSID:</label>
+        <input type="text" id="router_ssid" class="form-control" />
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Router Password:</label>
+        <input type="password" id="router_password" class="form-control" />
+      </div>
+      <button type="submit" class="btn btn-primary w-100">Save Configuration And reboot</button>
+    </form>
+
+    <!-- Pulsanti per accedere alle altre pagine di configurazione -->
+    <div class="text-center mt-4">
+      <button type="button" class="btn btn-secondary" onclick="window.location.href='/combinations.html'">
+        Combo
+      </button>
+      <button type="button" class="btn btn-secondary" onclick="window.location.href='/combo.html'">
+        Combo2
+      </button>
+      <button type="button" class="btn btn-secondary mt-3" onclick="window.location.href='/advanced.html'">
+        System Config
+      </button>
+      <button type="button" class="btn btn-secondary mt-3" onclick="window.location.href='/gesture_features.html'">
+        Gesture Features
+      </button>
+      <button type="button" class="btn btn-secondary mt-3" onclick="window.location.href='/special_actions.html'">
+        System Actions
+      </button>
+    </div>
+
+    <h2 class="text-center mt-5">Status</h2>
+    <div class="text-center">
+      <p>WiFi Status: <span id="wifi_status"></span></p>
+      <p>AP IP Address: <span id="ap_ip"></span></p>
+      <p>STA IP Address: <span id="sta_ip"></span></p>
+    </div>
+
+    <div id="status" class="text-center mt-3"></div>
+    <script>
+      let originalConfig = {};
+
+      async function loadConfig() {
+        try {
+          const response = await fetch("/config.json");
+          if (!response.ok) throw new Error("Failed to fetch config");
+          originalConfig = await response.json();
+
+          document.getElementById("ap_ssid").value = originalConfig.wifi?.ap_ssid || "";
+          document.getElementById("ap_password").value = originalConfig.wifi?.ap_password || "";
+          document.getElementById("router_ssid").value = originalConfig.wifi?.router_ssid || "";
+          document.getElementById("router_password").value = originalConfig.wifi?.router_password || "";
+        } catch (error) {
+          console.error("Error loading config:", error);
+          document.getElementById("status").innerHTML = "⚠️ Error loading config.";
+        }
+      }
+
+      async function saveConfig(event) {
+        event.preventDefault();
+        let newConfig = { wifi: {} };
+
+        function checkChange(field, category) {
+          let newValue = document.getElementById(field).value.trim();
+          if (originalConfig[category]?.[field] !== newValue) {
+            newConfig[category][field] = newValue;
+          }
+        }
+
+        checkChange("ap_ssid", "wifi");
+        checkChange("ap_password", "wifi");
+        checkChange("router_ssid", "wifi");
+        checkChange("router_password", "wifi");
+
+        if (Object.keys(newConfig.wifi).length === 0) {
+          document.getElementById("status").innerHTML = "⚠️ No changes detected.";
+          return;
+        }
+
+        document.getElementById("status").innerHTML = "⏳ Saving...";
+
+        try {
+          const response = await fetch("/config.json", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(newConfig),
+          });
+
+          const message = await response.text();
+          document.getElementById("status").innerHTML = `✅ ${message}`;
+        } catch (error) {
+          console.error("Error saving config:", error);
+          document.getElementById("status").innerHTML = "❌ Error saving config.";
+        }
+      }
+
+      document.getElementById("configForm").addEventListener("submit", saveConfig);
+      loadConfig();
+    </script>
+  </body>
+</html>

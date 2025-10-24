@@ -101,3 +101,10 @@ Usare ext1 con `ANY_HIGH`**
 
 * comuqnue va...
 
+###
+* special action per controllare colore e iintesita del led dal keypad con combo, esempio cw+1 rosso++ ccw+1 red-- , 3+6+button red255 green255 blue255 per la torcia
+
+* pagina html per tutti i json
+
+* mouse gyro mode con combo separate
+
