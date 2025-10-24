@@ -108,7 +108,11 @@ void setup()
     if (ledConfig.active)
     {
         Led::getInstance().begin(ledConfig.pinRed, ledConfig.pinGreen, ledConfig.pinBlue, ledConfig.anodeCommon);
-        Led::getInstance().setColor(255, 0, 255); // Magenta
+
+        // Load saved brightness before setting any colors
+        specialAction.loadBrightness();
+
+        specialAction.setSystemLedColor(255, 0, 255, false); // Magenta with loaded brightness (system notification)
         Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
     }
     // Set serial enabled based on config
@@ -327,7 +331,7 @@ void setup()
         vTaskDelay(pdMS_TO_TICKS(50)); // Dai tempo al BLE
 
         Logger::getInstance().log("Free heap after Bluetooth start: " + String(ESP.getFreeHeap()) + " bytes");
-        Led::getInstance().setColor(0, 0, 255); // Blu
+        specialAction.setSystemLedColor(0, 0, 255, false); // Blu with saved brightness (BLE notification)
         Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
     }
     else
@@ -365,7 +369,7 @@ void setup()
                 if (!systemConfig.ap_autostart)
                 {
 
-                    Led::getInstance().setColor(255, 0, 0); // Rosso
+                    specialAction.setSystemLedColor(255, 0, 0, false); // Rosso with saved brightness (WiFi failed notification)
                     Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
                     Logger::getInstance().log("Starting AP BACKUP MODE...");
                     wifiManager.beginAP(configManager.getWifiConfig().ap_ssid.c_str(), configManager.getWifiConfig().ap_password.c_str());
@@ -373,7 +377,7 @@ void setup()
             }
             else
             {
-                Led::getInstance().setColor(0, 255, 0); // Verde
+                specialAction.setSystemLedColor(0, 255, 0, false); // Verde with saved brightness (WiFi connected notification)
                 Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
                 Logger::getInstance().log("connesso a " + configManager.getWifiConfig().router_ssid);
             }
@@ -381,7 +385,7 @@ void setup()
 
         if (systemConfig.ap_autostart)
         {
-            Led::getInstance().setColor(255, 0, 0); // Rosso
+            specialAction.setSystemLedColor(255, 0, 0, false); // Rosso with saved brightness (AP mode notification)
             Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
             Logger::getInstance().log("Starting AP mode...");
             wifiManager.beginAP(configManager.getWifiConfig().ap_ssid.c_str(), configManager.getWifiConfig().ap_password.c_str());

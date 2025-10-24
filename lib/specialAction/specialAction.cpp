@@ -31,6 +31,7 @@
 #include "IRStorage.h"
 #include <ArduinoJson.h>
 #include "rotaryEncoder.h"
+#include "Led.h"
 
 extern Keypad *keypad;
 extern RotaryEncoder *rotaryEncoder;
@@ -1003,7 +1004,7 @@ void SpecialAction::toggleSendIR(int deviceId, const String &exitCombo)
     }
 }
 
-void SpecialAction::sendIRCommand(int deviceId, int commandId)
+void SpecialAction::sendIRCommand(const String &deviceName, const String &commandName)
 {
     if (!irSender || !irStorage)
     {
@@ -1019,9 +1020,6 @@ void SpecialAction::sendIRCommand(int deviceId, int commandId)
 
     // Power management: register activity
     powerManager.registerActivity();
-
-    String deviceName = "dev" + String(deviceId);
-    String commandName = "cmd" + String(commandId);
 
     JsonObject commandObj = irStorage->getCommand(deviceName, commandName);
     if (commandObj.isNull())
@@ -1079,4 +1077,199 @@ void SpecialAction::checkIRSignal()
     {
         Logger::getInstance().log("No IR signal detected");
     }
+}
+
+// ==================== LED RGB CONTROL FUNCTIONS ====================
+
+void SpecialAction::setLedColor(int red, int green, int blue, bool save)
+{
+    // Manual LED control - NO brightness applied
+    red = constrain(red, 0, 255);
+    green = constrain(green, 0, 255);
+    blue = constrain(blue, 0, 255);
+
+    Led::getInstance().setColor(red, green, blue, save);
+    Logger::getInstance().log("LED set to RGB(" + String(red) + "," + String(green) + "," + String(blue) + ") [manual]");
+}
+
+void SpecialAction::setSystemLedColor(int red, int green, int blue, bool save)
+{
+    // System notification LED control - brightness applied
+    red = constrain(red, 0, 255);
+    green = constrain(green, 0, 255);
+    blue = constrain(blue, 0, 255);
+
+    // Apply brightness scaling (0-100%)
+    float brightnessScale = currentBrightness / 100.0f;
+    int adjustedRed = (int)(red * brightnessScale);
+    int adjustedGreen = (int)(green * brightnessScale);
+    int adjustedBlue = (int)(blue * brightnessScale);
+
+    Led::getInstance().setColor(adjustedRed, adjustedGreen, adjustedBlue, save);
+    Logger::getInstance().log("LED set to RGB(" + String(red) + "," + String(green) + "," + String(blue) +
+                              ") @ " + String(currentBrightness) + "% brightness [system]");
+}
+
+void SpecialAction::adjustLedColor(int redDelta, int greenDelta, int blueDelta)
+{
+    // Get current LED color
+    int currentRed, currentGreen, currentBlue;
+    Led::getInstance().getColor(currentRed, currentGreen, currentBlue);
+
+    // Apply deltas with clamping
+    int newRed = constrain(currentRed + redDelta, 0, 255);
+    int newGreen = constrain(currentGreen + greenDelta, 0, 255);
+    int newBlue = constrain(currentBlue + blueDelta, 0, 255);
+
+    Led::getInstance().setColor(newRed, newGreen, newBlue, false);
+
+    Logger::getInstance().log("LED adjusted from RGB(" + String(currentRed) + "," + String(currentGreen) + "," + String(currentBlue) +
+                              ") to RGB(" + String(newRed) + "," + String(newGreen) + "," + String(newBlue) + ")");
+}
+
+void SpecialAction::turnOffLed()
+{
+    Led::getInstance().setColor(0, 0, 0, false);
+    Logger::getInstance().log("LED turned OFF");
+}
+
+void SpecialAction::saveLedColor()
+{
+    // Get current color and save it
+    int red, green, blue;
+    Led::getInstance().getColor(red, green, blue);
+    Led::getInstance().setColor(red, green, blue, true);
+    Logger::getInstance().log("LED color saved: RGB(" + String(red) + "," + String(green) + "," + String(blue) + ")");
+}
+
+void SpecialAction::restoreLedColor()
+{
+    Led::getInstance().setColor(true); // Restore saved color
+
+    int red, green, blue;
+    Led::getInstance().getColor(red, green, blue);
+    Logger::getInstance().log("LED color restored: RGB(" + String(red) + "," + String(green) + "," + String(blue) + ")");
+}
+
+void SpecialAction::showLedInfo()
+{
+    int red, green, blue;
+    Led::getInstance().getColor(red, green, blue);
+    String colorInfo = "LED: RGB(" + String(red) + "," + String(green) + "," + String(blue) + ") - " + Led::getInstance().getColorLog();
+    colorInfo += " @ " + String(currentBrightness) + "% brightness";
+    Logger::getInstance().log(colorInfo);
+}
+
+// ==================== LED BRIGHTNESS CONTROL FUNCTIONS ====================
+
+void SpecialAction::saveBrightnessToFile()
+{
+    if (!LittleFS.begin(true))
+    {
+        Logger::getInstance().log("Failed to mount LittleFS for brightness save");
+        return;
+    }
+
+    File file = LittleFS.open("/led_brightness.json", "w");
+    if (!file)
+    {
+        Logger::getInstance().log("Failed to open brightness file for writing");
+        return;
+    }
+
+    DynamicJsonDocument doc(128);
+    doc["brightness"] = currentBrightness;
+
+    if (serializeJson(doc, file) == 0)
+    {
+        Logger::getInstance().log("Failed to write brightness to file");
+    }
+
+    file.close();
+}
+
+void SpecialAction::loadBrightness()
+{
+    if (!LittleFS.begin(true))
+    {
+        Logger::getInstance().log("Failed to mount LittleFS for brightness load");
+        currentBrightness = 100; // Default
+        return;
+    }
+
+    if (!LittleFS.exists("/led_brightness.json"))
+    {
+        Logger::getInstance().log("Brightness file not found, using default 100%");
+        currentBrightness = 100;
+        saveBrightnessToFile(); // Create file with default
+        return;
+    }
+
+    File file = LittleFS.open("/led_brightness.json", "r");
+    if (!file)
+    {
+        Logger::getInstance().log("Failed to open brightness file for reading");
+        currentBrightness = 100;
+        return;
+    }
+
+    DynamicJsonDocument doc(128);
+    DeserializationError error = deserializeJson(doc, file);
+    file.close();
+
+    if (error)
+    {
+        Logger::getInstance().log("Failed to parse brightness file: " + String(error.c_str()));
+        currentBrightness = 100;
+        return;
+    }
+
+    currentBrightness = doc["brightness"] | 100; // Default to 100 if not found
+    currentBrightness = constrain(currentBrightness, 0, 100);
+
+    Logger::getInstance().log("Loaded brightness: " + String(currentBrightness) + "%");
+}
+
+void SpecialAction::setBrightness(int brightness)
+{
+    int oldBrightness = currentBrightness;
+    currentBrightness = constrain(brightness, 0, 100);
+    saveBrightnessToFile();
+
+    // Refresh current LED color with new brightness (only if brightness changed)
+    if (oldBrightness > 0 && currentBrightness != oldBrightness)
+    {
+        int red, green, blue;
+        Led::getInstance().getColor(red, green, blue);
+
+        // Scale back to original values (reverse the old brightness scaling)
+        float oldScale = oldBrightness / 100.0f;
+        int originalRed = (int)(red / oldScale);
+        int originalGreen = (int)(green / oldScale);
+        int originalBlue = (int)(blue / oldScale);
+
+        // Re-apply with new brightness using system LED (with brightness)
+        setSystemLedColor(originalRed, originalGreen, originalBlue, false);
+    }
+
+    Logger::getInstance().log("Brightness set to " + String(currentBrightness) + "% (applies to system notifications only)");
+}
+
+void SpecialAction::adjustBrightness(int delta)
+{
+    int newBrightness = currentBrightness + delta;
+    setBrightness(newBrightness);
+
+    Logger::getInstance().log("Brightness adjusted from " + String(currentBrightness - delta) +
+                              "% to " + String(currentBrightness) + "%");
+}
+
+int SpecialAction::getBrightness()
+{
+    return currentBrightness;
+}
+
+void SpecialAction::showBrightnessInfo()
+{
+    Logger::getInstance().log("LED Brightness: " + String(currentBrightness) + "%");
 }

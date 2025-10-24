@@ -57,13 +57,35 @@ public:
     /// IR remote control management (toggle pattern)
     void toggleScanIR(int deviceId, const String &exitCombo = "");             // Toggle IR scan mode (auto-switches between devices)
     void toggleSendIR(int deviceId, const String &exitCombo = "");             // Toggle IR send mode (auto-switches between devices)
-    void sendIRCommand(int deviceId, int commandId); // Send specific IR command immediately (for encoder bindings)
+    void sendIRCommand(const String &deviceName, const String &commandName); // Send specific IR command immediately (supports any device/command names)
     void checkIRSignal();                        // Check current IR signal (for debugging)
+
+    /// LED RGB control
+    void setLedColor(int red, int green, int blue, bool save = false);         // Set LED color (NO brightness for manual control)
+    void setSystemLedColor(int red, int green, int blue, bool save = false);   // Set LED color with brightness (for system notifications)
+    void adjustLedColor(int redDelta, int greenDelta, int blueDelta);          // Adjust RGB values relatively (with clamp)
+    void turnOffLed();                                                         // Turn off LED (set to 0,0,0)
+    void saveLedColor();                                                       // Save current LED color
+    void restoreLedColor();                                                    // Restore saved LED color
+    void showLedInfo();                                                        // Show current LED color info in log
+    int ledAdjustmentStep = 5;                                                 // Default step for PLUS/MINUS (configurable)
+
+    /// LED Brightness control (persistent)
+    void setBrightness(int brightness);                                 // Set brightness 0-100% (saves to file)
+    void adjustBrightness(int delta);                                   // Adjust brightness relatively
+    int getBrightness();                                                // Get current brightness
+    void loadBrightness();                                              // Load brightness from file
+    void showBrightnessInfo();                                          // Show current brightness in log
+    int brightnessAdjustmentStep = 10;                                  // Default step for brightness PLUS/MINUS (configurable)
 
 private:
     int getKeypadInput(unsigned long timeout);
     int getInput(unsigned long timeout, bool allowGesture = false); // Keypad + optional gesture input
     String getInputWithEncoder(unsigned long timeout, bool allowGesture = false, bool allowEncoder = true, const String &exitCombo = ""); // Keypad + gesture + encoder (CW/CCW/BUTTON)
+
+    // LED Brightness storage
+    int currentBrightness = 100;                                    // Current brightness (0-100%), default 100%
+    void saveBrightnessToFile();                                    // Save brightness to persistent storage
 };
 
 #endif
