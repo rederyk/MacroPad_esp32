@@ -113,9 +113,15 @@ Usare ext1 con `ANY_HIGH`**
 
 
 ### problemi
-* l ordine dei tasti in odalita non ordinata ,impone di salvare le vonfig in ordine numerico, dovrebbe ignorare l ordine sia nei config che nelle combo nella modalita disordinata 
-* ir scan parte con gia l ir ricevuto perche usa quello precedente , svuotarlo prima di scansioanare
+* l ordine dei tasti in modalita non disordinata ,impone di salvare le config in ordine numerico, dovrebbe ignorare l ordine sia nei config che nelle combo nella modalita disordinata 
+
+
+- bluethoot si connette a male
+
+
+
+
 ### miglioramenti
 
-* sposta il reactive lighting direttamente in keypad ed encoder o crea un warpper di tutti gli input che sarebbe il top ,cosi da renderlo disponibile altre modalita
+* sposta il reactive lighting direttamente in keypad ed encoder, o crea un warpper di tutti gli input che sarebbe il top ,cosi da renderlo disponibile altre modalita
 *dare piu tempo per selezioanre la combo per la modalita ir riguardo al keypad ,mentre ml encoder o altro va processato subito

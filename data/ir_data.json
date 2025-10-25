@@ -61,28 +61,21 @@
                 "address": 57568,
                 "command": 57375
             },
-            "cmd4": {
-                "protocol": "SAMSUNG",
-                "value": "e0e09768",
-                "bits": 32,
-                "address": 57568,
-                "command": 38760
-            },
-            "cmd7": {
+            "cmd9": {
                 "protocol": "SAMSUNG",
                 "value": "e0e043bc",
                 "bits": 32,
                 "address": 57568,
                 "command": 17340
             },
-            "cmd9": {
+            "cmd8": {
                 "protocol": "SAMSUNG",
                 "value": "e0e07d82",
                 "bits": 32,
                 "address": 57568,
                 "command": 32130
             },
-            "cmd8": {
+            "cmd7": {
                 "protocol": "SAMSUNG",
                 "value": "e0e09768",
                 "bits": 32,

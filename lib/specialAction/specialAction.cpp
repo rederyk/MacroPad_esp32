@@ -1354,15 +1354,20 @@ void SpecialAction::setSystemLedColor(int red, int green, int blue, bool save)
     green = constrain(green, 0, 255);
     blue = constrain(blue, 0, 255);
 
-    // Apply brightness scaling (0-100%)
-    float brightnessScale = currentBrightness / 100.0f;
+    // Salva i valori RGB originali (prima dello scaling)
+    originalRed = red;
+    originalGreen = green;
+    originalBlue = blue;
+
+    // Apply brightness scaling (0-255)
+    float brightnessScale = currentBrightness / 255.0f;
     int adjustedRed = (int)(red * brightnessScale);
     int adjustedGreen = (int)(green * brightnessScale);
     int adjustedBlue = (int)(blue * brightnessScale);
 
     Led::getInstance().setColor(adjustedRed, adjustedGreen, adjustedBlue, save);
     Logger::getInstance().log("LED set to RGB(" + String(red) + "," + String(green) + "," + String(blue) +
-                              ") @ " + String(currentBrightness) + "% brightness [system]");
+                              ") @ " + String(currentBrightness) + "/255 brightness [system]");
 }
 
 void SpecialAction::adjustLedColor(int redDelta, int greenDelta, int blueDelta)
@@ -1411,7 +1416,7 @@ void SpecialAction::showLedInfo()
     int red, green, blue;
     Led::getInstance().getColor(red, green, blue);
     String colorInfo = "LED: RGB(" + String(red) + "," + String(green) + "," + String(blue) + ") - " + Led::getInstance().getColorLog();
-    colorInfo += " @ " + String(currentBrightness) + "% brightness";
+    colorInfo += " @ " + String(currentBrightness) + "/255 brightness";
     Logger::getInstance().log(colorInfo);
 }
 
@@ -1448,14 +1453,14 @@ void SpecialAction::loadBrightness()
     if (!LittleFS.begin(true))
     {
         Logger::getInstance().log("Failed to mount LittleFS for brightness load");
-        currentBrightness = 100; // Default
+        currentBrightness = 255; // Default
         return;
     }
 
     if (!LittleFS.exists("/led_brightness.json"))
     {
-        Logger::getInstance().log("Brightness file not found, using default 100%");
-        currentBrightness = 100;
+        Logger::getInstance().log("Brightness file not found, using default 255");
+        currentBrightness = 255;
         saveBrightnessToFile(); // Create file with default
         return;
     }
@@ -1464,7 +1469,7 @@ void SpecialAction::loadBrightness()
     if (!file)
     {
         Logger::getInstance().log("Failed to open brightness file for reading");
-        currentBrightness = 100;
+        currentBrightness = 255;
         return;
     }
 
@@ -1475,39 +1480,36 @@ void SpecialAction::loadBrightness()
     if (error)
     {
         Logger::getInstance().log("Failed to parse brightness file: " + String(error.c_str()));
-        currentBrightness = 100;
+        currentBrightness = 255;
         return;
     }
 
-    currentBrightness = doc["brightness"] | 100; // Default to 100 if not found
-    currentBrightness = constrain(currentBrightness, 0, 100);
+    currentBrightness = doc["brightness"] | 255; // Default to 255 if not found
+    currentBrightness = constrain(currentBrightness, 0, 255);
 
-    Logger::getInstance().log("Loaded brightness: " + String(currentBrightness) + "%");
+    Logger::getInstance().log("Loaded brightness: " + String(currentBrightness));
 }
 
 void SpecialAction::setBrightness(int brightness)
 {
     int oldBrightness = currentBrightness;
-    currentBrightness = constrain(brightness, 0, 100);
+    currentBrightness = constrain(brightness, 0, 255);
     saveBrightnessToFile();
 
     // Refresh current LED color with new brightness (only if brightness changed)
-    if (oldBrightness > 0 && currentBrightness != oldBrightness)
+    if (currentBrightness != oldBrightness)
     {
-        int red, green, blue;
-        Led::getInstance().getColor(red, green, blue);
+        // Usa i valori RGB originali salvati e applica il nuovo brightness
+        float newScale = currentBrightness / 255.0f;
+        int newRed = (int)(originalRed * newScale);
+        int newGreen = (int)(originalGreen * newScale);
+        int newBlue = (int)(originalBlue * newScale);
 
-        // Scale back to original values (reverse the old brightness scaling)
-        float oldScale = oldBrightness / 100.0f;
-        int originalRed = (int)(red / oldScale);
-        int originalGreen = (int)(green / oldScale);
-        int originalBlue = (int)(blue / oldScale);
-
-        // Re-apply with new brightness using system LED (with brightness)
-        setSystemLedColor(originalRed, originalGreen, originalBlue, false);
+        // Applica il nuovo colore con il nuovo brightness
+        Led::getInstance().setColor(newRed, newGreen, newBlue, false);
     }
 
-    Logger::getInstance().log("Brightness set to " + String(currentBrightness) + "% (applies to system notifications only)");
+    Logger::getInstance().log("Brightness set to " + String(currentBrightness) + "/255 (applies to system notifications only)");
 }
 
 void SpecialAction::adjustBrightness(int delta)
@@ -1516,7 +1518,7 @@ void SpecialAction::adjustBrightness(int delta)
     setBrightness(newBrightness);
 
     Logger::getInstance().log("Brightness adjusted from " + String(currentBrightness - delta) +
-                              "% to " + String(currentBrightness) + "%");
+                              " to " + String(currentBrightness) + "/255");
 }
 
 int SpecialAction::getBrightness()
@@ -1526,5 +1528,5 @@ int SpecialAction::getBrightness()
 
 void SpecialAction::showBrightnessInfo()
 {
-    Logger::getInstance().log("LED Brightness: " + String(currentBrightness) + "%");
+    Logger::getInstance().log("LED Brightness: " + String(currentBrightness) + "/255");
 }

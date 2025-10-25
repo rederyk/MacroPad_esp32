@@ -85,7 +85,7 @@
     "motionWakeEnabled": true,
     "motionWakeThreshold": 5,
     "motionWakeDuration": 5,
-    "motionWakeHighPass": 10,
+    "motionWakeHighPass": 5,
     "motionWakeCycleRate": 1,
     "autoCalibrate": true,
     "autoCalibrateGyroThreshold": 0.12,

@@ -71,7 +71,7 @@ public:
     int ledAdjustmentStep = 5;                                                 // Default step for PLUS/MINUS (configurable)
 
     /// LED Brightness control (persistent)
-    void setBrightness(int brightness);                                 // Set brightness 0-100% (saves to file)
+    void setBrightness(int brightness);                                 // Set brightness 0-255 (saves to file)
     void adjustBrightness(int delta);                                   // Adjust brightness relatively
     int getBrightness();                                                // Get current brightness
     void loadBrightness();                                              // Load brightness from file
@@ -84,8 +84,13 @@ private:
     String getInputWithEncoder(unsigned long timeout, bool allowGesture = false, bool allowEncoder = true, const String &exitCombo = ""); // Keypad + gesture + encoder (CW/CCW/BUTTON)
 
     // LED Brightness storage
-    int currentBrightness = 100;                                    // Current brightness (0-100%), default 100%
+    int currentBrightness = 255;                                    // Current brightness (0-255), default 255
     void saveBrightnessToFile();                                    // Save brightness to persistent storage
+
+    // Valori RGB originali (prima dello scaling del brightness)
+    int originalRed = 255;
+    int originalGreen = 255;
+    int originalBlue = 255;
 };
 
 #endif

@@ -509,21 +509,45 @@ void MacroManager::pressAction(const std::string &action)
         // Extract parameter after "LED_BRIGHTNESS_"
         std::string param = action.substr(15); // Skip "LED_BRIGHTNESS_"
 
-        if (param == "PLUS_PLUS")
+        // Check for PLUS with optional multiplier (PLUS, PLUS2, PLUS3, etc.)
+        if (param.rfind("PLUS", 0) == 0)
         {
-            specialAction.adjustBrightness(specialAction.brightnessAdjustmentStep * 2);
+            int multiplier = 1;
+            if (param.length() > 4) // Has number after PLUS
+            {
+                try
+                {
+                    std::string numStr = param.substr(4);
+                    multiplier = std::stoi(numStr);
+                }
+                catch (const std::exception &e)
+                {
+                    Logger::getInstance().log("Invalid PLUS multiplier: " + String(param.c_str()));
+                    multiplier = 1;
+                }
+            }
+            specialAction.adjustBrightness(specialAction.brightnessAdjustmentStep * multiplier);
         }
-        else if (param == "PLUS")
+        // Check for MINUS with optional multiplier (MINUS, MINUS0, MINUS1, MINUS2, etc.)
+        else if (param.rfind("MINUS", 0) == 0)
         {
-            specialAction.adjustBrightness(specialAction.brightnessAdjustmentStep);
-        }
-        else if (param == "MINUS_MINUS")
-        {
-            specialAction.adjustBrightness(-specialAction.brightnessAdjustmentStep * 2);
-        }
-        else if (param == "MINUS")
-        {
-            specialAction.adjustBrightness(-specialAction.brightnessAdjustmentStep);
+            int multiplier = 1;
+            if (param.length() > 5) // Has number after MINUS
+            {
+                try
+                {
+                    std::string numStr = param.substr(5);
+                    int num = std::stoi(numStr);
+                    // MINUS0 or MINUS1 = same as MINUS (multiplier 1)
+                    multiplier = (num <= 1) ? 1 : num;
+                }
+                catch (const std::exception &e)
+                {
+                    Logger::getInstance().log("Invalid MINUS multiplier: " + String(param.c_str()));
+                    multiplier = 1;
+                }
+            }
+            specialAction.adjustBrightness(-specialAction.brightnessAdjustmentStep * multiplier);
         }
         else if (param == "INFO")
         {
@@ -531,7 +555,7 @@ void MacroManager::pressAction(const std::string &action)
         }
         else
         {
-            // Try to parse as absolute value (0-100)
+            // Try to parse as absolute value (0-255)
             try
             {
                 int brightness = std::stoi(param);
