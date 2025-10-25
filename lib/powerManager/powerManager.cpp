@@ -111,22 +111,33 @@ void PowerManager::enterDeepSleep(bool force)
             }
             else
             {
+                // Wait for sensor to stabilize after entering standby mode
+                vTaskDelay(pdMS_TO_TICKS(50));
+
                 wakeLevel = digitalRead(static_cast<uint8_t>(effectiveWakePin));
                 Logger::getInstance().log("Wake pin level after standby: " + String(wakeLevel == LOW ? "LOW" : "HIGH"));
-                if (wakeLevel == LOW)
+
+                // Retry loop to clear spurious interrupts
+                const uint8_t maxClearAttempts = 3;
+                for (uint8_t attempt = 0; attempt < maxClearAttempts && wakeLevel == LOW; attempt++)
                 {
-                    Logger::getInstance().log("Motion interrupt already active: clearing before sleep");
+                    Logger::getInstance().log("Motion interrupt active (attempt " + String(attempt + 1) + "/" + String(maxClearAttempts) + "): clearing");
+
                     if (!gestureSensor.clearMotionWakeInterrupt())
                     {
-                        Logger::getInstance().log("Failed to clear motion interrupt before sleep");
+                        Logger::getInstance().log("Failed to clear motion interrupt");
+                        break;
                     }
-                    vTaskDelay(pdMS_TO_TICKS(10));
+
+                    // Longer delay to allow sensor to stabilize
+                    vTaskDelay(pdMS_TO_TICKS(100));
                     wakeLevel = digitalRead(static_cast<uint8_t>(effectiveWakePin));
                     Logger::getInstance().log("Wake pin level after clear: " + String(wakeLevel == LOW ? "LOW" : "HIGH"));
                 }
+
                 if (wakeLevel == LOW)
                 {
-                    Logger::getInstance().log("⚠️ Wake pin still LOW; motion wake may fire immediately");
+                    Logger::getInstance().log("⚠️ Wake pin still LOW after " + String(maxClearAttempts) + " attempts; motion wake may fire immediately");
                 }
             }
         }

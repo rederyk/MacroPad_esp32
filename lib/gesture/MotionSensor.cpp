@@ -820,10 +820,12 @@ namespace
                 return false;
             }
 
-            // Clear any pending interrupt
+            // Clear any pending interrupt (read twice for some clones)
             uint8_t status = 0;
             readRegister(_wire, _address, MPU6050_REG_INT_STATUS, status);
-            vTaskDelay(pdMS_TO_TICKS(20));
+            vTaskDelay(pdMS_TO_TICKS(10));
+            readRegister(_wire, _address, MPU6050_REG_INT_STATUS, status);
+            vTaskDelay(pdMS_TO_TICKS(50));
 
             _motionWakeEnabled = true;
             return true;
@@ -863,6 +865,13 @@ namespace
         bool clearMotionInterrupt() override
         {
             uint8_t status = 0;
+            // Read interrupt status register twice to ensure it's cleared
+            // Some clones need multiple reads to properly clear latched interrupts
+            if (!readRegister(_wire, _address, MPU6050_REG_INT_STATUS, status))
+            {
+                return false;
+            }
+            vTaskDelay(pdMS_TO_TICKS(5));
             return readRegister(_wire, _address, MPU6050_REG_INT_STATUS, status);
         }
 
