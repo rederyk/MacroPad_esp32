@@ -23,58 +23,87 @@
 
 CombinationManager::CombinationManager() {}
 
+bool CombinationManager::loadJsonFile(const char* filepath, JsonObject& target)
+{
+    File file = LittleFS.open(filepath);
+    if (!file)
+    {
+        Logger::getInstance().log("Failed to open file: " + String(filepath));
+        return false;
+    }
+
+    // Usa un buffer dinamico per il caricamento temporaneo
+    // I file combo_X.json sono massimo 1.5KB, ma ArduinoJson ha overhead
+    DynamicJsonDocument tempDoc(2560);  // Aumentato per overhead JSON
+    DeserializationError error = deserializeJson(tempDoc, file);
+    file.close();
+
+    if (error)
+    {
+        Logger::getInstance().log("Failed to parse " + String(filepath) + ": " + String(error.c_str()));
+        return false;
+    }
+
+    // Copy all key-value pairs to target
+    for (JsonPair kv : tempDoc.as<JsonObject>())
+    {
+        target[kv.key()] = kv.value();
+    }
+
+    return true;
+}
+
+bool CombinationManager::mergeJsonFile(const char* filepath, JsonObject& target)
+{
+    return loadJsonFile(filepath, target);
+}
+
 bool CombinationManager::loadCombinations(int setNumber)
 {
-
     if (!LittleFS.begin(true))
     {
         Logger::getInstance().log("Failed to mount LittleFS");
         return false;
     }
 
-    File comboFile = LittleFS.open("/combo.json");
-    if (!comboFile)
+    // Clear previous data
+    doc.clear();
+    combinations = doc.to<JsonObject>();
+
+    // Load common combinations first
+    if (!loadJsonFile("/combo_common.json", combinations))
     {
-        Logger::getInstance().log("Failed to open combo file");
-        LittleFS.end();
-        return false;
+        Logger::getInstance().log("Warning: Failed to load common combinations");
+        // Continue anyway, common file is optional
     }
 
-    DeserializationError error = deserializeJson(doc, comboFile);
-    if (error)
-    {
-        Logger::getInstance().log("Failed to parse combo file: " + String(error.c_str()));
-        comboFile.close();
-        LittleFS.end();
-        return false;
-    }
+    // Load device-specific combinations
+    String comboFilePath = "/combo_" + String(setNumber) + ".json";
 
-    comboFile.close();
-    LittleFS.end();
-
-    // Try to load the requested set
-    String setKey = "combinations_" + String(setNumber);
-    if (doc.containsKey(setKey))
+    if (!mergeJsonFile(comboFilePath.c_str(), combinations))
     {
-        combinations = doc[setKey];
-    }
-    else
-    {
-        // Fallback to set 0 if requested set doesn't exist
+        // Fallback to combo_0.json if requested set doesn't exist
         Logger::getInstance().log("Set " + String(setNumber) + " not found, falling back to set 0");
-        if (doc.containsKey("combinations_0"))
+
+        if (!mergeJsonFile("/combo_0.json", combinations))
         {
-            combinations = doc["combinations_0"];
-        }
-        else
-        {
-            Logger::getInstance().log("No combinations found in combo file");
+            Logger::getInstance().log("Failed to load combo_0.json");
+            LittleFS.end();
             return false;
         }
     }
 
+    LittleFS.end();
+
+    // Validate that we have at least some combinations
+    if (combinations.size() == 0)
+    {
+        Logger::getInstance().log("No combinations loaded!");
+        return false;
+    }
+
     // Log loaded combinations
-    Logger::getInstance().log("Loaded combination set " + String(setNumber) + ":");
+    Logger::getInstance().log("Loaded combination set " + String(setNumber) + " (" + String(combinations.size()) + " entries):");
     for (JsonPair combo : combinations)
     {
         String logMessage = "  " + String(combo.key().c_str()) + ": ";

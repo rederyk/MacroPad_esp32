@@ -59,38 +59,101 @@ bool writeConfigFile(const String &json)
     return true;
 }
 
-// Funzioni helper per leggere/scrivere il file combo.json
-String readComboFile()
+// Funzioni helper per leggere/scrivere i file combo
+String readComboFile(int setNumber = -1)
 {
-    File file = LittleFS.open("/combo.json", "r");
-    if (!file)
+    String output = "{";
+    bool firstSet = true;
+
+    // Se setNumber è -1, ritorna tutto (old behavior per retrocompatibilità)
+    if (setNumber == -1)
     {
-        Logger::getInstance().log("⚠️ Failed to open combo.json");
-        return "{}"; // Ritorna un oggetto JSON vuoto
+        // Leggi tutti i file e costruisci la struttura originale
+        for (int i = 0; i < 3; i++)
+        {
+            String filePath = "/combo_" + String(i) + ".json";
+            File file = LittleFS.open(filePath, "r");
+            if (file)
+            {
+                if (!firstSet) output += ",";
+                output += "\"combinations_" + String(i) + "\":";
+                output += file.readString();
+                file.close();
+                firstSet = false;
+            }
+        }
     }
-    String json = file.readString();
-    Logger::getInstance().log("combo.json size ");
-    Logger::getInstance().log(String(file.size()));
-    file.close();
-    if (json.length() == 0)
+    else
     {
-        Logger::getInstance().log("⚠️ combo.json is empty!");
-        return "{}";
+        // Leggi solo il set richiesto (merged con common)
+        // Questa funzione non viene usata dal sistema, quindi possiamo semplificare
+        String filePath = "/combo_" + String(setNumber) + ".json";
+        File file = LittleFS.open(filePath, "r");
+        if (file)
+        {
+            output = file.readString();
+            file.close();
+            return output.length() > 0 ? output : "{}";
+        }
     }
-    return json;
+
+    output += "}";
+    Logger::getInstance().log("Combo file size: " + String(output.length()));
+    return output.length() > 0 ? output : "{}";
 }
 
-bool writeComboFile(const String &json)
+bool writeComboFile(int setNumber, const String &json)
 {
-    File file = LittleFS.open("/combo.json", "w");
+    String filePath = "/combo_" + String(setNumber) + ".json";
+    File file = LittleFS.open(filePath.c_str(), "w");
     if (!file)
     {
-        Logger::getInstance().log("⚠️ Failed to open combo.json for writing.");
+        Logger::getInstance().log("⚠️ Failed to open " + filePath + " for writing.");
         return false;
     }
     file.print(json);
     file.close();
+    Logger::getInstance().log("💾 Saved " + filePath);
     return true;
+}
+
+bool writeComboFile(const String &json)
+{
+    // Controllo veloce del formato guardando la stringa
+    if (json.indexOf("\"combinations_0\"") >= 0 ||
+        json.indexOf("\"combinations_1\"") >= 0 ||
+        json.indexOf("\"combinations_2\"") >= 0)
+    {
+        // Vecchio formato: usa parsing parziale per dividere
+        DynamicJsonDocument doc(12288);  // Ridotto da 16384
+        DeserializationError error = deserializeJson(doc, json);
+        if (error)
+        {
+            Logger::getInstance().log("⚠️ Failed to parse JSON: " + String(error.c_str()));
+            return false;
+        }
+
+        bool success = true;
+        for (int i = 0; i < 3; i++)
+        {
+            String key = "combinations_" + String(i);
+            if (doc.containsKey(key))
+            {
+                String output;
+                serializeJson(doc[key], output);
+                if (!writeComboFile(i, output))
+                {
+                    success = false;
+                }
+            }
+        }
+        return success;
+    }
+    else
+    {
+        // Nuovo formato: scrivi direttamente su combo_0.json
+        return writeComboFile(0, json);
+    }
 }
 
 // Legge il file gesture_features.json

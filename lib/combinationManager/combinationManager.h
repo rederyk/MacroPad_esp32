@@ -25,9 +25,12 @@
 
 class CombinationManager {
 private:
-    StaticJsonDocument<8192> doc;
+    StaticJsonDocument<3072> doc;  // Reduced from 8192 to 3072 bytes (saves ~5KB RAM)
     JsonObject combinations;
-    
+
+    bool loadJsonFile(const char* filepath, JsonObject& target);
+    bool mergeJsonFile(const char* filepath, JsonObject& target);
+
 public:
     CombinationManager();
     bool loadCombinations(int setNumber = 0);
