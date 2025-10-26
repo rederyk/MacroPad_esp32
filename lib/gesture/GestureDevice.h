@@ -49,6 +49,16 @@ public:
     void setRecognitionEnabled(bool enable);
     bool isRecognitionEnabled() const { return recognitionEnabled; }
 
+    /**
+     * Calibrate accelerometer axes automatically
+     * User should hold device in normal position (buttons facing them, vertical)
+     * and keep it still for ~2 seconds
+     *
+     * @param saveToFile If true, saves calibration to config.json
+     * @return true if calibration successful
+     */
+    bool calibrateAxes(bool saveToFile = true);
+
 private:
     void resetEvent();
     bool performRecognition();

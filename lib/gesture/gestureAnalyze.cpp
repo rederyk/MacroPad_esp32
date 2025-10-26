@@ -20,12 +20,18 @@
 #include "gestureNormalize.h"
 #include "gestureFeatures.h"
 #include "gestureStorage.h"
+#include "gestureMotionIntegrator.h"
+#include "gestureShapeAnalysis.h"
+#include "gestureOrientationFeatures.h"
 #include "Logger.h"
 #include <cfloat>
 #include <unordered_map>
 
 GestureAnalyze::GestureAnalyze(GestureRead &gestureReader)
-    : _gestureReader(gestureReader), _isAnalyzing(false)
+    : _gestureReader(gestureReader),
+      _isAnalyzing(false),
+      _mode(MODE_AUTO),
+      _confidenceThreshold(0.5f)
 {
 }
 
@@ -288,4 +294,267 @@ int GestureAnalyze::findKNNMatch(int k)
     delete[] matrix;
 
     return bestMatch;
+}
+
+// ============ NEW DUAL-MODE GESTURE RECOGNITION IMPLEMENTATION ============
+
+const char* GestureResult::getName() const
+{
+    if (mode == MODE_SHAPE_RECOGNITION && shapeType != SHAPE_UNKNOWN) {
+        return getShapeName(shapeType);
+    } else if (mode == MODE_ORIENTATION && orientationType != ORIENT_UNKNOWN) {
+        return getOrientationName(orientationType);
+    } else if (gestureID >= 0) {
+        static char buffer[32];
+        snprintf(buffer, sizeof(buffer), "Gesture %d", gestureID);
+        return buffer;
+    }
+    return "Unknown";
+}
+
+GestureResult GestureAnalyze::recognizeGesture()
+{
+    SampleBuffer& buffer = getRawSample();
+
+    if (buffer.sampleCount == 0 || !buffer.samples) {
+        Logger::getInstance().log("[GestureAnalyze] No samples to analyze");
+        return GestureResult();
+    }
+
+    // Determine best mode if AUTO
+    GestureMode mode = _mode;
+    if (mode == MODE_AUTO) {
+        mode = selectBestMode(&buffer);
+        Logger::getInstance().log("[GestureAnalyze] Auto-selected mode: " + String(mode));
+    }
+
+    return recognizeGesture(mode);
+}
+
+GestureResult GestureAnalyze::recognizeGesture(GestureMode mode)
+{
+    switch (mode) {
+        case MODE_SHAPE_RECOGNITION:
+            return recognizeShape();
+
+        case MODE_ORIENTATION:
+            return recognizeOrientation();
+
+        case MODE_LEGACY_KNN:
+        default: {
+            // Use legacy KNN method
+            GestureResult result;
+            result.gestureID = findKNNMatch(3);
+            result.mode = MODE_LEGACY_KNN;
+            result.confidence = result.gestureID >= 0 ? 0.7f : 0.0f;
+            return result;
+        }
+    }
+}
+
+GestureResult GestureAnalyze::recognizeShape()
+{
+    GestureResult result;
+    result.mode = MODE_SHAPE_RECOGNITION;
+
+    SampleBuffer& buffer = getRawSample();
+
+    // Apply light filtering (higher cutoff than legacy to preserve motion dynamics)
+    applyLowPassFilter(&buffer, 10.0f);
+
+    // Integrate motion to get path
+    MotionPath path;
+    if (!_motionIntegrator.integrate(&buffer, path)) {
+        Logger::getInstance().log("[ShapeRecognition] Motion integration failed");
+        return result;
+    }
+
+    // Analyze shape
+    ShapeFeatures features;
+    if (!_shapeAnalyzer.analyze(path, features)) {
+        Logger::getInstance().log("[ShapeRecognition] Shape analysis failed");
+        return result;
+    }
+
+    // Classify shape
+    ShapeType type = _shapeAnalyzer.classifyShape(features);
+    float confidence = _shapeAnalyzer.getConfidence();
+
+    Logger::getInstance().log("[ShapeRecognition] Detected: " + String(getShapeName(type)) +
+                             " (confidence: " + String(confidence, 2) + ")");
+
+    // Check confidence threshold
+    if (confidence < _confidenceThreshold) {
+        Logger::getInstance().log("[ShapeRecognition] Confidence too low, rejecting");
+        return result;
+    }
+
+    result.shapeType = type;
+    result.confidence = confidence;
+    result.gestureID = static_cast<int>(type); // Map shape type to ID
+
+    return result;
+}
+
+GestureResult GestureAnalyze::recognizeOrientation()
+{
+    GestureResult result;
+    result.mode = MODE_ORIENTATION;
+
+    if (!hasGyroscope()) {
+        Logger::getInstance().log("[OrientationRecognition] No gyroscope available");
+        return result;
+    }
+
+    SampleBuffer& buffer = getRawSample();
+
+    // Extract orientation features
+    OrientationFeatures features;
+    if (!_orientationExtractor.extract(&buffer, features)) {
+        Logger::getInstance().log("[OrientationRecognition] Feature extraction failed");
+        return result;
+    }
+
+    // Classify orientation gesture
+    OrientationType type = _orientationExtractor.classify(features);
+    float confidence = _orientationExtractor.getConfidence();
+
+    Logger::getInstance().log("[OrientationRecognition] Detected: " + String(getOrientationName(type)) +
+                             " (confidence: " + String(confidence, 2) + ")");
+
+    // Check confidence threshold
+    if (confidence < _confidenceThreshold) {
+        Logger::getInstance().log("[OrientationRecognition] Confidence too low, rejecting");
+        return result;
+    }
+
+    result.orientationType = type;
+    result.confidence = confidence;
+    result.gestureID = 100 + static_cast<int>(type); // Map orientation to ID (offset by 100)
+
+    return result;
+}
+
+void GestureAnalyze::setRecognitionMode(GestureMode mode)
+{
+    _mode = mode;
+    Logger::getInstance().log("[GestureAnalyze] Recognition mode set to: " + String(mode));
+}
+
+void GestureAnalyze::setConfidenceThreshold(float threshold)
+{
+    _confidenceThreshold = threshold;
+}
+
+bool GestureAnalyze::hasGyroscope() const
+{
+    // Access gesture reader directly since getRawSample() is not const
+    SampleBuffer& buffer = _gestureReader.getCollectedSamples();
+
+    if (buffer.sampleCount == 0 || !buffer.samples) {
+        return false;
+    }
+
+    // Check if any sample has valid gyro data
+    for (uint16_t i = 0; i < buffer.sampleCount; i++) {
+        if (buffer.samples[i].gyroValid) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+GestureMode GestureAnalyze::selectBestMode(SampleBuffer* buffer)
+{
+    if (!buffer || buffer->sampleCount == 0) {
+        return MODE_LEGACY_KNN;
+    }
+
+    bool hasGyro = false;
+    for (uint16_t i = 0; i < buffer->sampleCount; i++) {
+        if (buffer->samples[i].gyroValid) {
+            hasGyro = true;
+            break;
+        }
+    }
+
+    // If no gyro, can only do shape recognition or legacy KNN
+    if (!hasGyro) {
+        Logger::getInstance().log("[AutoSelect] No gyro, using shape recognition");
+        return MODE_SHAPE_RECOGNITION;
+    }
+
+    // Check if gesture has significant motion (for shape) or orientation change
+    bool hasMotion = hasSignificantMotion(buffer);
+    bool hasOrient = hasOrientationChange(buffer);
+
+    Logger::getInstance().log("[AutoSelect] Motion=" + String(hasMotion) +
+                             ", Orient=" + String(hasOrient));
+
+    // If both, prefer orientation (usually more intentional)
+    if (hasOrient) {
+        return MODE_ORIENTATION;
+    } else if (hasMotion) {
+        return MODE_SHAPE_RECOGNITION;
+    }
+
+    // Fallback to legacy
+    return MODE_LEGACY_KNN;
+}
+
+bool GestureAnalyze::hasSignificantMotion(SampleBuffer* buffer) const
+{
+    if (!buffer || buffer->sampleCount < 10) {
+        return false;
+    }
+
+    // Calculate total acceleration magnitude variation
+    float sumMag = 0;
+    float sumMagSq = 0;
+
+    for (uint16_t i = 0; i < buffer->sampleCount; i++) {
+        float mag = sqrtf(buffer->samples[i].x * buffer->samples[i].x +
+                         buffer->samples[i].y * buffer->samples[i].y +
+                         buffer->samples[i].z * buffer->samples[i].z);
+        sumMag += mag;
+        sumMagSq += mag * mag;
+    }
+
+    float avgMag = sumMag / buffer->sampleCount;
+    float variance = (sumMagSq / buffer->sampleCount) - (avgMag * avgMag);
+    float stdDev = sqrtf(fmaxf(variance, 0.0f));
+
+    // Significant motion if std deviation > 0.3g
+    return stdDev > 0.3f;
+}
+
+bool GestureAnalyze::hasOrientationChange(SampleBuffer* buffer) const
+{
+    if (!buffer || buffer->sampleCount < 10) {
+        return false;
+    }
+
+    // Check if gyroscope shows significant rotation
+    float maxGyroMag = 0;
+    float sumGyroMag = 0;
+
+    for (uint16_t i = 0; i < buffer->sampleCount; i++) {
+        if (buffer->samples[i].gyroValid) {
+            float gyroMag = sqrtf(buffer->samples[i].gyroX * buffer->samples[i].gyroX +
+                                 buffer->samples[i].gyroY * buffer->samples[i].gyroY +
+                                 buffer->samples[i].gyroZ * buffer->samples[i].gyroZ);
+            sumGyroMag += gyroMag;
+            if (gyroMag > maxGyroMag) {
+                maxGyroMag = gyroMag;
+            }
+        }
+    }
+
+    float avgGyroMag = sumGyroMag / buffer->sampleCount;
+
+    // Significant orientation change if:
+    // - Peak gyro > 1.0 rad/s (57 deg/s)
+    // - OR average gyro > 0.5 rad/s (28 deg/s)
+    return (maxGyroMag > 1.0f) || (avgGyroMag > 0.5f);
 }

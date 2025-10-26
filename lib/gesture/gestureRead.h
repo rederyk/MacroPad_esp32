@@ -96,6 +96,9 @@ public:
     void setAutoCalibrationParameters(float gyroStillThresholdRad, uint16_t minStableSamples, float smoothingFactor);
     bool isAutoCalibrationEnabled() const;
 
+    // Get underlying motion sensor (for axis calibration)
+    MotionSensor* getMotionSensor() { return _sensor.get(); }
+
 private:
     void getMappedGyro(float &x, float &y, float &z);
     void resetAutoCalibrationState();
