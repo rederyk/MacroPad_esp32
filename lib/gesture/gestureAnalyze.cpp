@@ -23,6 +23,8 @@
 #include "gestureMotionIntegrator.h"
 #include "gestureShapeAnalysis.h"
 #include "gestureOrientationFeatures.h"
+#include "MPU6050GestureRecognizer.h"
+#include "ADXL345GestureRecognizer.h"
 #include "Logger.h"
 #include <cfloat>
 #include <unordered_map>
@@ -557,4 +559,115 @@ bool GestureAnalyze::hasOrientationChange(SampleBuffer* buffer) const
     // - Peak gyro > 1.0 rad/s (57 deg/s)
     // - OR average gyro > 0.5 rad/s (28 deg/s)
     return (maxGyroMag > 1.0f) || (avgGyroMag > 0.5f);
+}
+// ============ NEW SENSOR-SPECIFIC RECOGNITION IMPLEMENTATION ============
+
+bool GestureAnalyze::initRecognizer(const String& sensorType, const String& gestureMode) {
+    _currentSensorType = sensorType;
+
+    // Determine which recognizer to use based on gestureMode
+    String mode = gestureMode;
+    mode.toLowerCase();
+
+    // Auto-select based on sensor type if mode is "auto"
+    if (mode == "auto") {
+        if (sensorType == "mpu6050") {
+            mode = "mpu6050";
+        } else if (sensorType == "adxl345") {
+            mode = "adxl345";
+        } else {
+            Logger::getInstance().log("[GestureAnalyze] Unknown sensor type: " + sensorType);
+            return false;
+        }
+    }
+
+    // Create appropriate recognizer
+    if (mode == "mpu6050" || mode == "shape" || mode == "orientation") {
+        _recognizer.reset(new MPU6050GestureRecognizer());
+        Logger::getInstance().log("[GestureAnalyze] Using MPU6050 recognizer (shape+orientation)");
+    } else if (mode == "adxl345" || mode == "legacy_knn") {
+        _recognizer.reset(new ADXL345GestureRecognizer());
+        Logger::getInstance().log("[GestureAnalyze] Using ADXL345 recognizer (KNN)");
+    } else {
+        Logger::getInstance().log("[GestureAnalyze] Unknown gesture mode: " + mode);
+        return false;
+    }
+
+    // Initialize recognizer
+    if (!_recognizer->init(sensorType)) {
+        Logger::getInstance().log("[GestureAnalyze] Failed to initialize recognizer");
+        _recognizer.reset();
+        return false;
+    }
+
+    // Set confidence threshold
+    _recognizer->setConfidenceThreshold(_confidenceThreshold);
+
+    Logger::getInstance().log("[GestureAnalyze] Recognizer initialized: " + _recognizer->getModeName());
+    return true;
+}
+
+GestureRecognitionResult GestureAnalyze::recognizeWithRecognizer() {
+    if (!_recognizer) {
+        Logger::getInstance().log("[GestureAnalyze] No recognizer initialized");
+        return GestureRecognitionResult();
+    }
+
+    SampleBuffer& buffer = getRawSample();
+
+    if (buffer.sampleCount == 0 || !buffer.samples) {
+        Logger::getInstance().log("[GestureAnalyze] No samples to analyze");
+        return GestureRecognitionResult();
+    }
+
+    // Use sensor-specific recognizer
+    GestureRecognitionResult result = _recognizer->recognize(&buffer);
+
+    if (result.gestureID >= 0 && result.confidence >= _confidenceThreshold) {
+        Logger::getInstance().log(String("[GestureAnalyze] Recognized: ") + result.gestureName +
+                                " (ID: " + String(result.gestureID) +
+                                ", conf: " + String(result.confidence, 2) + ")");
+    } else {
+        Logger::getInstance().log("[GestureAnalyze] No gesture recognized (low confidence)");
+    }
+
+    return result;
+}
+
+bool GestureAnalyze::trainGestureWithRecognizer(uint8_t gestureID) {
+    if (!_recognizer) {
+        Logger::getInstance().log("[GestureAnalyze] No recognizer initialized");
+        return false;
+    }
+
+    if (!_recognizer->supportsCustomTraining()) {
+        Logger::getInstance().log("[GestureAnalyze] Current recognizer does not support custom training");
+        return false;
+    }
+
+    SampleBuffer& buffer = getRawSample();
+
+    if (buffer.sampleCount == 0 || !buffer.samples) {
+        Logger::getInstance().log("[GestureAnalyze] No samples to train");
+        return false;
+    }
+
+    // Train using sensor-specific recognizer
+    bool result = _recognizer->trainCustomGesture(&buffer, gestureID);
+
+    if (result) {
+        Logger::getInstance().log(String("[GestureAnalyze] Custom gesture ") + String(gestureID) +
+                                " trained successfully with " + _recognizer->getModeName());
+    } else {
+        Logger::getInstance().log("[GestureAnalyze] Failed to train custom gesture");
+    }
+
+    return result;
+}
+
+String GestureAnalyze::getRecognizerModeName() const {
+    if (!_recognizer) {
+        return "None";
+    }
+    return _recognizer->getModeName();
 }

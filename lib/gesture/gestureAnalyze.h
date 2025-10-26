@@ -27,7 +27,9 @@
 #include "gestureMotionIntegrator.h"
 #include "gestureShapeAnalysis.h"
 #include "gestureOrientationFeatures.h"
+#include "IGestureRecognizer.h"
 #include <vector>
+#include <memory>
 
 struct GestureAnalysis
 {
@@ -144,18 +146,60 @@ public:
      */
     void setConfidenceThreshold(float threshold);
 
+    /**
+     * Get current confidence threshold
+     */
+    float getConfidenceThreshold() const { return _confidenceThreshold; }
+
+    // ============ NEW SENSOR-SPECIFIC RECOGNITION ============
+
+    /**
+     * Initialize sensor-specific recognizer based on sensor type
+     * @param sensorType "mpu6050" or "adxl345"
+     * @param gestureMode "auto", "mpu6050", "adxl345", "legacy_knn", "shape", "orientation"
+     * @return true if initialized successfully
+     */
+    bool initRecognizer(const String& sensorType, const String& gestureMode);
+
+    /**
+     * Recognize gesture using sensor-specific recognizer
+     * @return Unified gesture result
+     */
+    GestureRecognitionResult recognizeWithRecognizer();
+
+    /**
+     * Train custom gesture using sensor-specific recognizer
+     * @param gestureID Custom gesture ID (0-8)
+     * @return true if saved successfully
+     */
+    bool trainGestureWithRecognizer(uint8_t gestureID);
+
+    /**
+     * Check if sensor-specific recognizer is initialized
+     */
+    bool hasRecognizer() const { return _recognizer != nullptr; }
+
+    /**
+     * Get current recognizer mode name
+     */
+    String getRecognizerModeName() const;
+
 private:
     GestureRead &_gestureReader;
     bool _isAnalyzing;
     SampleBuffer _samples;
 
-    // Recognition components
+    // Recognition components (legacy)
     GestureMode _mode;
     MotionIntegrator _motionIntegrator;
     ShapeAnalysis _shapeAnalyzer;
     OrientationFeatureExtractor _orientationExtractor;
 
     float _confidenceThreshold;
+
+    // NEW: Sensor-specific recognizer
+    std::unique_ptr<IGestureRecognizer> _recognizer;
+    String _currentSensorType;
 
     // Helper: Determine best recognition mode based on sensor and data
     GestureMode selectBestMode(SampleBuffer* buffer);

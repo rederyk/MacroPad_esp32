@@ -144,7 +144,20 @@ bool GestureDevice::saveGesture(uint8_t id)
         return false;
     }
 
-    const bool result = analyzer.saveFeaturesWithID(id);
+    bool result = false;
+
+    // Check if sensor-specific recognizer is available
+    if (analyzer.hasRecognizer())
+    {
+        // Use new sensor-specific training
+        result = analyzer.trainGestureWithRecognizer(id);
+    }
+    else
+    {
+        // Fallback to legacy training
+        result = analyzer.saveFeaturesWithID(id);
+    }
+
     if (result)
     {
         sensor.clearMemory();
@@ -178,35 +191,64 @@ bool GestureDevice::performRecognition()
         return false;
     }
 
-    // Use new dual-mode recognition system (auto-selects best method)
-    analyzer.setRecognitionMode(MODE_AUTO);
-    analyzer.setConfidenceThreshold(0.5f);  // 50% minimum confidence
-
-    GestureResult result = analyzer.recognizeGesture();
-    lastGestureId = result.gestureID;
-
-    if (result.gestureID < 0 || result.confidence < 0.5f)
+    // Check if sensor-specific recognizer is available
+    if (analyzer.hasRecognizer())
     {
-        Logger::getInstance().log("GestureDevice: gesture not recognized (low confidence)");
+        // Use new sensor-specific recognizer
+        GestureRecognitionResult result = analyzer.recognizeWithRecognizer();
+        lastGestureId = result.gestureID;
+
+        if (result.gestureID < 0 || result.confidence < analyzer.getConfidenceThreshold())
+        {
+            Logger::getInstance().log("GestureDevice: gesture not recognized (low confidence)");
+            sensor.clearMemory();
+            return false;
+        }
+
+        Logger::getInstance().log("GestureDevice: recognized " + result.gestureName +
+                                 " (mode: " + analyzer.getRecognizerModeName() +
+                                 ", confidence: " + String(result.confidence * 100, 0) + "%)");
+
+        pendingEvent.type = InputEvent::EventType::MOTION;
+        pendingEvent.value1 = result.gestureID;
+        pendingEvent.value2 = buffer.sampleCount;
+        pendingEvent.state = true;
+        eventReady = true;
+
         sensor.clearMemory();
-        return false;
+        return eventReady;
     }
+    else
+    {
+        // Fallback to legacy dual-mode recognition system
+        analyzer.setRecognitionMode(MODE_AUTO);
+        analyzer.setConfidenceThreshold(0.5f);
 
-    // Log recognition details
-    String modeName = (result.mode == MODE_SHAPE_RECOGNITION) ? "Shape" :
-                     (result.mode == MODE_ORIENTATION) ? "Orientation" : "Legacy";
-    Logger::getInstance().log("GestureDevice: recognized " + String(result.getName()) +
-                             " (mode: " + modeName +
-                             ", confidence: " + String(result.confidence * 100, 0) + "%)");
+        GestureResult result = analyzer.recognizeGesture();
+        lastGestureId = result.gestureID;
 
-    pendingEvent.type = InputEvent::EventType::MOTION;
-    pendingEvent.value1 = result.gestureID;
-    pendingEvent.value2 = buffer.sampleCount;
-    pendingEvent.state = true;
-    eventReady = true;
+        if (result.gestureID < 0 || result.confidence < 0.5f)
+        {
+            Logger::getInstance().log("GestureDevice: gesture not recognized (low confidence)");
+            sensor.clearMemory();
+            return false;
+        }
 
-    sensor.clearMemory();
-    return eventReady;
+        String modeName = (result.mode == MODE_SHAPE_RECOGNITION) ? "Shape" :
+                         (result.mode == MODE_ORIENTATION) ? "Orientation" : "Legacy";
+        Logger::getInstance().log("GestureDevice: recognized " + String(result.getName()) +
+                                 " (mode: " + modeName +
+                                 ", confidence: " + String(result.confidence * 100, 0) + "%)");
+
+        pendingEvent.type = InputEvent::EventType::MOTION;
+        pendingEvent.value1 = result.gestureID;
+        pendingEvent.value2 = buffer.sampleCount;
+        pendingEvent.state = true;
+        eventReady = true;
+
+        sensor.clearMemory();
+        return eventReady;
+    }
 }
 
 bool GestureDevice::calibrateAxes(bool saveToFile)

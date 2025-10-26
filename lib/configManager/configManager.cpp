@@ -304,6 +304,10 @@ bool ConfigurationManager::loadConfig()
             this->accelerometerConfig.autoCalibrateStableSamples = accelerometerConfig["autoCalibrateStableSamples"];
         if (accelerometerConfig.containsKey("autoCalibrateSmoothing"))
             this->accelerometerConfig.autoCalibrateSmoothing = accelerometerConfig["autoCalibrateSmoothing"];
+        if (accelerometerConfig.containsKey("gestureMode"))
+            this->accelerometerConfig.gestureMode = accelerometerConfig["gestureMode"].as<String>();
+        else
+            this->accelerometerConfig.gestureMode = "auto"; // Default to auto
     }
 
     configFile.close();

@@ -83,6 +83,7 @@ struct AccelerometerConfig
     float autoCalibrateGyroThreshold;
     uint16_t autoCalibrateStableSamples;
     float autoCalibrateSmoothing;
+    String gestureMode; // "auto", "mpu6050", "adxl345", "legacy_knn", "shape", "orientation"
 };
 
 struct WifiConfig

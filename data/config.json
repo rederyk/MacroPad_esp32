@@ -90,6 +90,7 @@
     "autoCalibrate": true,
     "autoCalibrateGyroThreshold": 0.12,
     "autoCalibrateStableSamples": 0,
-    "autoCalibrateSmoothing": 0.05
+    "autoCalibrateSmoothing": 0.05,
+    "gestureMode": "auto"
   }
 }
