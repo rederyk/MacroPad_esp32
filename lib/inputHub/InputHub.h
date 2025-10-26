@@ -7,6 +7,7 @@
 #include <functional>
 
 #include "inputDevice.h"
+#include "ReactiveLightingController.h"
 
 class ConfigurationManager;
 class Keypad;
@@ -14,6 +15,7 @@ class RotaryEncoder;
 class IRSensor;
 class IRSender;
 class IRStorage;
+struct ComboSettings;
 
 /**
  * @brief Central coordinator for input devices.
@@ -86,6 +88,14 @@ public:
     IRSender *getIrSender();
     IRStorage *getIrStorage();
 
+    // Reactive lighting controls
+    void setReactiveLightingEnabled(bool enable);
+    bool isReactiveLightingEnabled() const;
+    void handleReactiveLighting(uint8_t keyIndex, bool isEncoder, int encoderDirection, uint16_t activeKeysMask);
+    void updateReactiveLighting();
+    void updateReactiveLightingColors(const ComboSettings &settings);
+    void saveReactiveLightingColors() const;
+
 private:
     static constexpr size_t MAX_QUEUE_SIZE = 32;
 
@@ -99,6 +109,7 @@ private:
     std::unique_ptr<IRSensor> irSensor;
     std::unique_ptr<IRSender> irSender;
     std::unique_ptr<IRStorage> irStorage;
+    ReactiveLightingController reactiveLighting;
 };
 
 #endif // INPUT_HUB_H

@@ -12,5 +12,5 @@
   "1+2+3,BUTTON": ["TOGGLE_BLE_WIFI"],
   "1+4+7,BUTTON": ["HOP_BLE_DEVICE"],
   "7+8+9,BUTTON": ["RESET_ALL"],
-  "1+2+3+4+5+6+7+8+9": ["ENTER_SLEEP"]
+  "1+2+3+4+5+6+7+8+9": ["<DELAY_100><ENTER_SLEEP>"]
 }

@@ -7,6 +7,7 @@
 #include "IRSender.h"
 #include "IRStorage.h"
 #include "Logger.h"
+#include "combinationManager.h"
 
 InputHub::InputHub() = default;
 
@@ -217,4 +218,34 @@ void InputHub::scanRotaryEncoder()
     {
         enqueue(rotaryEncoder->getEvent());
     }
+}
+
+void InputHub::setReactiveLightingEnabled(bool enable)
+{
+    reactiveLighting.enable(enable);
+}
+
+bool InputHub::isReactiveLightingEnabled() const
+{
+    return reactiveLighting.isEnabled();
+}
+
+void InputHub::handleReactiveLighting(uint8_t keyIndex, bool isEncoder, int encoderDirection, uint16_t activeKeysMask)
+{
+    reactiveLighting.handleInput(keyIndex, isEncoder, encoderDirection, activeKeysMask);
+}
+
+void InputHub::updateReactiveLighting()
+{
+    reactiveLighting.update();
+}
+
+void InputHub::updateReactiveLightingColors(const ComboSettings &settings)
+{
+    reactiveLighting.updateColors(settings);
+}
+
+void InputHub::saveReactiveLightingColors() const
+{
+    reactiveLighting.saveColors();
 }

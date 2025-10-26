@@ -134,7 +134,7 @@ void setup()
 
     // Load interactive lighting colors from initial combo settings
     const ComboSettings& initialSettings = comboManager.getSettings();
-    macroManager.updateInteractiveLightingColors(initialSettings);
+    inputHub.updateReactiveLightingColors(initialSettings);
 
     // Initialize I2C with configured pins
 
@@ -351,7 +351,7 @@ void mainLoopTask(void *parameter)
 
                     // Load interactive lighting colors from combo settings
                     const ComboSettings& comboSettings = comboManager.getSettings();
-                    macroManager.updateInteractiveLightingColors(comboSettings);
+                    inputHub.updateReactiveLightingColors(comboSettings);
 
                     // Visual feedback - brief LED flash using custom color from settings or default green
                     if (comboSettings.hasLedColor())
