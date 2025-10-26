@@ -23,6 +23,7 @@
 #include <Arduino.h>
 #include <vector>
 #include <map>
+#include <functional>
 
 // #define COMBO_DELAY 100 // Adjust this value as needed (milliseconds)
 #include <string>
@@ -43,6 +44,12 @@ public:
     void update();
     void clearActiveKeys();
     void setUseKeyPressOrder(bool useOrder);
+    bool reloadCombinationsFromManager(JsonObject newCombos);
+
+    // Combo switch request system
+    bool hasPendingComboSwitch();
+    void getPendingComboSwitch(std::string& outPrefix, int& outSetNumber);
+    void clearPendingComboSwitch();
 
 
     // Configurazione delle combinazioni
@@ -128,6 +135,11 @@ private:
 
     // Flashlight mode state
     bool flashlightActive = false;
+
+    // Pending combo switch request
+    bool pendingComboSwitchFlag = false;
+    std::string pendingComboPrefix;
+    int pendingComboSetNumber = 0;
 };
 
 #endif // MACRO_MANAGER_H

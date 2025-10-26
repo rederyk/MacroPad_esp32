@@ -488,6 +488,41 @@ void mainLoopTask(void *parameter)
         gestureSensor.updateSampling(); // Assicurati che non blocchi
         macroManager.update();          // Assicurati che non blocchi
 
+        // Check for pending combo switch request (processed outside of action context to avoid stack issues)
+        if (macroManager.hasPendingComboSwitch())
+        {
+            std::string prefix;
+            int setNumber;
+            macroManager.getPendingComboSwitch(prefix, setNumber);
+            macroManager.clearPendingComboSwitch();
+
+            Logger::getInstance().log("Processing combo switch: " + String(prefix.c_str()) + "_" + String(setNumber));
+
+            // Reload combinations from the new file
+            if (comboManager.reloadCombinations(setNumber, prefix.c_str()))
+            {
+                // Get the new combinations and reload into macroManager
+                JsonObject newCombos = comboManager.getCombinations();
+                if (macroManager.reloadCombinationsFromManager(newCombos))
+                {
+                    Logger::getInstance().log("Successfully switched to " + String(prefix.c_str()) + "_" + String(setNumber) +
+                              " with " + String(macroManager.combinations.size()) + " combinations");
+
+                    // Visual feedback - brief LED flash
+                    Led::getInstance().setColor(0, 255, 0, false);
+                    vTaskDelay(pdMS_TO_TICKS(150));
+                }
+                else
+                {
+                    Logger::getInstance().log("Failed to reload combinations into macroManager");
+                }
+            }
+            else
+            {
+                Logger::getInstance().log("Failed to load " + String(prefix.c_str()) + "_" + String(setNumber) + ".json");
+            }
+        }
+
         // Controlla inattività per sleep mode
         if (powerManager.checkInactivity())
         {

@@ -682,6 +682,42 @@ void MacroManager::releaseAction(const std::string &action)
     {
         enableReactiveLighting(!reactiveLightingEnabled);
     }
+    else if (action.rfind("SWITCH_MY_COMBO_", 0) == 0)
+    {
+        // Extract combo number from "SWITCH_MY_COMBO_X"
+        std::string numStr = action.substr(16); // After "SWITCH_MY_COMBO_"
+        try
+        {
+            int comboNum = std::stoi(numStr);
+            Logger::getInstance().log("Switch to my_combo_" + String(comboNum) + " requested");
+            // Set pending flag instead of executing immediately to avoid stack issues
+            pendingComboSwitchFlag = true;
+            pendingComboPrefix = "my_combo";
+            pendingComboSetNumber = comboNum;
+        }
+        catch (const std::exception &e)
+        {
+            Logger::getInstance().log("Invalid SWITCH_MY_COMBO format: " + String(action.c_str()));
+        }
+    }
+    else if (action.rfind("SWITCH_COMBO_", 0) == 0)
+    {
+        // Extract combo number from "SWITCH_COMBO_X"
+        std::string numStr = action.substr(13); // After "SWITCH_COMBO_"
+        try
+        {
+            int comboNum = std::stoi(numStr);
+            Logger::getInstance().log("Switch to combo_" + String(comboNum) + " requested");
+            // Set pending flag instead of executing immediately to avoid stack issues
+            pendingComboSwitchFlag = true;
+            pendingComboPrefix = "combo";
+            pendingComboSetNumber = comboNum;
+        }
+        catch (const std::exception &e)
+        {
+            Logger::getInstance().log("Invalid SWITCH_COMBO format: " + String(action.c_str()));
+        }
+    }
 
     Logger::getInstance().log(logMessage);
     return;
@@ -1144,6 +1180,47 @@ void MacroManager::clearActiveKeys()
     }
 
     lastAction.clear();
+}
+
+bool MacroManager::reloadCombinationsFromManager(JsonObject newCombos)
+{
+    // Clear all active states first
+    clearActiveKeys();
+
+    // Clear existing combinations map to free memory
+    combinations.clear();
+
+    // Reload combinations from the new JsonObject
+    for (JsonPair combo : newCombos)
+    {
+        std::vector<std::string> actions;
+        for (JsonVariant v : combo.value().as<JsonArray>())
+        {
+            actions.push_back(std::string(v.as<const char *>()));
+        }
+        combinations[std::string(combo.key().c_str())] = actions;
+    }
+
+    Logger::getInstance().log("Reloaded " + String(combinations.size()) + " combinations into macroManager");
+    return combinations.size() > 0;
+}
+
+bool MacroManager::hasPendingComboSwitch()
+{
+    return pendingComboSwitchFlag;
+}
+
+void MacroManager::getPendingComboSwitch(std::string& outPrefix, int& outSetNumber)
+{
+    outPrefix = pendingComboPrefix;
+    outSetNumber = pendingComboSetNumber;
+}
+
+void MacroManager::clearPendingComboSwitch()
+{
+    pendingComboSwitchFlag = false;
+    pendingComboPrefix.clear();
+    pendingComboSetNumber = 0;
 }
 
 void MacroManager::update()

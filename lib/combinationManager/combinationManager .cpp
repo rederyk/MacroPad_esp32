@@ -21,7 +21,7 @@
 #include <LittleFS.h>
 #include "Logger.h"
 
-CombinationManager::CombinationManager() {}
+CombinationManager::CombinationManager() : currentSetNumber(0), currentPrefix("combo") {}
 
 bool CombinationManager::loadJsonFile(const char* filepath, JsonObject& target)
 {
@@ -58,7 +58,7 @@ bool CombinationManager::mergeJsonFile(const char* filepath, JsonObject& target)
     return loadJsonFile(filepath, target);
 }
 
-bool CombinationManager::loadCombinations(int setNumber)
+bool CombinationManager::loadCombinationsInternal(int setNumber, const char* prefix)
 {
     if (!LittleFS.begin(true))
     {
@@ -70,20 +70,20 @@ bool CombinationManager::loadCombinations(int setNumber)
     doc.clear();
     combinations = doc.to<JsonObject>();
 
-    // Load common combinations first
+    // Load common combinations first (always use combo_common.json)
     if (!loadJsonFile("/combo_common.json", combinations))
     {
         Logger::getInstance().log("Warning: Failed to load common combinations");
         // Continue anyway, common file is optional
     }
 
-    // Load device-specific combinations
-    String comboFilePath = "/combo_" + String(setNumber) + ".json";
+    // Load device-specific combinations with prefix
+    String comboFilePath = "/" + String(prefix) + "_" + String(setNumber) + ".json";
 
     if (!mergeJsonFile(comboFilePath.c_str(), combinations))
     {
         // Fallback to combo_0.json if requested set doesn't exist
-        Logger::getInstance().log("Set " + String(setNumber) + " not found, falling back to set 0");
+        Logger::getInstance().log("Set " + String(setNumber) + " not found with prefix '" + String(prefix) + "', falling back to combo_0");
 
         if (!mergeJsonFile("/combo_0.json", combinations))
         {
@@ -91,6 +91,15 @@ bool CombinationManager::loadCombinations(int setNumber)
             LittleFS.end();
             return false;
         }
+        // Reset to default if fallback was used
+        currentSetNumber = 0;
+        currentPrefix = "combo";
+    }
+    else
+    {
+        // Successfully loaded requested set
+        currentSetNumber = setNumber;
+        currentPrefix = String(prefix);
     }
 
     LittleFS.end();
@@ -103,7 +112,7 @@ bool CombinationManager::loadCombinations(int setNumber)
     }
 
     // Log loaded combinations
-    Logger::getInstance().log("Loaded combination set " + String(setNumber) + " (" + String(combinations.size()) + " entries):");
+    Logger::getInstance().log("Loaded combination set '" + currentPrefix + "_" + String(currentSetNumber) + "' (" + String(combinations.size()) + " entries):");
     for (JsonPair combo : combinations)
     {
         String logMessage = "  " + String(combo.key().c_str()) + ": ";
@@ -117,6 +126,17 @@ bool CombinationManager::loadCombinations(int setNumber)
     }
 
     return true;
+}
+
+bool CombinationManager::loadCombinations(int setNumber)
+{
+    return loadCombinationsInternal(setNumber, "combo");
+}
+
+bool CombinationManager::reloadCombinations(int setNumber, const char* prefix)
+{
+    Logger::getInstance().log("Reloading combinations: " + String(prefix) + "_" + String(setNumber));
+    return loadCombinationsInternal(setNumber, prefix);
 }
 
 JsonObject CombinationManager::getCombinations()

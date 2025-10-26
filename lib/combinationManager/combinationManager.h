@@ -27,14 +27,20 @@ class CombinationManager {
 private:
     StaticJsonDocument<3072> doc;  // Reduced from 8192 to 3072 bytes (saves ~5KB RAM)
     JsonObject combinations;
+    int currentSetNumber;  // Track current loaded set
+    String currentPrefix;  // Track current file prefix ("combo" or "my_combo")
 
     bool loadJsonFile(const char* filepath, JsonObject& target);
     bool mergeJsonFile(const char* filepath, JsonObject& target);
+    bool loadCombinationsInternal(int setNumber, const char* prefix);
 
 public:
     CombinationManager();
     bool loadCombinations(int setNumber = 0);
+    bool reloadCombinations(int setNumber, const char* prefix = "combo");
     JsonObject getCombinations();
+    int getCurrentSet() const { return currentSetNumber; }
+    String getCurrentPrefix() const { return currentPrefix; }
 };
 
 #endif // COMBINATION_MANAGER_H

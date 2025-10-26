@@ -1,0 +1,16 @@
+{
+  "1": ["S_B:a"],
+  "2": ["S_B:b"],
+  "3": ["S_B:c"],
+  "4": ["S_B:d"],
+  "5": ["S_B:e"],
+  "6": ["S_B:f"],
+  "7": ["S_B:g"],
+  "8": ["S_B:h"],
+  "9": ["S_B:i"],
+  "CW": ["S_B:MOUSE_MOVE_0_0_1_0"],
+  "CCW": ["S_B:MOUSE_MOVE_0_0_-1_0"],
+  "1+5": ["<S_B:Hello><S_B:SPACE><S_B:World>"],
+  "2+5": ["SWITCH_COMBO_0"],
+  "3+5": ["SWITCH_MY_COMBO_1"]
+}
