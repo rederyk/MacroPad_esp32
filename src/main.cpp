@@ -17,7 +17,6 @@
  */
 
 #include <Arduino.h>
-#include <queue>
 #include <esp_system.h>
 #include <esp_err.h>
 #include <esp_log.h>
@@ -27,8 +26,6 @@
 #include "Led.h"
 #include "configManager.h"
 #include "combinationManager.h"
-#include "keypad.h"
-#include "rotaryEncoder.h"
 #include "BLEController.h"
 #include "macroManager.h"
 #include "inputDevice.h"
@@ -37,18 +34,9 @@
 #include "WIFIManager.h"
 #include "specialAction.h"
 #include "powerManager.h"
-#include "IRSensor.h"
-#include "IRSender.h"
-#include "IRStorage.h"
+#include "InputHub.h"
 
 WIFIManager wifiManager; // Create an instance of WIFIManager
-
-// Event buffer structure
-struct TimedEvent
-{
-    InputEvent event;
-    unsigned long timestamp;
-};
 
 ConfigurationManager configManager;
 PowerManager powerManager;
@@ -59,30 +47,7 @@ SpecialAction specialAction;
 BLEController bleController("Macropad_esp32"); // prendere nome dal config in qualche modo...uguale per wifi e bluethoot
 // modificare blecontroller.start??
 MacroManager macroManager(nullptr, nullptr);
-Keypad *keypad;
-RotaryEncoder *rotaryEncoder;
-
-// IR Remote Control components (pointers for optional initialization)
-IRSensor *irSensor = nullptr;
-IRSender *irSender = nullptr;
-IRStorage *irStorage = nullptr;
-
-// Event buffer
-std::queue<TimedEvent> eventBuffer;
-const size_t MAX_BUFFER_SIZE = 16;
-
-// Function to process buffered events
-void processEvents()
-{
-    while (!eventBuffer.empty())
-    {
-        TimedEvent timedEvent = eventBuffer.front();
-        eventBuffer.pop();
-
-        // Handle event in macro manager
-        macroManager.handleInputEvent(timedEvent.event);
-    }
-}
+InputHub inputHub;
 
 // Task function prototype
 void mainLoopTask(void *parameter);
@@ -208,117 +173,8 @@ void setup()
         }
     }
 
-    // Initialize IR Remote Control components
-    // REASON: IRrecv (IRSensor) conflicts with BLE due to RMT hardware sharing
-    // IRsend (IRSender) can work with BLE enabled with minimal RMT usage
-    const SystemConfig &irSystemConfig = configManager.getSystemConfig();
-
-    // IR Sensor: ONLY initialize when BLE is DISABLED (RMT conflict)
-    if (!irSystemConfig.enable_BLE)
-    {
-        const IRSensorConfig &irSensorConfig = configManager.getIrSensorConfig();
-        Logger::getInstance().log("IR Sensor Config: pin=" + String(irSensorConfig.pin) +
-                                  ", active=" + String(irSensorConfig.active ? "true" : "false"));
-        if (irSensorConfig.active && irSensorConfig.pin >= 0)
-        {
-            Logger::getInstance().log("Initializing IR Sensor on pin " + String(irSensorConfig.pin));
-            irSensor = new IRSensor(irSensorConfig.pin);
-            if (irSensor && irSensor->begin())
-            {
-                Logger::getInstance().log("IR Sensor initialized successfully");
-            }
-            else
-            {
-                Logger::getInstance().log("Failed to initialize IR Sensor");
-                if (irSensor)
-                {
-                    delete irSensor;
-                    irSensor = nullptr;
-                }
-            }
-        }
-        else
-        {
-            Logger::getInstance().log("IR Sensor NOT initialized (disabled or invalid pin)");
-        }
-    }
-    else
-    {
-        Logger::getInstance().log("IR Sensor DISABLED (BLE enabled - RMT conflict)");
-    }
-
-    // IR Sender: Can be initialized EVEN with BLE enabled (minimal RMT usage)
-    const IRLedConfig &irLedConfig = configManager.getIrLedConfig();
-    Logger::getInstance().log("IR LED Config: pin=" + String(irLedConfig.pin) +
-                              ", active=" + String(irLedConfig.active ? "true" : "false") +
-                              ", anodeGpio=" + String(irLedConfig.anodeGpio ? "true" : "false"));
-    if (irLedConfig.active && irLedConfig.pin >= 0)
-    {
-        Logger::getInstance().log("Initializing IR Sender on pin " + String(irLedConfig.pin) +
-                                  (irSystemConfig.enable_BLE ? " (BLE mode - IR receive disabled)" : ""));
-        irSender = new IRSender(irLedConfig.pin, irLedConfig.anodeGpio);
-        if (irSender && irSender->begin())
-        {
-            Logger::getInstance().log("IR Sender initialized successfully");
-        }
-        else
-        {
-            Logger::getInstance().log("Failed to initialize IR Sender");
-            if (irSender)
-            {
-                delete irSender;
-                irSender = nullptr;
-            }
-        }
-    }
-    else
-    {
-        Logger::getInstance().log("IR Sender NOT initialized (disabled or invalid pin)");
-    }
-
-    // Initialize IR Storage (if either sensor or sender is active)
-    Logger::getInstance().log("Checking IR Storage initialization: irSensor=" +
-                              String(irSensor != nullptr ? "OK" : "NULL") +
-                              ", irSender=" + String(irSender != nullptr ? "OK" : "NULL"));
-    if ((irSensor != nullptr) || (irSender != nullptr))
-    {
-        Logger::getInstance().log("Initializing IR Storage");
-        irStorage = new IRStorage();
-        if (irStorage && irStorage->begin())
-        {
-            Logger::getInstance().log("IR Storage initialized successfully");
-            if (irStorage->loadIRData())
-            {
-                Logger::getInstance().log("IR data loaded from file");
-            }
-            else
-            {
-                Logger::getInstance().log("No existing IR data file (this is normal on first run)");
-            }
-        }
-        else
-        {
-            Logger::getInstance().log("Failed to initialize IR Storage (LittleFS error?)");
-            if (irStorage)
-            {
-                delete irStorage;
-                irStorage = nullptr;
-            }
-        }
-    }
-    else
-    {
-        Logger::getInstance().log("IR Storage NOT initialized (no IR sensor or sender available)");
-    }
-
-    Logger::getInstance().log("Free heap after IR initialization: " + String(ESP.getFreeHeap()) + " bytes");
-
-    // Initialize hardware with configurations
-    keypad = new Keypad(&configManager.getKeypadConfig());
-    rotaryEncoder = new RotaryEncoder(&configManager.getEncoderConfig());
-
-    keypad->setup();
-    rotaryEncoder->setup();
+    // Initialise input subsystem (keypad, rotary encoder, IR peripherals)
+    inputHub.begin(configManager);
 
     // Create main loop task with sufficient stack size
     xTaskCreateUniversal(
@@ -331,10 +187,8 @@ void setup()
         NULL,  // Task handle,
         CONFIG_ARDUINO_RUNNING_CORE);
 
-    // Log free RAM memory
+    // Log free RAM/flash memory after hardware initialisation
     Logger::getInstance().log("Free RAM memory: " + String(ESP.getFreeHeap()) + " bytes");
-
-    // Log free flash memory
     Logger::getInstance().log("Free sketch memory: " + String(ESP.getFreeSketchSpace()) + " bytes");
 
     /// system Feature
@@ -460,37 +314,14 @@ void mainLoopTask(void *parameter)
         int64_t startTimeMicros = esp_timer_get_time();
 
         // ----- INIZIO del tuo codice del loop -----
-        // Metti qui TUTTO il codice che vuoi eseguire ad ogni ciclo
-        unsigned long now = millis(); // Necessario per i timestamp degli eventi
+        inputHub.scanDevices();
 
-        // Check for keypad events
-        if (keypad->processInput())
+        InputEvent nextEvent;
+        while (inputHub.poll(nextEvent))
         {
-            TimedEvent timedEvent;
-            timedEvent.event = keypad->getEvent();
-            timedEvent.timestamp = now;
-            if (eventBuffer.size() < MAX_BUFFER_SIZE)
-            {
-                eventBuffer.push(timedEvent);
-            }
+            macroManager.handleInputEvent(nextEvent);
             powerManager.registerActivity();
         }
-
-        // Check for encoder events
-        if (rotaryEncoder->processInput())
-        {
-            TimedEvent timedEvent;
-            timedEvent.event = rotaryEncoder->getEvent();
-            timedEvent.timestamp = now;
-            if (eventBuffer.size() < MAX_BUFFER_SIZE)
-            {
-                eventBuffer.push(timedEvent);
-            }
-            powerManager.registerActivity();
-        }
-
-        // Process buffered events
-        processEvents();
 
 
         // --- Operazioni potenzialmente più lunghe ---

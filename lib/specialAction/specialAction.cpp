@@ -32,12 +32,9 @@
 #include <ArduinoJson.h>
 #include "rotaryEncoder.h"
 #include "Led.h"
+#include "InputHub.h"
 
-extern Keypad *keypad;
-extern RotaryEncoder *rotaryEncoder;
-extern IRSensor *irSensor;
-extern IRSender *irSender;
-extern IRStorage *irStorage;
+extern InputHub inputHub;
 
 extern GestureRead gestureSensor;
 extern GestureAnalyze gestureAnalyzer;
@@ -117,12 +114,21 @@ int SpecialAction::getKeypadInput(unsigned long timeout)
 {
     unsigned long startTime = millis();
     int key = -1;
+    Keypad *keypadDevice = inputHub.getKeypad();
+
+    if (!keypadDevice)
+    {
+        Logger::getInstance().log("Keypad not available");
+        return -1;
+    }
+
+    inputHub.clearQueue();
 
     while (key < 0 || key > 8)
     {
-        if (keypad->processInput())
+        if (keypadDevice->processInput())
         {
-            InputEvent event = keypad->getEvent();
+            InputEvent event = keypadDevice->getEvent();
             if (event.type == InputEvent::EventType::KEY_PRESS && event.state)
             {
                 key = event.value1; // Get key code (0-8)
@@ -134,10 +140,12 @@ int SpecialAction::getKeypadInput(unsigned long timeout)
         if (millis() - startTime > timeout)
         {
             Logger::getInstance().log("Timeout");
+            inputHub.clearQueue();
             return -1;
         }
         vTaskDelay(pdMS_TO_TICKS(10)); // Dai tempo al logger
     }
+    inputHub.clearQueue();
     return key;
 }
 
@@ -145,13 +153,22 @@ int SpecialAction::getInput(unsigned long timeout, bool allowGesture)
 {
     unsigned long startTime = millis();
     int value = -1;
+    Keypad *keypadDevice = inputHub.getKeypad();
+
+    if (!keypadDevice)
+    {
+        Logger::getInstance().log("Keypad not available");
+        return -1;
+    }
+
+    inputHub.clearQueue();
 
     while (value < 0 || value > 8)
     {
         // Check keypad input
-        if (keypad->processInput())
+        if (keypadDevice->processInput())
         {
-            InputEvent event = keypad->getEvent();
+            InputEvent event = keypadDevice->getEvent();
             if (event.type == InputEvent::EventType::KEY_PRESS && event.state)
             {
                 value = event.value1; // Get key code (0-8)
@@ -182,10 +199,12 @@ int SpecialAction::getInput(unsigned long timeout, bool allowGesture)
         if (millis() - startTime > timeout)
         {
             Logger::getInstance().log("Input timeout");
+            inputHub.clearQueue();
             return -1;
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
+    inputHub.clearQueue();
     return value;
 }
 
@@ -193,6 +212,22 @@ String SpecialAction::getInputWithEncoder(unsigned long timeout, bool allowGestu
 {
     unsigned long startTime = millis();
     String result = "";
+    Keypad *keypadDevice = inputHub.getKeypad();
+    RotaryEncoder *rotaryDevice = inputHub.getRotaryEncoder();
+
+    if (!keypadDevice)
+    {
+        Logger::getInstance().log("Keypad not available");
+        return "";
+    }
+
+    if (allowEncoder && !rotaryDevice)
+    {
+        Logger::getInstance().log("Rotary encoder not available");
+        allowEncoder = false;
+    }
+
+    inputHub.clearQueue();
 
     // Track pressed keys for exit combo detection
     uint16_t pressedKeys = 0; // Bitmask for keys 0-15
@@ -202,9 +237,9 @@ String SpecialAction::getInputWithEncoder(unsigned long timeout, bool allowGestu
     while (result == "")
     {
         // Check keypad input
-        if (keypad->processInput())
+        if (keypadDevice->processInput())
         {
-            InputEvent event = keypad->getEvent();
+            InputEvent event = keypadDevice->getEvent();
 
             // Track key presses/releases for exit combo
             if (checkingExitCombo && event.type == InputEvent::EventType::KEY_PRESS)
@@ -284,9 +319,9 @@ String SpecialAction::getInputWithEncoder(unsigned long timeout, bool allowGestu
         }
 
         // Check encoder input
-        if (allowEncoder && rotaryEncoder->processInput())
+        if (allowEncoder && rotaryDevice->processInput())
         {
-            InputEvent event = rotaryEncoder->getEvent();
+            InputEvent event = rotaryDevice->getEvent();
 
             // Handle encoder rotation
             if (event.type == InputEvent::EventType::ROTATION && event.state)
@@ -326,10 +361,12 @@ String SpecialAction::getInputWithEncoder(unsigned long timeout, bool allowGestu
         if (millis() - startTime > timeout)
         {
             Logger::getInstance().log("Input timeout");
+            inputHub.clearQueue();
             return "";
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
+    inputHub.clearQueue();
     return result;
 }
 
@@ -763,6 +800,10 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
 {
     vTaskDelay(pdMS_TO_TICKS(10));
 
+    IRSensor *irSensor = inputHub.getIrSensor();
+    IRStorage *irStorage = inputHub.getIrStorage();
+    Keypad *keypadDevice = inputHub.getKeypad();
+
     if (!irSensor || !irStorage)
     {
         Logger::getInstance().log("IR Sensor or Storage not initialized");
@@ -846,9 +887,9 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
         }
 
         // Check for exit combo input
-        if (exitCombo.length() > 0 && keypad->processInput())
+        if (exitCombo.length() > 0 && keypadDevice && keypadDevice->processInput())
         {
-            InputEvent event = keypad->getEvent();
+            InputEvent event = keypadDevice->getEvent();
             if (event.type == InputEvent::EventType::KEY_PRESS)
             {
                 if (event.state) // Key pressed
@@ -1026,6 +1067,9 @@ void SpecialAction::toggleSendIR(int deviceId, const String &exitCombo)
 {
     vTaskDelay(pdMS_TO_TICKS(10));
 
+    IRSender *irSender = inputHub.getIrSender();
+    IRStorage *irStorage = inputHub.getIrStorage();
+
     if (!irSender || !irStorage)
     {
         Logger::getInstance().log("IR Sender or Storage not initialized");
@@ -1154,6 +1198,9 @@ void SpecialAction::toggleSendIR(int deviceId, const String &exitCombo)
 
 void SpecialAction::sendIRCommand(const String &deviceName, const String &commandName)
 {
+    IRSender *irSender = inputHub.getIrSender();
+    IRStorage *irStorage = inputHub.getIrStorage();
+
     if (!irSender || !irStorage)
     {
         Logger::getInstance().log("IR Sender or Storage not initialized");
@@ -1221,6 +1268,10 @@ void SpecialAction::sendIRCommand(const String &deviceName, const String &comman
 
 void SpecialAction::checkIRSignal()
 {
+    IRSensor *irSensor = inputHub.getIrSensor();
+    IRSender *irSender = inputHub.getIrSender();
+    IRStorage *irStorage = inputHub.getIrStorage();
+
     if (!irSensor)
     {
         Logger::getInstance().log("IR Sensor not initialized");
