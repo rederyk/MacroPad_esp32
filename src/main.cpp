@@ -167,6 +167,10 @@ void setup()
     // Internal loaded combinations
     Logger::getInstance().log("Loaded " + String(macroManager.combinations.size()) + " combinations");
 
+    // Load interactive lighting colors from initial combo settings
+    const ComboSettings& initialSettings = comboManager.getSettings();
+    macroManager.updateInteractiveLightingColors(initialSettings);
+
     // Initialize I2C with configured pins
 
     const AccelerometerConfig &accelConfig = configManager.getAccelerometerConfig();
@@ -514,8 +518,11 @@ void mainLoopTask(void *parameter)
                     Logger::getInstance().log("Successfully switched to " + String(prefix.c_str()) + "_" + String(setNumber) +
                               " with " + String(macroManager.combinations.size()) + " combinations");
 
-                    // Visual feedback - brief LED flash using custom color from settings or default green
+                    // Load interactive lighting colors from combo settings
                     const ComboSettings& comboSettings = comboManager.getSettings();
+                    macroManager.updateInteractiveLightingColors(comboSettings);
+
+                    // Visual feedback - brief LED flash using custom color from settings or default green
                     if (comboSettings.hasLedColor())
                     {
                         // Use custom LED color from combo settings

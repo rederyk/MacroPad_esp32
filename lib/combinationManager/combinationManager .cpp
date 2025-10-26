@@ -84,6 +84,33 @@ void CombinationManager::parseSettings(JsonObject& obj)
                     String(settings.ledB) + ")");
             }
         }
+
+        // Parse interactive lighting colors if present
+        if (settingsObj.containsKey("interactive_colors"))
+        {
+            JsonArray interactiveColorsArray = settingsObj["interactive_colors"].as<JsonArray>();
+            settings.interactiveColors.clear();
+
+            for (JsonVariant colorVariant : interactiveColorsArray)
+            {
+                JsonArray colorArray = colorVariant.as<JsonArray>();
+                if (colorArray.size() == 3)
+                {
+                    std::array<int, 3> rgb = {
+                        colorArray[0].as<int>(),
+                        colorArray[1].as<int>(),
+                        colorArray[2].as<int>()
+                    };
+                    settings.interactiveColors.push_back(rgb);
+                }
+            }
+
+            if (settings.hasInteractiveColors())
+            {
+                Logger::getInstance().log("  Loaded " + String(settings.interactiveColors.size()) +
+                                        " interactive lighting colors");
+            }
+        }
     }
 }
 

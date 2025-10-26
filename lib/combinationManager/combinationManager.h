@@ -22,6 +22,8 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <vector>
+#include <array>
 
 // Struct to hold combo settings
 struct ComboSettings {
@@ -30,6 +32,19 @@ struct ComboSettings {
     int ledB = -1;
 
     bool hasLedColor() const { return ledR >= 0 && ledG >= 0 && ledB >= 0; }
+
+    // Interactive lighting colors: vector of RGB triplets, one per key
+    std::vector<std::array<int, 3>> interactiveColors;
+
+    bool hasInteractiveColors() const { return !interactiveColors.empty(); }
+
+    // Get color for a specific key index (returns default if not set)
+    std::array<int, 3> getKeyColor(size_t keyIndex, const std::array<int, 3>& defaultColor) const {
+        if (keyIndex < interactiveColors.size()) {
+            return interactiveColors[keyIndex];
+        }
+        return defaultColor;
+    }
 };
 
 class CombinationManager {

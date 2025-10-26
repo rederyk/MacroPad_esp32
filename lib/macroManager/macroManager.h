@@ -24,6 +24,7 @@
 #include <vector>
 #include <map>
 #include <functional>
+#include <array>
 
 // #define COMBO_DELAY 100 // Adjust this value as needed (milliseconds)
 #include <string>
@@ -31,6 +32,7 @@
 #include "configTypes.h"
 #include "specialAction.h"
 #include "configManager.h"
+#include "combinationManager.h"
 extern SpecialAction specialAction;
 
 #define GESTURE_HOLD_TIME 200 // Tempo di mantenimento della gesture in ms
@@ -51,6 +53,9 @@ public:
     void getPendingComboSwitch(std::string& outPrefix, int& outSetNumber);
     void clearPendingComboSwitch();
 
+    // Interactive lighting functions (public for access from main.cpp)
+    void updateInteractiveLightingColors(const ComboSettings& settings);
+    void saveInteractiveColors();
 
     // Configurazione delle combinazioni
     std::map<std::string, std::vector<std::string>> combinations;
@@ -104,37 +109,41 @@ private:
     void processKeyCombination();
     void releaseGestureActions();
 
-    // Reactive lighting system
-    bool reactiveLightingEnabled = false;
+    // ==================== INTERACTIVE LIGHTING SYSTEM ====================
+
+    // Interactive lighting state
+    struct InteractiveLightingState {
+        bool enabled = false;
+        std::vector<std::array<int, 3>> keyColors;  // RGB colors for each key
+        int savedLedColor[3] = {0, 0, 0};           // Original LED color before reactive mode
+        unsigned long ledReactiveTime = 0;
+        bool ledReactiveActive = false;
+
+        // Color editing mode
+        bool editMode = false;                      // true when holding a key + rotating encoder
+        uint8_t selectedKey = 0;                    // Key being edited
+        uint8_t selectedChannel = 0;                // 0=R, 1=G, 2=B
+        unsigned long lastChannelSwitchTime = 0;    // For encoder button debounce
+
+        // Brightness control
+        int baseBrightness = 255;                   // Global brightness for interactive mode
+    } interactiveLighting;
+
+    static constexpr unsigned long LED_REACTIVE_DURATION = 300; // milliseconds
+    static constexpr unsigned long CHANNEL_SWITCH_DEBOUNCE = 200; // milliseconds
+
+    // Interactive lighting private functions
     void enableReactiveLighting(bool enable);
     void handleReactiveLighting(uint8_t keyIndex, bool isEncoder, int encoderDirection);
 
-    // Color mapping for reactive lighting (RGB values for each key 0-8)
-    int keyColors[9][3] = {
-        {255, 0, 0},     // Key 0: Red
-        {255, 127, 0},   // Key 1: Orange
-        {255, 255, 0},   // Key 2: Yellow
-        {0, 255, 0},     // Key 3: Green
-        {0, 255, 255},   // Key 4: Cyan
-        {0, 0, 255},     // Key 5: Blue
-        {127, 0, 255},   // Key 6: Purple
-        {255, 0, 255},   // Key 7: Magenta
-        {255, 255, 255}  // Key 8: White
-    };
-
-    // Encoder colors
-    int encoderCWColor[3] = {0, 255, 127};   // Cyan-Green for clockwise
-    int encoderCCWColor[3] = {255, 127, 0};  // Orange for counter-clockwise
-    int encoderButtonColor[3] = {255, 0, 127}; // Pink for button
-
-    // LED state management for reactive lighting
-    int savedLedColor[3] = {0, 0, 0};
-    unsigned long ledReactiveTime = 0;
-    static constexpr unsigned long LED_REACTIVE_DURATION = 300; // milliseconds
-    bool ledReactiveActive = false;
+    // Helper functions for interactive lighting
+    std::array<int, 3> generateDefaultKeyColor(size_t keyIndex, size_t totalKeys);
+    void applyColorWithBrightness(int r, int g, int b);
+    const char* getChannelName(uint8_t channel);
 
     // Flashlight mode state
     bool flashlightActive = false;
+    int flashlightSavedColor[3] = {0, 0, 0}; // Saved color before flashlight activation
 
     // Pending combo switch request
     bool pendingComboSwitchFlag = false;

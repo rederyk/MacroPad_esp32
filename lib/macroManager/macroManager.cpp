@@ -574,7 +574,7 @@ void MacroManager::pressAction(const std::string &action)
         if (!flashlightActive)
         {
             // Save current LED state
-            Led::getInstance().getColor(savedLedColor[0], savedLedColor[1], savedLedColor[2]);
+            Led::getInstance().getColor(flashlightSavedColor[0], flashlightSavedColor[1], flashlightSavedColor[2]);
             // Turn on white LED at full brightness
             Led::getInstance().setColor(255, 255, 255, false);
             flashlightActive = true;
@@ -583,12 +583,12 @@ void MacroManager::pressAction(const std::string &action)
         else
         {
             // Restore previous LED state
-            Led::getInstance().setColor(savedLedColor[0], savedLedColor[1], savedLedColor[2], false);
+            Led::getInstance().setColor(flashlightSavedColor[0], flashlightSavedColor[1], flashlightSavedColor[2], false);
             flashlightActive = false;
-            Logger::getInstance().log("Flashlight OFF - LED restored to RGB(" + 
-                                    String(savedLedColor[0]) + "," + 
-                                    String(savedLedColor[1]) + "," + 
-                                    String(savedLedColor[2]) + ")");
+            Logger::getInstance().log("Flashlight OFF - LED restored to RGB(" +
+                                    String(flashlightSavedColor[0]) + "," +
+                                    String(flashlightSavedColor[1]) + "," +
+                                    String(flashlightSavedColor[2]) + ")");
         }
     }
 
@@ -680,7 +680,11 @@ void MacroManager::releaseAction(const std::string &action)
     }
     else if (action == "REACTIVE_LIGHTING")
     {
-        enableReactiveLighting(!reactiveLightingEnabled);
+        enableReactiveLighting(!interactiveLighting.enabled);
+    }
+    else if (action == "SAVE_INTERACTIVE_COLORS")
+    {
+        saveInteractiveColors();
     }
     else if (action.rfind("SWITCH_MY_COMBO_", 0) == 0)
     {
@@ -1270,11 +1274,17 @@ void MacroManager::update()
         encoderReleaseScheduled = false;
     }
 
-    // Reactive lighting timeout - restore original color
-    if (ledReactiveActive && currentTime >= ledReactiveTime)
+    // Interactive lighting timeout - restore original color
+    if (interactiveLighting.ledReactiveActive && currentTime >= interactiveLighting.ledReactiveTime)
     {
-        Led::getInstance().setColor(savedLedColor[0], savedLedColor[1], savedLedColor[2], false);
-        ledReactiveActive = false;
+        Led::getInstance().setColor(
+            interactiveLighting.savedLedColor[0],
+            interactiveLighting.savedLedColor[1],
+            interactiveLighting.savedLedColor[2],
+            false
+        );
+        interactiveLighting.ledReactiveActive = false;
+        interactiveLighting.editMode = false; // Exit edit mode on timeout
     }
 
     // Logger::getInstance().processBuffer();
@@ -1289,85 +1299,338 @@ void MacroManager::releaseGestureActions()
     }
 }
 
-// ==================== REACTIVE LIGHTING FUNCTIONS ====================
+// ==================== INTERACTIVE LIGHTING FUNCTIONS ====================
 
+/**
+ * Generate a default color for a key using HSV color space
+ * Distributes colors evenly across the hue spectrum
+ */
+std::array<int, 3> MacroManager::generateDefaultKeyColor(size_t keyIndex, size_t totalKeys)
+{
+    if (totalKeys == 0) totalKeys = 1; // Prevent division by zero
+
+    // Distribute hue evenly across all keys
+    float hue = (float)(keyIndex * 360) / (float)totalKeys;
+
+    // For more than 12 keys, also vary saturation/value to create more distinct colors
+    float saturation = 1.0f;
+    float value = 1.0f;
+
+    if (totalKeys > 12)
+    {
+        // Alternate between full and slightly reduced saturation
+        saturation = (keyIndex % 2 == 0) ? 1.0f : 0.85f;
+        // Vary brightness for additional distinction
+        value = 0.8f + (0.2f * (keyIndex % 3) / 2.0f);
+    }
+
+    // Convert HSV to RGB
+    float c = value * saturation;
+    float x = c * (1.0f - fabs(fmod(hue / 60.0f, 2.0f) - 1.0f));
+    float m = value - c;
+
+    float r, g, b;
+    if (hue < 60) { r = c; g = x; b = 0; }
+    else if (hue < 120) { r = x; g = c; b = 0; }
+    else if (hue < 180) { r = 0; g = c; b = x; }
+    else if (hue < 240) { r = 0; g = x; b = c; }
+    else if (hue < 300) { r = x; g = 0; b = c; }
+    else { r = c; g = 0; b = x; }
+
+    return {
+        static_cast<int>((r + m) * 255),
+        static_cast<int>((g + m) * 255),
+        static_cast<int>((b + m) * 255)
+    };
+}
+
+/**
+ * Apply a color to the LED with the current brightness setting
+ */
+void MacroManager::applyColorWithBrightness(int r, int g, int b)
+{
+    float brightnessFactor = interactiveLighting.baseBrightness / 255.0f;
+    int adjustedR = static_cast<int>(r * brightnessFactor);
+    int adjustedG = static_cast<int>(g * brightnessFactor);
+    int adjustedB = static_cast<int>(b * brightnessFactor);
+
+    Led::getInstance().setColor(adjustedR, adjustedG, adjustedB, false);
+}
+
+/**
+ * Get the name of the currently selected color channel
+ */
+const char* MacroManager::getChannelName(uint8_t channel)
+{
+    switch (channel)
+    {
+        case 0: return "RED";
+        case 1: return "GREEN";
+        case 2: return "BLUE";
+        default: return "UNKNOWN";
+    }
+}
+
+/**
+ * Enable or disable interactive lighting mode
+ */
 void MacroManager::enableReactiveLighting(bool enable)
 {
-    reactiveLightingEnabled = enable;
+    interactiveLighting.enabled = enable;
 
     if (enable)
     {
         // Save current LED color when enabling
-        Led::getInstance().getColor(savedLedColor[0], savedLedColor[1], savedLedColor[2]);
-        Logger::getInstance().log("Reactive Lighting ENABLED - LED will respond to key/encoder input");
+        Led::getInstance().getColor(
+            interactiveLighting.savedLedColor[0],
+            interactiveLighting.savedLedColor[1],
+            interactiveLighting.savedLedColor[2]
+        );
+
+        // Initialize key colors if not already set
+        if (interactiveLighting.keyColors.empty())
+        {
+            // Generate default colors for 9 keys (can be updated later)
+            for (size_t i = 0; i < 9; i++)
+            {
+                interactiveLighting.keyColors.push_back(generateDefaultKeyColor(i, 9));
+            }
+        }
+
+        Logger::getInstance().log("Interactive Lighting ENABLED - Use keys to show colors, encoder to adjust brightness");
+        Logger::getInstance().log("Hold a key + rotate encoder to edit that key's color");
     }
     else
     {
         // Restore original LED color when disabling
-        if (ledReactiveActive)
+        if (interactiveLighting.ledReactiveActive)
         {
-            Led::getInstance().setColor(savedLedColor[0], savedLedColor[1], savedLedColor[2], false);
-            ledReactiveActive = false;
+            Led::getInstance().setColor(
+                interactiveLighting.savedLedColor[0],
+                interactiveLighting.savedLedColor[1],
+                interactiveLighting.savedLedColor[2],
+                false
+            );
+            interactiveLighting.ledReactiveActive = false;
         }
-        Logger::getInstance().log("Reactive Lighting DISABLED");
+        interactiveLighting.editMode = false;
+        Logger::getInstance().log("Interactive Lighting DISABLED");
     }
 }
 
+/**
+ * Handle interactive lighting input events
+ * - Key press: Show key color
+ * - Encoder rotation (no keys): Adjust global brightness
+ * - Encoder rotation (key held): Edit that key's color
+ * - Encoder button (key held): Switch RGB channel
+ */
 void MacroManager::handleReactiveLighting(uint8_t keyIndex, bool isEncoder, int encoderDirection)
 {
-    if (!reactiveLightingEnabled)
+    if (!interactiveLighting.enabled)
         return;
 
     // Save the current LED color if not already in reactive mode
-    if (!ledReactiveActive)
+    if (!interactiveLighting.ledReactiveActive)
     {
-        Led::getInstance().getColor(savedLedColor[0], savedLedColor[1], savedLedColor[2]);
+        Led::getInstance().getColor(
+            interactiveLighting.savedLedColor[0],
+            interactiveLighting.savedLedColor[1],
+            interactiveLighting.savedLedColor[2]
+        );
     }
-
-    // Choose color based on input type
-    int red, green, blue;
 
     if (isEncoder)
     {
-        // Encoder handling: direction determines color
-        if (encoderDirection > 0) // CW
+        // ===== ENCODER HANDLING =====
+
+        if (activeKeysMask == 0)
         {
-            red = encoderCWColor[0];
-            green = encoderCWColor[1];
-            blue = encoderCWColor[2];
+            // No keys pressed: Encoder controls GLOBAL BRIGHTNESS
+            if (encoderDirection != 0) // Rotation (CW or CCW)
+            {
+                int step = 15; // Brightness adjustment step
+                int oldBrightness = interactiveLighting.baseBrightness;
+
+                if (encoderDirection > 0) // CW - Increase brightness
+                {
+                    interactiveLighting.baseBrightness = min(255, interactiveLighting.baseBrightness + step);
+                }
+                else // CCW - Decrease brightness
+                {
+                    interactiveLighting.baseBrightness = max(0, interactiveLighting.baseBrightness - step);
+                }
+
+                if (oldBrightness != interactiveLighting.baseBrightness)
+                {
+                    Logger::getInstance().log("Interactive Brightness: " + String(interactiveLighting.baseBrightness));
+
+                    // Show brightness change with white color
+                    applyColorWithBrightness(255, 255, 255);
+                    interactiveLighting.ledReactiveActive = true;
+                    interactiveLighting.ledReactiveTime = millis() + LED_REACTIVE_DURATION;
+                }
+            }
         }
-        else if (encoderDirection < 0) // CCW
+        else
         {
-            red = encoderCCWColor[0];
-            green = encoderCCWColor[1];
-            blue = encoderCCWColor[2];
-        }
-        else // Button (direction == 0)
-        {
-            red = encoderButtonColor[0];
-            green = encoderButtonColor[1];
-            blue = encoderButtonColor[2];
+            // Key is pressed: Encoder EDITS COLOR
+
+            if (encoderDirection != 0) // Rotation - adjust current channel
+            {
+                // Enter edit mode and select the first pressed key
+                if (!interactiveLighting.editMode)
+                {
+                    interactiveLighting.editMode = true;
+                    // Find first active key
+                    for (uint8_t i = 0; i < 16; i++)
+                    {
+                        if (activeKeysMask & (1 << i))
+                        {
+                            interactiveLighting.selectedKey = i;
+                            break;
+                        }
+                    }
+                }
+
+                uint8_t selectedKey = interactiveLighting.selectedKey;
+
+                // Ensure we have a color for this key
+                while (interactiveLighting.keyColors.size() <= selectedKey)
+                {
+                    interactiveLighting.keyColors.push_back(
+                        generateDefaultKeyColor(interactiveLighting.keyColors.size(), 9)
+                    );
+                }
+
+                // Get current color
+                auto& color = interactiveLighting.keyColors[selectedKey];
+                uint8_t channel = interactiveLighting.selectedChannel;
+
+                int step = 10; // Color adjustment step
+                int oldValue = color[channel];
+
+                if (encoderDirection > 0) // CW - Increase
+                {
+                    color[channel] = min(255, color[channel] + step);
+                }
+                else // CCW - Decrease
+                {
+                    color[channel] = max(0, color[channel] - step);
+                }
+
+                if (oldValue != color[channel])
+                {
+                    Logger::getInstance().log(
+                        "Key " + String(selectedKey) + " " +
+                        String(getChannelName(channel)) + ": " +
+                        String(color[channel])
+                    );
+
+                    // Show the updated color immediately
+                    applyColorWithBrightness(color[0], color[1], color[2]);
+                    interactiveLighting.ledReactiveActive = true;
+                    interactiveLighting.ledReactiveTime = millis() + 2000; // Longer timeout when editing
+                }
+            }
+            else // Encoder button pressed - switch channel
+            {
+                unsigned long currentTime = millis();
+                if (currentTime - interactiveLighting.lastChannelSwitchTime > CHANNEL_SWITCH_DEBOUNCE)
+                {
+                    interactiveLighting.editMode = true;
+                    interactiveLighting.selectedChannel = (interactiveLighting.selectedChannel + 1) % 3;
+                    interactiveLighting.lastChannelSwitchTime = currentTime;
+
+                    Logger::getInstance().log(
+                        "Editing channel: " + String(getChannelName(interactiveLighting.selectedChannel))
+                    );
+
+                    // Brief flash to indicate channel change
+                    int flashColor[3] = {0, 0, 0};
+                    flashColor[interactiveLighting.selectedChannel] = 255;
+                    applyColorWithBrightness(flashColor[0], flashColor[1], flashColor[2]);
+
+                    interactiveLighting.ledReactiveActive = true;
+                    interactiveLighting.ledReactiveTime = millis() + 400;
+                }
+            }
         }
     }
     else
     {
-        // Key press - use key color mapping
-        if (keyIndex >= 0 && keyIndex < 9)
+        // ===== KEY PRESS HANDLING =====
+        // Show the color assigned to this key
+
+        // Ensure we have a color for this key
+        while (interactiveLighting.keyColors.size() <= keyIndex)
         {
-            red = keyColors[keyIndex][0];
-            green = keyColors[keyIndex][1];
-            blue = keyColors[keyIndex][2];
+            interactiveLighting.keyColors.push_back(
+                generateDefaultKeyColor(interactiveLighting.keyColors.size(), 9)
+            );
         }
-        else
+
+        const auto& color = interactiveLighting.keyColors[keyIndex];
+        applyColorWithBrightness(color[0], color[1], color[2]);
+
+        // Mark reactive mode as active and set timeout
+        interactiveLighting.ledReactiveActive = true;
+        interactiveLighting.ledReactiveTime = millis() + LED_REACTIVE_DURATION;
+
+        // Reset edit mode when key is released
+        if (activeKeysMask == 0)
         {
-            return; // Invalid key index
+            interactiveLighting.editMode = false;
         }
     }
+}
 
-    // Set the LED to the reactive color
-    Led::getInstance().setColor(red, green, blue, false);
+/**
+ * Update interactive lighting colors from combo settings
+ * Called when switching combo sets
+ */
+void MacroManager::updateInteractiveLightingColors(const ComboSettings& settings)
+{
+    if (settings.hasInteractiveColors())
+    {
+        interactiveLighting.keyColors = settings.interactiveColors;
+        Logger::getInstance().log("Loaded " + String(interactiveLighting.keyColors.size()) +
+                                " interactive colors from combo settings");
+    }
+    else
+    {
+        // Generate default colors if not specified
+        interactiveLighting.keyColors.clear();
+        for (size_t i = 0; i < 9; i++)
+        {
+            interactiveLighting.keyColors.push_back(generateDefaultKeyColor(i, 9));
+        }
+        Logger::getInstance().log("Using default interactive colors (9 keys)");
+    }
+}
 
-    // Mark reactive mode as active and set timeout
-    ledReactiveActive = true;
-    ledReactiveTime = millis() + LED_REACTIVE_DURATION;
+/**
+ * Save current interactive colors to combo JSON file
+ * This will be triggered by a special action command
+ */
+void MacroManager::saveInteractiveColors()
+{
+    Logger::getInstance().log("SAVE_INTERACTIVE_COLORS command received");
+    Logger::getInstance().log("Note: Auto-save to JSON not yet implemented");
+    Logger::getInstance().log("Current colors:");
+
+    for (size_t i = 0; i < interactiveLighting.keyColors.size(); i++)
+    {
+        const auto& color = interactiveLighting.keyColors[i];
+        Logger::getInstance().log(
+            "  Key " + String(i) + ": RGB(" +
+            String(color[0]) + "," +
+            String(color[1]) + "," +
+            String(color[2]) + ")"
+        );
+    }
+
+    // TODO: Implement actual JSON file writing
+    // This would require access to CombinationManager and LittleFS writing
+    // For now, just log the colors so the user can manually add them to the JSON
 }
