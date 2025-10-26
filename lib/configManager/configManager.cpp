@@ -20,7 +20,6 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <Arduino.h>
-#include "gestureRead.h"
 #include "Logger.h"
 
 ConfigurationManager::ConfigurationManager() : systemConfig() {}

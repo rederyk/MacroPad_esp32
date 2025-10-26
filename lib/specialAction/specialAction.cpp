@@ -389,59 +389,51 @@ void SpecialAction::calibrateSensor()
 
 String SpecialAction::getGestureID()
 {
-    if (!configManager.getAccelerometerConfig().active)
+    if (!configManager.getAccelerometerConfig().active || !inputHub.hasGestureSensor())
     {
         Logger::getInstance().log("Accelerometer disabled");
         return "";
     }
-    static unsigned long executeTime = 0;
 
-    if (gestureSensor.isSampling())
+    if (inputHub.isGestureCapturing())
     {
         return ""; // No gesture recognized yet
     }
     else
     {
-        // Get gesture ID using KNN
-        int gestureID = gestureAnalyzer.findKNNMatch(6); // Use 6 nearest neighbors
+        int gestureId = inputHub.getLastGestureId();
+        if (gestureId < 0)
+        {
+            return "";
+        }
         String result = "G_ID:";
-        if (gestureID >= 0)
-        {
-            // Format return string
-            result += String(gestureID);
-        }
-        else
-        {
-            result = "";
-        }
+        result += String(gestureId);
         return result;
     }
 }
 
 void SpecialAction::toggleSampling(bool pressed)
 {
-    if (!configManager.getAccelerometerConfig().active)
+    if (!configManager.getAccelerometerConfig().active || !inputHub.hasGestureSensor())
     {
         Logger::getInstance().log("Accelerometer disabled");
         return;
     }
     if (pressed)
     {
-        if (!gestureSensor.isSampling())
+        if (inputHub.startGestureCapture())
         {
-            gestureSensor.startSampling();
             Logger::getInstance().log("Sampling started");
         }
         else
         {
-            Logger::getInstance().log("Sampling already started");
+            Logger::getInstance().log("Sampling already started or failed to start");
         }
     }
     else
     {
-        if (gestureSensor.isSampling())
+        if (inputHub.stopGestureCapture())
         {
-            gestureSensor.stopSampling();
             Logger::getInstance().log("Sampling stopped");
         }
         else
@@ -453,7 +445,7 @@ void SpecialAction::toggleSampling(bool pressed)
 
 bool SpecialAction::saveGesture(int id)
 {
-    if (!configManager.getAccelerometerConfig().active)
+    if (!configManager.getAccelerometerConfig().active || !inputHub.hasGestureSensor())
     {
         Logger::getInstance().log("Accelerometer disabled");
         return false;
@@ -465,7 +457,7 @@ bool SpecialAction::saveGesture(int id)
         return false;
     }
 
-    return gestureAnalyzer.saveFeaturesWithID(id);
+    return inputHub.saveGestureSample(static_cast<uint8_t>(id));
 }
 
 bool SpecialAction::convertJsonToBinary()
@@ -720,56 +712,71 @@ void SpecialAction::clearGestureWithID(int key)
 
 void SpecialAction::executeGesture(bool pressed)
 {
-    if (!configManager.getAccelerometerConfig().active)
+    if (!configManager.getAccelerometerConfig().active || !inputHub.hasGestureSensor())
     {
         Logger::getInstance().log("Accelerometer disabled");
         return;
     }
-    static unsigned long executeTime = 0;
 
-    // Toggle sampling state
-    toggleSampling(pressed);
-    // Stop execution mode and recognize
-    executeTime = millis();
-
-    if (gestureSensor.isSampling())
+    if (pressed)
     {
-        // Start execution mode
-        Logger::getInstance().log("Execution started - make your gesture");
-        return; // No gesture recognized yet
+        if (inputHub.startGestureCapture())
+        {
+            Logger::getInstance().log("Execution started - make your gesture");
+        }
+        else
+        {
+            Logger::getInstance().log("Execution already running");
+        }
     }
-    else if (!gestureSensor.isSampling() || millis() - executeTime > 5000)
+    else
     {
-        // Get gesture ID using KNN
-        int gestureID = gestureAnalyzer.findKNNMatch(6); // Use 3 nearest neighbors
+        if (!inputHub.stopGestureCapture())
+        {
+            Logger::getInstance().log("Execution stop requested but gesture capture inactive");
+            return;
+        }
 
-        // Format return string
-        String result = "gesture_ID:";
-        result += String(gestureID);
-
-        Logger::getInstance().log(String("Recognized gesture ID: ") + result.c_str());
-
-        return;
+        int gestureID = inputHub.getLastGestureId();
+        if (gestureID >= 0)
+        {
+            String result = "gesture_ID:";
+            result += String(gestureID);
+            Logger::getInstance().log(String("Recognized gesture ID: ") + result.c_str());
+        }
+        else
+        {
+            Logger::getInstance().log("No gesture recognized");
+        }
     }
 }
 void SpecialAction::trainGesture(bool pressed, int key)
 {
-    if (!configManager.getAccelerometerConfig().active)
+    if (!configManager.getAccelerometerConfig().active || !inputHub.hasGestureSensor())
     {
         Logger::getInstance().log("Accelerometer disabled");
         return;
     }
-    // Toggle sampling state
-    toggleSampling(pressed);
 
-    if (gestureSensor.isSampling())
+    if (pressed)
     {
-        // Start training mode
-        Logger::getInstance().log("Training started - make your gesture");
+        if (inputHub.startGestureCapture(false))
+        {
+            Logger::getInstance().log("Training started - make your gesture");
+        }
+        else
+        {
+            Logger::getInstance().log("Training already active");
+        }
     }
     else
     {
-        // Stop training mode and save
+        if (!inputHub.stopGestureCapture())
+        {
+            Logger::getInstance().log("Training stop requested but gesture capture inactive");
+            return;
+        }
+
         Logger::getInstance().log("Press key 1-9 to save gesture");
         Logger::getInstance().processBuffer();
 

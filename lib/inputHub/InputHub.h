@@ -15,6 +15,7 @@ class RotaryEncoder;
 class IRSensor;
 class IRSender;
 class IRStorage;
+class GestureDevice;
 struct ComboSettings;
 
 /**
@@ -88,6 +89,15 @@ public:
     IRSender *getIrSender();
     IRStorage *getIrStorage();
 
+    // Gesture controls
+    bool hasGestureSensor() const;
+    bool startGestureCapture(bool enableRecognition = true);
+    bool stopGestureCapture();
+    bool isGestureCapturing() const;
+    int getLastGestureId() const;
+    void clearLastGesture();
+    bool saveGestureSample(uint8_t id);
+
     // Reactive lighting controls
     void setReactiveLightingEnabled(bool enable);
     bool isReactiveLightingEnabled() const;
@@ -102,6 +112,7 @@ private:
     void enqueue(const InputEvent &event);
     void scanKeypad();
     void scanRotaryEncoder();
+    void scanGestures();
 
     std::deque<TimedEvent> eventQueue;
     std::unique_ptr<Keypad> keypad;
@@ -109,6 +120,7 @@ private:
     std::unique_ptr<IRSensor> irSensor;
     std::unique_ptr<IRSender> irSender;
     std::unique_ptr<IRStorage> irStorage;
+    std::unique_ptr<GestureDevice> gestureDevice;
     ReactiveLightingController reactiveLighting;
 };
 

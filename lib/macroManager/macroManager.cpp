@@ -247,9 +247,16 @@ void MacroManager::pressAction(const std::string &action)
     }
     else if (action == "EXECUTE_GESTURE")
     {
-        logMessage = "started " + String(action.c_str());
-        specialAction.toggleSampling(true);
-        is_action_locked = true;
+        if (inputHub.startGestureCapture())
+        {
+            logMessage = "started " + String(action.c_str());
+            is_action_locked = true;
+        }
+        else
+        {
+            logMessage = "failed to start " + String(action.c_str());
+            is_action_locked = false;
+        }
     }
     else if (action == "RESET_ALL")
     {
@@ -635,18 +642,15 @@ void MacroManager::releaseAction(const std::string &action)
     }
     else if (action == "EXECUTE_GESTURE")
     {
-        logMessage += " sampling stopped and Founded ";
-
-        specialAction.toggleSampling(false);
-        String G_ID = specialAction.getGestureID();
-        if (G_ID != "")
+        if (inputHub.stopGestureCapture())
         {
-            pendingCombination = G_ID.c_str();
+            logMessage += " gesture capture stopped";
+        }
+        else
+        {
+            logMessage += " gesture capture already idle";
         }
         is_action_locked = false;
-        gestureExecuted = true;
-        gestureExecutionTime = millis();
-        newKeyPressed = true;
     }
 
     // IR Remote Control no longer needs release actions (now using toggle pattern)
@@ -914,6 +918,18 @@ void MacroManager::handleInputEvent(const InputEvent &event)
                 lastExecutedAction.clear();
                 Logger::getInstance().log("Released combo on button release");
             }
+        }
+        break;
+
+    case InputEvent::EventType::MOTION:
+        if (event.state && event.value1 >= 0)
+        {
+            pendingCombination = "G_ID:" + std::to_string(event.value1);
+            lastCombinationTime = millis();
+            newKeyPressed = true;
+            gestureExecuted = true;
+            gestureExecutionTime = millis();
+            Logger::getInstance().log("Gesture event recognized: " + String(pendingCombination.c_str()));
         }
         break;
 

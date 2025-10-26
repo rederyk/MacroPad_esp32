@@ -326,7 +326,6 @@ void mainLoopTask(void *parameter)
 
         // --- Operazioni potenzialmente più lunghe ---
         bleController.checkConnection();
-        gestureSensor.updateSampling(); // Assicurati che non blocchi
         macroManager.update();          // Assicurati che non blocchi
 
         // Check for pending combo switch request (processed outside of action context to avoid stack issues)

@@ -8,6 +8,10 @@
 #include "IRStorage.h"
 #include "Logger.h"
 #include "combinationManager.h"
+#include "GestureDevice.h"
+
+extern GestureRead gestureSensor;
+extern GestureAnalyze gestureAnalyzer;
 
 InputHub::InputHub() = default;
 
@@ -21,9 +25,30 @@ bool InputHub::begin(ConfigurationManager &configManager)
 
     const EncoderConfig &encoderConfig = configManager.getEncoderConfig();
     rotaryEncoder.reset(new RotaryEncoder(&encoderConfig));
-    rotaryEncoder->setup();
+   rotaryEncoder->setup();
 
     const SystemConfig &systemConfig = configManager.getSystemConfig();
+    const AccelerometerConfig &accelerometerConfig = configManager.getAccelerometerConfig();
+
+    if (accelerometerConfig.active)
+    {
+        if (!gestureDevice)
+        {
+            gestureDevice.reset(new GestureDevice(gestureSensor, gestureAnalyzer));
+        }
+        gestureDevice->setSensorAvailable(true);
+        gestureDevice->setup();
+        Logger::getInstance().log("Gesture device registered");
+    }
+    else
+    {
+        if (gestureDevice)
+        {
+            gestureDevice.reset();
+        }
+        Logger::getInstance().log("Gesture device disabled (accelerometer inactive)");
+    }
+
     const IRSensorConfig &irSensorConfig = configManager.getIrSensorConfig();
     const IRLedConfig &irLedConfig = configManager.getIrLedConfig();
 
@@ -111,6 +136,7 @@ void InputHub::scanDevices()
 {
     scanKeypad();
     scanRotaryEncoder();
+    scanGestures();
 }
 
 bool InputHub::poll(InputEvent &outEvent)
@@ -182,6 +208,63 @@ IRStorage *InputHub::getIrStorage()
     return irStorage.get();
 }
 
+bool InputHub::hasGestureSensor() const
+{
+    return gestureDevice && gestureDevice->hasSensor();
+}
+
+bool InputHub::startGestureCapture(bool enableRecognition)
+{
+    if (!gestureDevice)
+    {
+        Logger::getInstance().log("InputHub: gesture device not available");
+        return false;
+    }
+    gestureDevice->setRecognitionEnabled(enableRecognition);
+    gestureDevice->clearLastGesture();
+    return gestureDevice->startCapture();
+}
+
+bool InputHub::stopGestureCapture()
+{
+    if (!gestureDevice)
+    {
+        return false;
+    }
+    return gestureDevice->stopCapture();
+}
+
+bool InputHub::isGestureCapturing() const
+{
+    return gestureDevice && gestureDevice->isCapturing();
+}
+
+int InputHub::getLastGestureId() const
+{
+    if (!gestureDevice)
+    {
+        return -1;
+    }
+    return gestureDevice->getLastGestureId();
+}
+
+void InputHub::clearLastGesture()
+{
+    if (gestureDevice)
+    {
+        gestureDevice->clearLastGesture();
+    }
+}
+
+bool InputHub::saveGestureSample(uint8_t id)
+{
+    if (!gestureDevice)
+    {
+        return false;
+    }
+    return gestureDevice->saveGesture(id);
+}
+
 void InputHub::enqueue(const InputEvent &event)
 {
     if (eventQueue.size() >= MAX_QUEUE_SIZE)
@@ -217,6 +300,19 @@ void InputHub::scanRotaryEncoder()
     while (rotaryEncoder->processInput())
     {
         enqueue(rotaryEncoder->getEvent());
+    }
+}
+
+void InputHub::scanGestures()
+{
+    if (!gestureDevice)
+    {
+        return;
+    }
+
+    if (gestureDevice->processInput())
+    {
+        enqueue(gestureDevice->getEvent());
     }
 }
 
