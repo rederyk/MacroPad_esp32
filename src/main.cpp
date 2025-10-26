@@ -149,6 +149,12 @@ void setup()
 
         for (JsonPair combo : combos)
         {
+            // Skip _settings entry as it's not a key combination
+            if (String(combo.key().c_str()) == "_settings")
+            {
+                continue;
+            }
+
             std::vector<std::string> actions;
             for (JsonVariant v : combo.value().as<JsonArray>())
             {
@@ -508,8 +514,18 @@ void mainLoopTask(void *parameter)
                     Logger::getInstance().log("Successfully switched to " + String(prefix.c_str()) + "_" + String(setNumber) +
                               " with " + String(macroManager.combinations.size()) + " combinations");
 
-                    // Visual feedback - brief LED flash
-                    Led::getInstance().setColor(0, 255, 0, false);
+                    // Visual feedback - brief LED flash using custom color from settings or default green
+                    const ComboSettings& comboSettings = comboManager.getSettings();
+                    if (comboSettings.hasLedColor())
+                    {
+                        // Use custom LED color from combo settings
+                        Led::getInstance().setColor(comboSettings.ledR, comboSettings.ledG, comboSettings.ledB, false);
+                    }
+                    else
+                    {
+                        // Default green flash if no custom color is set
+                        Led::getInstance().setColor(0, 255, 0, false);
+                    }
                     vTaskDelay(pdMS_TO_TICKS(150));
                 }
                 else

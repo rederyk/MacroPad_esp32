@@ -1193,6 +1193,12 @@ bool MacroManager::reloadCombinationsFromManager(JsonObject newCombos)
     // Reload combinations from the new JsonObject
     for (JsonPair combo : newCombos)
     {
+        // Skip _settings entry as it's not a key combination
+        if (String(combo.key().c_str()) == "_settings")
+        {
+            continue;
+        }
+
         std::vector<std::string> actions;
         for (JsonVariant v : combo.value().as<JsonArray>())
         {

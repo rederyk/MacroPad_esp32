@@ -58,6 +58,35 @@ bool CombinationManager::mergeJsonFile(const char* filepath, JsonObject& target)
     return loadJsonFile(filepath, target);
 }
 
+void CombinationManager::parseSettings(JsonObject& obj)
+{
+    // Reset settings to defaults
+    settings = ComboSettings();
+
+    // Look for _settings key
+    if (obj.containsKey("_settings"))
+    {
+        JsonObject settingsObj = obj["_settings"].as<JsonObject>();
+
+        // Parse LED color if present
+        if (settingsObj.containsKey("led_color"))
+        {
+            JsonArray ledColor = settingsObj["led_color"].as<JsonArray>();
+            if (ledColor.size() == 3)
+            {
+                settings.ledR = ledColor[0].as<int>();
+                settings.ledG = ledColor[1].as<int>();
+                settings.ledB = ledColor[2].as<int>();
+
+                Logger::getInstance().log("  Loaded settings: LED color RGB(" +
+                    String(settings.ledR) + "," +
+                    String(settings.ledG) + "," +
+                    String(settings.ledB) + ")");
+            }
+        }
+    }
+}
+
 bool CombinationManager::loadCombinationsInternal(int setNumber, const char* prefix)
 {
     if (!LittleFS.begin(true))
@@ -102,19 +131,34 @@ bool CombinationManager::loadCombinationsInternal(int setNumber, const char* pre
         currentPrefix = String(prefix);
     }
 
+    // Parse settings before closing LittleFS
+    parseSettings(combinations);
+
     LittleFS.end();
 
-    // Validate that we have at least some combinations
-    if (combinations.size() == 0)
+    // Validate that we have at least some combinations (excluding _settings)
+    int comboCount = combinations.size();
+    if (combinations.containsKey("_settings"))
+    {
+        comboCount--;  // Don't count _settings as a combination
+    }
+
+    if (comboCount == 0)
     {
         Logger::getInstance().log("No combinations loaded!");
         return false;
     }
 
     // Log loaded combinations
-    Logger::getInstance().log("Loaded combination set '" + currentPrefix + "_" + String(currentSetNumber) + "' (" + String(combinations.size()) + " entries):");
+    Logger::getInstance().log("Loaded combination set '" + currentPrefix + "_" + String(currentSetNumber) + "' (" + String(comboCount) + " entries):");
     for (JsonPair combo : combinations)
     {
+        // Skip _settings in the combination listing
+        if (String(combo.key().c_str()) == "_settings")
+        {
+            continue;
+        }
+
         String logMessage = "  " + String(combo.key().c_str()) + ": ";
 
         for (JsonVariant action : combo.value().as<JsonArray>())
