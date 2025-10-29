@@ -42,10 +42,10 @@
         "dev1": {
             "cmd5": {
                 "protocol": "SAMSUNG",
-                "value": "e0e040bf",
+                "value": "e0e016e9",
                 "bits": 32,
                 "address": 57568,
-                "command": 16575
+                "command": 5865
             },
             "CW": {
                 "protocol": "SAMSUNG",
@@ -81,6 +81,41 @@
                 "bits": 32,
                 "address": 57568,
                 "command": 38760
+            },
+            "cmd2": {
+                "protocol": "SAMSUNG",
+                "value": "e0e040bf",
+                "bits": 32,
+                "address": 57568,
+                "command": 16575
+            },
+            "cmd4": {
+                "protocol": "SAMSUNG",
+                "value": "e0e01ae5",
+                "bits": 32,
+                "address": 57568,
+                "command": 6885
+            },
+            "cmd6": {
+                "protocol": "SAMSUNG",
+                "value": "e0e09e61",
+                "bits": 32,
+                "address": 57568,
+                "command": 40545
+            },
+            "cmd3": {
+                "protocol": "SAMSUNG",
+                "value": "e0e046b9",
+                "bits": 32,
+                "address": 57568,
+                "command": 18105
+            },
+            "cmd1": {
+                "protocol": "SAMSUNG",
+                "value": "e0e0a659",
+                "bits": 32,
+                "address": 57568,
+                "command": 42585
             }
         },
         "dev2": {

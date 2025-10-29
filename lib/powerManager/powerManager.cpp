@@ -91,6 +91,17 @@ void PowerManager::enterDeepSleep(bool force)
         usingFallback = true;
     }
 
+    // Calibrate accelerometer before entering sleep to ensure stable state
+    Logger::getInstance().log("Calibrating accelerometer before sleep...");
+    if (gestureSensor.calibrate(10))
+    {
+        Logger::getInstance().log("Accelerometer calibrated successfully before sleep");
+    }
+    else
+    {
+        Logger::getInstance().log("⚠️ Accelerometer calibration failed before sleep");
+    }
+
     if (!rtc_gpio_is_valid_gpio(effectiveWakePin))
     {
         Logger::getInstance().log("⚠️ No valid wake pin configured for deep sleep ext0 (motionWake=" + String(motionWakeActive ? "true" : "false") + ")");
