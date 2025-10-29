@@ -20,6 +20,9 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
+#include <algorithm>
+#include <cctype>
+#include <vector>
 #include "Logger.h"
 
 AsyncWebServer server(80);
@@ -60,46 +63,85 @@ bool writeConfigFile(const String &json)
 }
 
 // Funzioni helper per leggere/scrivere i file combo
-String readComboFile(int setNumber = -1)
+String readComboFile()
 {
-    String output = "{";
-    bool firstSet = true;
+    DynamicJsonDocument doc(32768);
+    JsonObject root = doc.to<JsonObject>();
 
-    // Se setNumber è -1, ritorna tutto (old behavior per retrocompatibilità)
-    if (setNumber == -1)
+    File rootDir = LittleFS.open("/");
+    if (!rootDir)
     {
-        // Leggi tutti i file e costruisci la struttura originale
-        for (int i = 0; i < 3; i++)
+        Logger::getInstance().log("⚠️ Failed to open LittleFS root while reading combos.");
+        return "{}";
+    }
+
+    for (File entry = rootDir.openNextFile(); entry; entry = rootDir.openNextFile())
+    {
+        if (entry.isDirectory())
         {
-            String filePath = "/combo_" + String(i) + ".json";
-            File file = LittleFS.open(filePath, "r");
-            if (file)
+            entry.close();
+            continue;
+        }
+
+        String name = entry.name(); // e.g. "/combo_0.json"
+        if (!name.startsWith("/combo_") || !name.endsWith(".json") || name == "/combo_common.json")
+        {
+            entry.close();
+            continue;
+        }
+
+        String indexStr = name.substring(7, name.length() - 5); // between "/combo_" and ".json"
+        bool isNumeric = !indexStr.isEmpty();
+        for (size_t i = 0; i < indexStr.length(); ++i)
+        {
+            if (!isdigit(static_cast<unsigned char>(indexStr[i])))
             {
-                if (!firstSet) output += ",";
-                output += "\"combinations_" + String(i) + "\":";
-                output += file.readString();
-                file.close();
-                firstSet = false;
+                isNumeric = false;
+                break;
             }
         }
-    }
-    else
-    {
-        // Leggi solo il set richiesto (merged con common)
-        // Questa funzione non viene usata dal sistema, quindi possiamo semplificare
-        String filePath = "/combo_" + String(setNumber) + ".json";
-        File file = LittleFS.open(filePath, "r");
-        if (file)
+
+        if (!isNumeric)
         {
-            output = file.readString();
-            file.close();
-            return output.length() > 0 ? output : "{}";
+            Logger::getInstance().log("⚠️ Ignoring combo file with non-numeric suffix: " + name);
+            entry.close();
+            continue;
         }
+
+        String rawContent = entry.readString();
+        entry.close();
+
+        if (rawContent.isEmpty())
+        {
+            Logger::getInstance().log("⚠️ Combo file " + name + " is empty.");
+            continue;
+        }
+
+        DynamicJsonDocument setDoc(8192);
+        DeserializationError error = deserializeJson(setDoc, rawContent);
+        if (error)
+        {
+            Logger::getInstance().log("⚠️ Failed to parse " + name + ": " + String(error.c_str()));
+            continue;
+        }
+
+        String setKey = "combinations_" + indexStr;
+        root[setKey.c_str()] = setDoc.as<JsonVariant>();
     }
 
-    output += "}";
+    rootDir.close();
+
+    String output;
+    serializeJson(root, output);
+
+    if (output.length() == 0)
+    {
+        Logger::getInstance().log("⚠️ No combo files found.");
+        return "{}";
+    }
+
     Logger::getInstance().log("Combo file size: " + String(output.length()));
-    return output.length() > 0 ? output : "{}";
+    return output;
 }
 
 bool writeComboFile(int setNumber, const String &json)
@@ -119,41 +161,145 @@ bool writeComboFile(int setNumber, const String &json)
 
 bool writeComboFile(const String &json)
 {
-    // Controllo veloce del formato guardando la stringa
-    if (json.indexOf("\"combinations_0\"") >= 0 ||
-        json.indexOf("\"combinations_1\"") >= 0 ||
-        json.indexOf("\"combinations_2\"") >= 0)
+    DynamicJsonDocument doc(32768);
+    DeserializationError error = deserializeJson(doc, json);
+    if (error)
     {
-        // Vecchio formato: usa parsing parziale per dividere
-        DynamicJsonDocument doc(12288);  // Ridotto da 16384
-        DeserializationError error = deserializeJson(doc, json);
-        if (error)
+        Logger::getInstance().log("⚠️ Failed to parse JSON: " + String(error.c_str()));
+        return false;
+    }
+
+    if (!doc.is<JsonObject>())
+    {
+        Logger::getInstance().log("⚠️ Combo payload is not a JSON object.");
+        return false;
+    }
+
+    constexpr size_t prefixLen = 13; // strlen("combinations_")
+    JsonObject root = doc.as<JsonObject>();
+    std::vector<String> preservedFiles;
+    bool success = true;
+
+    for (JsonPair kv : root)
+    {
+        String key = kv.key().c_str();
+        if (!key.startsWith("combinations_") || key.length() <= prefixLen)
         {
-            Logger::getInstance().log("⚠️ Failed to parse JSON: " + String(error.c_str()));
-            return false;
+            Logger::getInstance().log("ℹ️ Ignoring non-standard combo key: " + key);
+            continue;
         }
 
-        bool success = true;
-        for (int i = 0; i < 3; i++)
+        String indexStr = key.substring(prefixLen);
+        bool isNumeric = !indexStr.isEmpty();
+        for (size_t i = 0; i < indexStr.length(); ++i)
         {
-            String key = "combinations_" + String(i);
-            if (doc.containsKey(key))
+            if (!isdigit(static_cast<unsigned char>(indexStr[i])))
             {
-                String output;
-                serializeJson(doc[key], output);
-                if (!writeComboFile(i, output))
-                {
-                    success = false;
-                }
+                isNumeric = false;
+                break;
             }
         }
-        return success;
+
+        if (!isNumeric)
+        {
+            Logger::getInstance().log("⚠️ Ignoring combo key with non-numeric suffix: " + key);
+            continue;
+        }
+
+        int setNumber = indexStr.toInt();
+        String serialized;
+        serializeJson(kv.value(), serialized);
+
+        if (!writeComboFile(setNumber, serialized))
+        {
+            success = false;
+        }
+
+        preservedFiles.push_back("/combo_" + indexStr + ".json");
     }
-    else
+
+    File rootDir = LittleFS.open("/");
+    if (!rootDir)
     {
-        // Nuovo formato: scrivi direttamente su combo_0.json
-        return writeComboFile(0, json);
+        Logger::getInstance().log("⚠️ Failed to open LittleFS root while cleaning combos.");
+        return false;
     }
+
+    for (File entry = rootDir.openNextFile(); entry; entry = rootDir.openNextFile())
+    {
+        if (entry.isDirectory())
+        {
+            entry.close();
+            continue;
+        }
+
+        String name = entry.name();
+        entry.close();
+
+        if (!name.startsWith("/combo_") || !name.endsWith(".json") || name == "/combo_common.json")
+        {
+            continue;
+        }
+
+        if (std::find(preservedFiles.begin(), preservedFiles.end(), name) == preservedFiles.end())
+        {
+            if (LittleFS.remove(name))
+            {
+                Logger::getInstance().log("🗑️ Removed obsolete combo file " + name);
+            }
+            else
+            {
+                Logger::getInstance().log("⚠️ Failed to remove obsolete combo file " + name);
+                success = false;
+            }
+        }
+    }
+
+    rootDir.close();
+    return success;
+}
+
+bool isValidComboFilename(const String &name)
+{
+    if (name.length() == 0)
+    {
+        return false;
+    }
+    if (name.indexOf('/') != -1 || name.indexOf('\\') != -1 || name.indexOf("..") != -1)
+    {
+        return false;
+    }
+    if (!name.endsWith(".json"))
+    {
+        return false;
+    }
+    if (name.startsWith("combo_") || name.startsWith("my_combo_") || name == "combo_common.json" ||
+        name == "combo.json" || name == "combinations.json")
+    {
+        return true;
+    }
+    return false;
+}
+
+String getComboFileType(const String &fullPath)
+{
+    if (fullPath == "/combo_common.json")
+    {
+        return "common";
+    }
+    if (fullPath.startsWith("/combo_"))
+    {
+        return "combo";
+    }
+    if (fullPath.startsWith("/my_combo_"))
+    {
+        return "custom";
+    }
+    if (fullPath == "/combo.json" || fullPath == "/combinations.json")
+    {
+        return "legacy";
+    }
+    return "unknown";
 }
 
 // Legge il file gesture_features.json
@@ -504,6 +650,178 @@ void configWebServer::setupRoutes()
                     jsonBuffer = "";
                 } });
 
+    // --- Endpoint per elencare e salvare direttamente i file combo ---
+    server.on("/combo_files.json", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+        DynamicJsonDocument doc(16384);  // Reduced buffer size since we're not sending content
+        JsonArray files = doc.createNestedArray("files");
+
+        File rootDir = LittleFS.open("/");
+        if (!rootDir)
+        {
+            Logger::getInstance().log("⚠️ Failed to open LittleFS root while listing combo files.");
+            request->send(500, "text/plain", "❌ Unable to list combo files.");
+            return;
+        }
+
+        std::vector<String> fileNames;
+        for (File entry = rootDir.openNextFile(); entry; entry = rootDir.openNextFile())
+        {
+            if (entry.isDirectory())
+            {
+                entry.close();
+                continue;
+            }
+
+            String name = entry.name();
+            // Normalize: ensure name starts with /
+            if (!name.startsWith("/"))
+            {
+                name = "/" + name;
+            }
+
+            if (name == "/combo_common.json" || name.startsWith("/combo_") || name.startsWith("/my_combo_") ||
+                name == "/combo.json" || name == "/combinations.json")
+            {
+                Logger::getInstance().log("✓ Found combo file: " + name);
+                fileNames.push_back(name);
+            }
+            entry.close();
+        }
+        rootDir.close();
+
+        Logger::getInstance().log("📂 Found " + String(fileNames.size()) + " combo files in total");
+
+        std::sort(fileNames.begin(), fileNames.end(), [](const String &a, const String &b)
+                  { return a < b; });
+
+        for (const String &fullName : fileNames)
+        {
+            File comboFile = LittleFS.open(fullName, "r");
+            if (!comboFile)
+            {
+                Logger::getInstance().log("⚠️ Failed to open " + fullName + " while listing combo files.");
+                continue;
+            }
+
+            String rawContent = comboFile.readString();
+            comboFile.close();
+
+            JsonObject fileObj = files.createNestedObject();
+            String fileName = fullName.substring(1); // remove leading slash
+            fileObj["name"] = fileName;
+            fileObj["type"] = getComboFileType(fullName);
+            fileObj["content"] = rawContent;  // We still include content for now - will load on demand later
+            Logger::getInstance().log("  → Added: " + fileName + " (" + String(rawContent.length()) + " bytes)");
+        }
+
+        String payload;
+        size_t jsonSize = measureJson(doc);
+        Logger::getInstance().log("📊 JSON size: " + String(jsonSize) + " bytes");
+
+        serializeJson(doc, payload);
+        Logger::getInstance().log("📤 Sending combo_files.json payload, size: " + String(payload.length()) + " bytes");
+
+        // Send with chunked transfer encoding if too large
+        AsyncResponseStream *response = request->beginResponseStream("application/json");
+        serializeJson(doc, *response);
+        request->send(response); });
+
+    server.on("/combo_files.json", HTTP_POST, [](AsyncWebServerRequest *request) {},
+              nullptr,
+              [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+              {
+        static String comboFilePayload;
+
+        if (index == 0)
+        {
+            comboFilePayload = "";
+        }
+
+        comboFilePayload.reserve(comboFilePayload.length() + len);
+        for (size_t i = 0; i < len; ++i)
+        {
+            comboFilePayload += static_cast<char>(data[i]);
+        }
+
+        if (index + len == total)
+        {
+            Logger::getInstance().log("📥 Received complete payload, size: " + String(total) + " bytes");
+            Logger::getInstance().log("📥 Payload preview: " + comboFilePayload.substring(0, 200));
+
+            DynamicJsonDocument doc(8192);  // Reduced from 65536
+            DeserializationError error = deserializeJson(doc, comboFilePayload);
+
+            if (error)
+            {
+                Logger::getInstance().log("⚠️ Failed to parse combo_files payload: " + String(error.c_str()));
+                Logger::getInstance().log("⚠️ Payload was: " + comboFilePayload);
+                comboFilePayload = "";
+                request->send(400, "text/plain", "❌ Invalid JSON payload.");
+                return;
+            }
+
+            comboFilePayload = "";
+
+            String name = doc["name"] | "";
+            Logger::getInstance().log("📝 Attempting to save file: " + name);
+
+            if (!isValidComboFilename(name))
+            {
+                Logger::getInstance().log("⚠️ Invalid combo file name: " + name);
+                request->send(400, "text/plain", "❌ Invalid combo file name.");
+                return;
+            }
+
+            if (!doc.containsKey("content"))
+            {
+                request->send(400, "text/plain", "❌ Missing content field.");
+                return;
+            }
+
+            JsonVariant contentVariant = doc["content"];
+            String contentStr;
+
+            Logger::getInstance().log("📦 Content type check...");
+
+            if (contentVariant.is<const char *>() || contentVariant.is<String>())
+            {
+                contentStr = contentVariant.as<String>();
+                Logger::getInstance().log("✓ Content is string, length: " + String(contentStr.length()));
+            }
+            else if (contentVariant.is<JsonObject>() || contentVariant.is<JsonArray>())
+            {
+                serializeJson(contentVariant, contentStr);
+                Logger::getInstance().log("✓ Content is JSON, serialized length: " + String(contentStr.length()));
+            }
+            else
+            {
+                Logger::getInstance().log("❌ Unsupported content format.");
+                request->send(400, "text/plain", "❌ Unsupported content format.");
+                return;
+            }
+
+            String path = "/" + name;
+            Logger::getInstance().log("💾 Opening file for writing: " + path);
+
+            File file = LittleFS.open(path.c_str(), "w");
+            if (!file)
+            {
+                Logger::getInstance().log("⚠️ Failed to open " + path + " for writing.");
+                request->send(500, "text/plain", "❌ Failed to save combo file.");
+                return;
+            }
+
+            size_t written = file.print(contentStr);
+            file.close();
+
+            Logger::getInstance().log("💾 Saved combo file " + path + " (" + String(written) + " bytes written)");
+            request->send(200, "text/plain", "✅ File combo salvato con successo! Riavvio...");
+            vTaskDelay(pdMS_TO_TICKS(1000)); // Dai tempo al tempo
+            ESP.restart();
+        }
+              });
+
     // --- Endpoint per la gestione delle "advanced" (tutte le altre config) ---
     // GET: restituisce tutte le sezioni del config.json tranne "wifi" e "combinations"
     server.on("/advanced.json", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -576,20 +894,25 @@ void configWebServer::setupRoutes()
         } });
 
     // --- Endpoint per servire la pagina principale (config.html) ---
-    server.on("/", HTTP_GET, [this](AsyncWebServerRequest *request)
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
               {
-        File file = LittleFS.open("/config.html", "r");
-        if (!file) {
+        if (!LittleFS.exists("/config.html"))
+        {
             Logger::getInstance().log("❌ config.html not found");
             request->send(404, "text/plain", "❌ config.html not found");
             return;
         }
-        String html = file.readString();
-        file.close();
-        html.replace("<span id=\"wifi_status\"></span>", wifiStatus);
-        html.replace("<span id=\"ap_ip\"></span>", apIPAddress);
-        html.replace("<span id=\"sta_ip\"></span>", staIPAddress);
-        request->send(200, "text/html", html); });
+        request->send(LittleFS, "/config.html", "text/html"); });
+
+    server.on("/status.json", HTTP_GET, [this](AsyncWebServerRequest *request)
+              {
+        StaticJsonDocument<256> doc;
+        doc["wifi_status"] = wifiStatus;
+        doc["ap_ip"] = apIPAddress;
+        doc["sta_ip"] = staIPAddress;
+        String payload;
+        serializeJson(doc, payload);
+        request->send(200, "application/json", payload); });
 
     // --- Endpoint per servire la pagina delle combinations (combinations.html) ---
     server.on("/combinations.html", HTTP_GET, [](AsyncWebServerRequest *request)

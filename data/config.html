@@ -3,119 +3,1823 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ESP32 Config</title>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+    <title>MacroPad Control Center</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMwZTYzOWMiLz48dGV4dCB4PSI1MCUiIHk9IjU1JSIgZm9udC1zaXplPSIzMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZmZmZiIgZm9udC1mYW1pbHk9IlNlZ29lIFVJLCBBcmlhbCwgc2Fucy1zZXJpZiI+TTwvdGV4dD48L3N2Zz4K"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/dracula.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/lint/lint.css"
+    />
+    <style>
+      :root {
+        --bg-primary: #1e1e1e;
+        --bg-secondary: #252526;
+        --bg-tertiary: #2d2d30;
+        --accent: #0e639c;
+        --accent-hover: #1177bb;
+        --danger: #a1260d;
+        --danger-hover: #bf2b0d;
+        --success: #0e7a3a;
+        --text-primary: #f0f0f0;
+        --text-secondary: #b0b0b0;
+        --border-color: #3c3c3c;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      a:hover {
+        color: var(--accent-hover);
+      }
+
+      .app-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .app-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 18px 24px;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        margin-bottom: 20px;
+      }
+
+      .branding {
+        font-size: 1.4rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .header-status {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .status-chip {
+        background-color: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: 999px;
+        padding: 6px 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.9rem;
+      }
+
+      .status-chip span {
+        color: var(--text-secondary);
+      }
+
+      #wifi_status,
+      #ap_ip,
+      #sta_ip {
+        color: #fff;
+        font-weight: 600;
+      }
+
+      .tab-nav {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+
+      .tab-button {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-secondary);
+        padding: 10px 18px;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+
+      .tab-button.active,
+      .tab-button:hover {
+        background-color: var(--accent);
+        color: #fff;
+        border-color: transparent;
+      }
+
+      .panel {
+        display: none;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 20px;
+      }
+
+      .panel.active {
+        display: block;
+      }
+
+      .panel-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 20px;
+      }
+
+      .card {
+        background-color: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .card-title {
+        margin: 0;
+        font-size: 1.2rem;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      label {
+        font-weight: 500;
+        color: var(--text-secondary);
+      }
+
+      input[type="text"],
+      input[type="password"],
+      input[type="number"] {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 10px 12px;
+        color: var(--text-primary);
+        font-size: 0.95rem;
+      }
+
+      input[type="text"]:focus,
+      input[type="password"]:focus,
+      input[type="number"]:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(14, 99, 156, 0.35);
+      }
+
+      .primary-btn,
+      .secondary-btn,
+      .danger-btn {
+        border: none;
+        border-radius: 6px;
+        padding: 10px 16px;
+        font-size: 0.95rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+
+      .primary-btn {
+        background-color: var(--accent);
+        color: #fff;
+      }
+
+      .primary-btn:hover {
+        background-color: var(--accent-hover);
+      }
+
+      .secondary-btn {
+        background-color: var(--bg-secondary);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+      }
+
+      .secondary-btn:hover {
+        color: #fff;
+        border-color: var(--accent);
+      }
+
+      .danger-btn {
+        background-color: var(--danger);
+        color: #fff;
+      }
+
+      .danger-btn:hover {
+        background-color: var(--danger-hover);
+      }
+
+      .form-status {
+        min-height: 20px;
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+      }
+
+      .quick-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .quick-actions button {
+        width: fit-content;
+      }
+
+      .quick-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .status-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        color: var(--text-secondary);
+        font-size: 0.95rem;
+      }
+
+      .panel-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      /* Combo editor styling */
+      .combo-shell {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .combo-tab-bar {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        overflow-x: auto;
+        padding: 4px 0;
+      }
+
+      .combo-tab-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .combo-tab-group-title {
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        padding-left: 6px;
+      }
+
+      .combo-tab {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        background-color: var(--bg-tertiary);
+        border-radius: 6px 6px 0 0;
+        border: 1px solid var(--border-color);
+        border-bottom: none;
+        cursor: pointer;
+        color: var(--text-secondary);
+        user-select: none;
+      }
+
+      .combo-tab.active {
+        background-color: var(--bg-secondary);
+        color: #fff;
+        border-color: var(--accent);
+      }
+
+      .tab-close {
+        font-size: 0.85rem;
+        opacity: 0.6;
+      }
+
+      .tab-close:hover {
+        opacity: 1;
+      }
+
+      .tab-add {
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+        font-size: 1.1rem;
+        padding: 6px 10px;
+        cursor: pointer;
+      }
+
+      .tab-add:hover {
+        color: #fff;
+      }
+
+      .ide-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        padding: 10px;
+        border-radius: 6px;
+      }
+
+      .CodeMirror {
+        height: calc(100vh - 340px);
+        min-height: 320px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+        font-size: 0.95rem;
+      }
+
+      .status-bar {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        background-color: var(--accent);
+        color: #fff;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+      }
+
+      .status-right {
+        display: flex;
+        gap: 12px;
+      }
+
+      .logs-container {
+        background-color: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+
+      .logs-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 12px;
+        background-color: var(--bg-secondary);
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .logs-header h5 {
+        margin: 0;
+        font-size: 1rem;
+      }
+
+      #comboLogContainer {
+        height: 200px;
+        overflow-y: auto;
+        padding: 10px;
+        font-family: "Cascadia Code", Consolas, monospace;
+        font-size: 0.85rem;
+        color: #ddd;
+      }
+
+      /* Wizard styling */
+      .wizard-shell {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .wizard-progress {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .wizard-progress .step {
+        flex: 1;
+        text-align: center;
+        padding: 12px 10px;
+        border-radius: 8px;
+        background-color: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        font-weight: 500;
+      }
+
+      .wizard-progress .step.active {
+        background-color: var(--accent);
+        color: #fff;
+        border-color: transparent;
+      }
+
+      .wizard-content {
+        min-height: 260px;
+      }
+
+      .wizard-step {
+        display: none;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .wizard-step.active {
+        display: flex;
+      }
+
+      .wizard-options {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+
+      .wizard-option {
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 14px;
+        background-color: var(--bg-secondary);
+        cursor: pointer;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        transition: border-color 0.2s ease, background-color 0.2s ease;
+      }
+
+      .wizard-option input {
+        width: 16px;
+        height: 16px;
+      }
+
+      .wizard-option.active {
+        border-color: var(--accent);
+        background-color: rgba(14, 99, 156, 0.2);
+      }
+
+      .wizard-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .wizard-footer .actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      .summary-card {
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 16px;
+        background-color: var(--bg-tertiary);
+      }
+
+      .summary-card ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        color: var(--text-secondary);
+      }
+
+      /* Toast notification */
+      .toast {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: var(--accent);
+        color: #fff;
+        padding: 12px 18px;
+        border-radius: 6px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+        z-index: 999;
+      }
+
+      .toast.show {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .toast.success {
+        background-color: var(--success);
+      }
+
+      .toast.error {
+        background-color: var(--danger);
+      }
+
+      .toast.info {
+        background-color: var(--accent);
+      }
+
+      @media (max-width: 768px) {
+        .CodeMirror {
+          height: calc(100vh - 260px);
+        }
+
+        .wizard-footer {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .wizard-footer .actions {
+          width: 100%;
+          justify-content: space-between;
+        }
+      }
+    </style>
   </head>
-  <body class="container mt-5">
-    <h1 class="text-center">ESP32 Configuration</h1>
-    <form id="configForm">
-      <h2>WiFi Settings</h2>
-      <div class="mb-3">
-        <label class="form-label">AP SSID:</label>
-        <input type="text" id="ap_ssid" class="form-control" />
-      </div>
-      <div class="mb-3">
-        <label class="form-label">AP Password:</label>
-        <input type="password" id="ap_password" class="form-control" />
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Router SSID:</label>
-        <input type="text" id="router_ssid" class="form-control" />
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Router Password:</label>
-        <input type="password" id="router_password" class="form-control" />
-      </div>
-      <button type="submit" class="btn btn-primary w-100">Save Configuration And reboot</button>
-    </form>
+  <body>
+    <div class="app-container">
+      <header class="app-header">
+        <div class="branding">
+          <i class="fas fa-microchip"></i>
+          <span>MacroPad Control Center</span>
+        </div>
+        <div class="header-status">
+          <div class="status-chip">
+            <i class="fas fa-wifi"></i>
+            <span>Status:</span>
+            <span id="wifi_status"></span>
+          </div>
+          <div class="status-chip">
+            <i class="fas fa-broadcast-tower"></i>
+            <span>AP:</span>
+            <span id="ap_ip"></span>
+          </div>
+          <div class="status-chip">
+            <i class="fas fa-network-wired"></i>
+            <span>STA:</span>
+            <span id="sta_ip"></span>
+          </div>
+        </div>
+      </header>
 
-    <!-- Pulsanti per accedere alle altre pagine di configurazione -->
-    <div class="text-center mt-4">
-      <button type="button" class="btn btn-secondary" onclick="window.location.href='/combinations.html'">
-        Combo
-      </button>
-      <button type="button" class="btn btn-secondary" onclick="window.location.href='/combo.html'">
-        Combo2
-      </button>
-      <button type="button" class="btn btn-secondary mt-3" onclick="window.location.href='/advanced.html'">
-        System Config
-      </button>
-      <button type="button" class="btn btn-secondary mt-3" onclick="window.location.href='/gesture_features.html'">
-        Gesture Features
-      </button>
-      <button type="button" class="btn btn-secondary mt-3" onclick="window.location.href='/special_actions.html'">
-        System Actions
-      </button>
+      <nav class="tab-nav">
+        <button class="tab-button active" data-target="panel-overview">
+          <i class="fas fa-sliders-h"></i>
+          Configurazione Rapida
+        </button>
+        <button class="tab-button" data-target="panel-combos">
+          <i class="fas fa-code"></i>
+          Gestione Combo
+        </button>
+        <button class="tab-button" data-target="panel-wizard">
+          <i class="fas fa-magic"></i>
+          Impostazione Guidata Wi-Fi
+        </button>
+      </nav>
+
+      <main>
+        <section class="panel active" id="panel-overview">
+          <div class="panel-grid">
+            <div class="card">
+              <div class="panel-heading">
+                <h2 class="card-title">
+                  <i class="fas fa-wifi me-2"></i>Impostazioni Wi-Fi
+                </h2>
+                <button class="secondary-btn" id="fillWizardFromForm">
+                  <i class="fas fa-bolt"></i> Usa nel wizard
+                </button>
+              </div>
+              <form id="wifiForm">
+                <div class="form-group">
+                  <label for="ap_ssid">Access Point SSID</label>
+                  <input type="text" id="ap_ssid" autocomplete="off" />
+                </div>
+                <div class="form-group">
+                  <label for="ap_password">Access Point Password</label>
+                  <input type="password" id="ap_password" autocomplete="off" />
+                </div>
+                <div class="form-group">
+                  <label for="router_ssid">Router SSID</label>
+                  <input type="text" id="router_ssid" autocomplete="off" />
+                </div>
+                <div class="form-group">
+                  <label for="router_password">Router Password</label>
+                  <input
+                    type="password"
+                    id="router_password"
+                    autocomplete="off"
+                  />
+                </div>
+                <div class="d-flex gap-2 flex-wrap mt-2">
+                  <button type="submit" class="primary-btn">
+                    <i class="fas fa-save"></i> Salva configurazione e riavvia
+                  </button>
+                  <button type="button" class="secondary-btn" id="resetWifiForm">
+                    <i class="fas fa-undo"></i> Ripristina
+                  </button>
+                </div>
+              </form>
+              <div class="form-status" id="wifiFormStatus"></div>
+            </div>
+
+            <div class="card">
+              <h2 class="card-title">
+                <i class="fas fa-info-circle me-2"></i>Stato e Azioni Rapide
+              </h2>
+              <div class="status-list">
+                <span>
+                  <i class="fas fa-signal me-2"></i>Modalità Corrente:
+                  <strong id="wifiModeLabel">-</strong>
+                </span>
+                <span>
+                  <i class="fas fa-circle-notch me-2"></i>Ultimo aggiornamento:
+                  <strong id="wifiUpdatedLabel">Mai</strong>
+                </span>
+              </div>
+              <div class="quick-actions">
+                <button class="secondary-btn" id="refreshWifiData">
+                  <i class="fas fa-sync-alt"></i>Aggiorna dallo sp device
+                </button>
+                <a class="secondary-btn" href="/advanced.html">
+                  <i class="fas fa-terminal"></i> Configurazione avanzata
+                </a>
+                <a class="secondary-btn" href="/gesture_features.html">
+                  <i class="fas fa-hand-sparkles"></i> Gesture features
+                </a>
+                <a class="secondary-btn" href="/special_actions.html">
+                  <i class="fas fa-bolt"></i> Azioni speciali
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" id="panel-combos">
+          <div class="combo-shell">
+            <div class="panel-heading">
+              <h2 class="card-title">
+                <i class="fas fa-layer-group me-2"></i>Editor combo multiset
+              </h2>
+              <button class="secondary-btn" id="reloadCombos">
+                <i class="fas fa-sync-alt"></i> Ricarica
+              </button>
+            </div>
+
+            <div class="combo-tab-bar" id="comboTabBar"></div>
+
+            <div class="ide-toolbar">
+              <button class="primary-btn" id="comboSaveButton">
+                <i class="fas fa-save"></i> Salva file
+              </button>
+              <button class="secondary-btn" id="comboFormatButton">
+                <i class="fas fa-align-left"></i> Format
+              </button>
+            </div>
+
+            <textarea id="comboEditor"></textarea>
+
+            <div class="status-bar">
+              <div id="comboStatus">Pronto</div>
+              <div class="status-right">
+                <span id="comboCursor">Ln 1, Col 1</span>
+                <span id="comboFormatIndicator">JSON</span>
+                <span id="comboErrorIndicator">0 errori</span>
+              </div>
+            </div>
+
+            <div class="logs-container">
+              <div class="logs-header">
+                <h5>Logs dispositivo</h5>
+                <div class="d-flex gap-2">
+                  <button class="secondary-btn" id="comboReconnectLog">
+                    <i class="fas fa-sync-alt"></i> Riconnetti
+                  </button>
+                  <button class="secondary-btn" id="comboClearLog">
+                    <i class="fas fa-broom"></i> Pulisci
+                  </button>
+                </div>
+              </div>
+              <div id="comboLogContainer"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" id="panel-wizard">
+          <div class="card wizard-shell">
+            <div class="panel-heading">
+              <h2 class="card-title">
+                <i class="fas fa-magic me-2"></i>Impostazione guidata Wi-Fi
+              </h2>
+              <button class="secondary-btn" id="wizardResetButton">
+                <i class="fas fa-undo"></i> Ricomincia
+              </button>
+            </div>
+
+            <div class="wizard-progress">
+              <div class="step active" data-step="1">1. Modalità</div>
+              <div class="step" data-step="2">2. Credenziali</div>
+              <div class="step" data-step="3">3. Riepilogo</div>
+            </div>
+
+            <div class="wizard-content">
+              <div class="wizard-step active" data-step="1">
+                <p>
+                  Scegli il tipo di connessione da configurare. È sempre
+                  consigliato mantenere l'Access Point attivo per recupero
+                  rapido.
+                </p>
+                <div class="wizard-options">
+                  <label class="wizard-option active" data-mode="dual">
+                    <input
+                      type="radio"
+                      name="wizard_mode"
+                      value="dual"
+                      checked
+                    />
+                    <div>
+                      <strong>Access Point + Router</strong>
+                      <p class="mb-0 text-secondary">
+                        L'ESP32 crea un proprio AP e si collega anche al router
+                        di casa.
+                      </p>
+                    </div>
+                  </label>
+                  <label class="wizard-option" data-mode="ap-only">
+                    <input type="radio" name="wizard_mode" value="ap-only" />
+                    <div>
+                      <strong>Solo Access Point</strong>
+                      <p class="mb-0 text-secondary">
+                        L'ESP32 resta isolato e crea solo la propria rete.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div class="wizard-step" data-step="2">
+                <p>
+                  Inserisci le credenziali desiderate. Se scegli solo AP, i
+                  campi router saranno ignorati.
+                </p>
+                <div class="form-group">
+                  <label for="wizard_ap_ssid">Access Point SSID</label>
+                  <input type="text" id="wizard_ap_ssid" autocomplete="off" />
+                </div>
+                <div class="form-group">
+                  <label for="wizard_ap_password">Access Point Password</label>
+                  <input
+                    type="password"
+                    id="wizard_ap_password"
+                    autocomplete="off"
+                  />
+                </div>
+                <div class="form-group wizard-router-fields">
+                  <label for="wizard_router_ssid">Router SSID</label>
+                  <input
+                    type="text"
+                    id="wizard_router_ssid"
+                    autocomplete="off"
+                  />
+                </div>
+                <div class="form-group wizard-router-fields">
+                  <label for="wizard_router_password">Router Password</label>
+                  <input
+                    type="password"
+                    id="wizard_router_password"
+                    autocomplete="off"
+                  />
+                </div>
+              </div>
+
+              <div class="wizard-step" data-step="3">
+                <p>Controlla il riepilogo prima di applicare le modifiche.</p>
+                <div class="summary-card">
+                  <ul id="wizardSummary"></ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="wizard-footer">
+              <div class="form-status" id="wizardStatus"></div>
+              <div class="actions">
+                <button class="secondary-btn" id="wizardBackButton">
+                  <i class="fas fa-arrow-left"></i> Indietro
+                </button>
+                <button class="primary-btn" id="wizardNextButton">
+                  Avanti <i class="fas fa-arrow-right"></i>
+                </button>
+                <button class="primary-btn d-none" id="wizardFinishButton">
+                  <i class="fas fa-check"></i> Applica configurazione
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
 
-    <h2 class="text-center mt-5">Status</h2>
-    <div class="text-center">
-      <p>WiFi Status: <span id="wifi_status"></span></p>
-      <p>AP IP Address: <span id="ap_ip"></span></p>
-      <p>STA IP Address: <span id="sta_ip"></span></p>
-    </div>
+    <div class="toast" id="toast"></div>
 
-    <div id="status" class="text-center mt-3"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/lint/lint.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/lint/json-lint.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/edit/closebrackets.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/edit/matchbrackets.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/selection/active-line.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsonlint/1.6.0/jsonlint.min.js"></script>
+    <script src="https://unpkg.com/prettier@2.8.8/standalone.js"></script>
+    <script src="https://unpkg.com/prettier@2.8.8/parser-babel.js"></script>
+
     <script>
-      let originalConfig = {};
+      const state = {
+        wifi: {
+          original: {},
+          lastUpdated: null,
+        },
+        combos: {
+          files: [],
+          currentIndex: 0,
+          editor: null,
+          errorCount: 0,
+          eventSource: null,
+        },
+        wizard: {
+          step: 1,
+          mode: "dual",
+          data: {
+            ap_ssid: "",
+            ap_password: "",
+            router_ssid: "",
+            router_password: "",
+          },
+        },
+      };
 
-      async function loadConfig() {
+      const toast = document.getElementById("toast");
+      const hasPrettier =
+        typeof window.prettier !== "undefined" &&
+        Array.isArray(window.prettierPlugins) &&
+        window.prettierPlugins.length > 0;
+      const prettierPlugins = hasPrettier ? window.prettierPlugins : [];
+      const supportsCodeMirror = typeof window.CodeMirror !== "undefined";
+      const statusElements = {
+        wifi: document.getElementById("wifi_status"),
+        ap: document.getElementById("ap_ip"),
+        sta: document.getElementById("sta_ip"),
+        mode: document.getElementById("wifiModeLabel"),
+        updated: document.getElementById("wifiUpdatedLabel"),
+      };
+      const comboTypeLabels = {
+        common: "Sistema",
+        combo: "Dispositivo",
+        custom: "Personale / Sessione",
+        legacy: "Legacy",
+        unknown: "Altro",
+      };
+      const comboTypeOrder = {
+        common: 0,
+        combo: 1,
+        custom: 2,
+        legacy: 3,
+        unknown: 4,
+      };
+
+      function formatJsonValue(value, options = {}) {
+        const { silent = false } = options;
         try {
-          const response = await fetch("/config.json");
-          if (!response.ok) throw new Error("Failed to fetch config");
-          originalConfig = await response.json();
+          const stringValue =
+            typeof value === "string" ? value : JSON.stringify(value);
 
-          document.getElementById("ap_ssid").value = originalConfig.wifi?.ap_ssid || "";
-          document.getElementById("ap_password").value = originalConfig.wifi?.ap_password || "";
-          document.getElementById("router_ssid").value = originalConfig.wifi?.router_ssid || "";
-          document.getElementById("router_password").value = originalConfig.wifi?.router_password || "";
+          if (hasPrettier) {
+            return window.prettier.format(stringValue, {
+              parser: "json",
+              plugins: prettierPlugins,
+              tabWidth: 2,
+              useTabs: false,
+            });
+          }
+
+          const parsed =
+            typeof value === "string" ? JSON.parse(stringValue) : value;
+
+          return JSON.stringify(parsed, null, 2);
         } catch (error) {
-          console.error("Error loading config:", error);
-          document.getElementById("status").innerHTML = "⚠️ Error loading config.";
+          if (silent) {
+            console.warn("Unable to format JSON value", error);
+            if (typeof value === "string") {
+              return value;
+            }
+            try {
+              return JSON.stringify(value, null, 2);
+            } catch (_) {
+              return "";
+            }
+          }
+          throw error;
         }
       }
 
-      async function saveConfig(event) {
-        event.preventDefault();
-        let newConfig = { wifi: {} };
+      function showToast(message, type = "info") {
+        toast.textContent = message;
+        toast.className = `toast show ${type}`;
+        setTimeout(() => {
+          toast.className = "toast";
+        }, 3200);
+      }
 
-        function checkChange(field, category) {
-          let newValue = document.getElementById(field).value.trim();
-          if (originalConfig[category]?.[field] !== newValue) {
-            newConfig[category][field] = newValue;
-          }
-        }
+      function switchPanel(panelId) {
+        document.querySelectorAll(".panel").forEach((panel) => {
+          panel.classList.toggle("active", panel.id === panelId);
+        });
+      }
 
-        checkChange("ap_ssid", "wifi");
-        checkChange("ap_password", "wifi");
-        checkChange("router_ssid", "wifi");
-        checkChange("router_password", "wifi");
+      function setupTabs() {
+        document.querySelectorAll(".tab-button").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            document.querySelectorAll(".tab-button").forEach((b) => {
+              b.classList.remove("active");
+            });
+            btn.classList.add("active");
+            switchPanel(btn.getAttribute("data-target"));
+          });
+        });
+      }
 
-        if (Object.keys(newConfig.wifi).length === 0) {
-          document.getElementById("status").innerHTML = "⚠️ No changes detected.";
+      function applyDeviceStatus(status) {
+        if (!status) {
           return;
         }
+        if (statusElements.wifi) statusElements.wifi.textContent = status.wifi_status || "-";
+        if (statusElements.ap) statusElements.ap.textContent = status.ap_ip || "-";
+        if (statusElements.sta) statusElements.sta.textContent = status.sta_ip || "-";
+      }
 
-        document.getElementById("status").innerHTML = "⏳ Saving...";
+      async function refreshDeviceStatus(showNotification = false) {
+        try {
+          const response = await fetch("/status.json", { cache: "no-cache" });
+          if (!response.ok) throw new Error("Impossibile recuperare status.json");
+          const status = await response.json();
+          applyDeviceStatus(status);
+          if (showNotification) {
+            showToast("Stato dispositivo aggiornato.", "success");
+          }
+        } catch (error) {
+          console.error("Errore durante l'aggiornamento dello stato:", error);
+          if (showNotification) {
+            showToast("Errore durante l'aggiornamento dello stato.", "error");
+          }
+        }
+      }
 
+      function prettifyComboFileLabel(name, type) {
+        if (name === "combo_common.json") {
+          return "combo_common.json (Shared)";
+        }
+        if (name === "combo.json") {
+          return "combo.json (Legacy multi-set)";
+        }
+        if (name === "combinations.json") {
+          return "combinations.json (Legacy config)";
+        }
+        if (type === "combo") {
+          const match = name.match(/combo_(\d+)\.json/);
+          if (match) {
+            return `combo_${match[1]}.json`;
+          }
+        }
+        if (type === "custom") {
+          const match = name.match(/my_combo_(\d+)\.json/);
+          if (match) {
+            return `my_combo_${match[1]}.json`;
+          }
+        }
+        return name;
+      }
+
+      function getCurrentComboFile() {
+        return state.combos.files[state.combos.currentIndex] || null;
+      }
+
+      async function loadWifiConfig(showNotification = false) {
+        const statusEl = document.getElementById("wifiFormStatus");
+        statusEl.textContent = "Caricamento configurazione...";
+        try {
+          const response = await fetch("/config.json");
+          if (!response.ok) throw new Error("Impossibile recuperare config.json");
+
+          state.wifi.original = await response.json();
+          const wifi = state.wifi.original.wifi || {};
+          document.getElementById("ap_ssid").value = wifi.ap_ssid || "";
+          document.getElementById("ap_password").value =
+            wifi.ap_password || "";
+          document.getElementById("router_ssid").value =
+            wifi.router_ssid || "";
+          document.getElementById("router_password").value =
+            wifi.router_password || "";
+
+          hydrateWizardFromWifi(wifi);
+          updateWifiModeLabel(wifi);
+          state.wifi.lastUpdated = new Date();
+          updateWifiUpdatedLabel();
+          statusEl.textContent = "Configurazione caricata dal dispositivo.";
+          if (showNotification) {
+            showToast("Configurazione Wi-Fi aggiornata.", "success");
+          }
+        } catch (error) {
+          console.error(error);
+          statusEl.textContent = "Errore nel caricamento della configurazione.";
+          showToast("Errore nel recupero della configurazione Wi-Fi.", "error");
+        }
+      }
+
+      function updateWifiModeLabel(wifi) {
+        const label = document.getElementById("wifiModeLabel");
+        const hasRouter =
+          wifi && wifi.router_ssid && wifi.router_ssid.trim().length > 0;
+        label.textContent = hasRouter
+          ? "AP + Router (dual mode)"
+          : "Solo Access Point";
+      }
+
+      function updateWifiUpdatedLabel() {
+        const label = document.getElementById("wifiUpdatedLabel");
+        if (!state.wifi.lastUpdated) {
+          label.textContent = "Mai";
+          return;
+        }
+        label.textContent = state.wifi.lastUpdated.toLocaleString();
+      }
+
+      async function submitWifiConfig(payload, statusEl) {
+        statusEl.textContent = "Salvataggio in corso...";
         try {
           const response = await fetch("/config.json", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(newConfig),
+            body: JSON.stringify(payload),
           });
 
-          const message = await response.text();
-          document.getElementById("status").innerHTML = `✅ ${message}`;
+          const text = await response.text();
+          statusEl.textContent = text || "Configurazione salvata.";
+          showToast("Configurazione salvata. Il dispositivo si riavvierà.", "success");
         } catch (error) {
-          console.error("Error saving config:", error);
-          document.getElementById("status").innerHTML = "❌ Error saving config.";
+          console.error(error);
+          statusEl.textContent = "Errore durante il salvataggio.";
+          showToast("Errore durante il salvataggio della configurazione.", "error");
         }
       }
 
-      document.getElementById("configForm").addEventListener("submit", saveConfig);
-      loadConfig();
+      function gatherWifiDataFromForm() {
+        return {
+          ap_ssid: document.getElementById("ap_ssid").value.trim(),
+          ap_password: document.getElementById("ap_password").value,
+          router_ssid: document.getElementById("router_ssid").value.trim(),
+          router_password: document.getElementById("router_password").value,
+        };
+      }
+
+      function hydrateWizardFromWifi(wifi) {
+        const payload = {
+          ap_ssid: wifi.ap_ssid || "",
+          ap_password: wifi.ap_password || "",
+          router_ssid: wifi.router_ssid || "",
+          router_password: wifi.router_password || "",
+        };
+
+        state.wizard.mode =
+          payload.router_ssid && payload.router_ssid.length > 0
+            ? "dual"
+            : "ap-only";
+        state.wizard.data = payload;
+        updateWizardInputs();
+        renderWizard();
+      }
+
+      function populateWizardSummary() {
+        const summary = document.getElementById("wizardSummary");
+        const data = state.wizard.data;
+        const mode =
+          state.wizard.mode === "dual"
+            ? "Access Point + Router"
+            : "Solo Access Point";
+        summary.innerHTML = `
+          <li><strong>Modalità:</strong> ${mode}</li>
+          <li><strong>AP SSID:</strong> ${data.ap_ssid || "<em>non impostato</em>"}</li>
+          <li><strong>AP Password:</strong> ${
+            data.ap_password ? "••••••" : "<em>non impostata</em>"
+          }</li>
+          ${
+            state.wizard.mode === "dual"
+              ? `<li><strong>Router SSID:</strong> ${
+                  data.router_ssid || "<em>non impostato</em>"
+                }</li>
+                 <li><strong>Router Password:</strong> ${
+                   data.router_password ? "••••••" : "<em>non impostata</em>"
+                 }</li>`
+              : "<li><strong>Router:</strong> disabilitato</li>"
+          }
+        `;
+      }
+
+      function updateWizardInputs() {
+        document
+          .querySelectorAll(".wizard-option")
+          .forEach((option) =>
+            option.classList.toggle(
+              "active",
+              option.getAttribute("data-mode") === state.wizard.mode
+            )
+          );
+        document
+          .querySelectorAll('input[name="wizard_mode"]')
+          .forEach((input) => {
+            input.checked = input.value === state.wizard.mode;
+          });
+
+        document.getElementById("wizard_ap_ssid").value =
+          state.wizard.data.ap_ssid || "";
+        document.getElementById("wizard_ap_password").value =
+          state.wizard.data.ap_password || "";
+        document.getElementById("wizard_router_ssid").value =
+          state.wizard.data.router_ssid || "";
+        document.getElementById("wizard_router_password").value =
+          state.wizard.data.router_password || "";
+
+        document.querySelectorAll(".wizard-router-fields").forEach((el) => {
+          el.style.display = state.wizard.mode === "dual" ? "flex" : "none";
+        });
+      }
+
+      function renderWizard() {
+        document.querySelectorAll(".wizard-step").forEach((step) => {
+          step.classList.toggle(
+            "active",
+            parseInt(step.getAttribute("data-step"), 10) === state.wizard.step
+          );
+        });
+        document.querySelectorAll(".wizard-progress .step").forEach((step) => {
+          step.classList.toggle(
+            "active",
+            parseInt(step.getAttribute("data-step"), 10) === state.wizard.step
+          );
+        });
+
+        document
+          .getElementById("wizardBackButton")
+          .classList.toggle("d-none", state.wizard.step === 1);
+
+        document
+          .getElementById("wizardNextButton")
+          .classList.toggle("d-none", state.wizard.step === 3);
+
+        document
+          .getElementById("wizardFinishButton")
+          .classList.toggle("d-none", state.wizard.step !== 3);
+
+        if (state.wizard.step === 3) {
+          populateWizardSummary();
+        }
+      }
+
+      function resetWizard() {
+        state.wizard.step = 1;
+        state.wizard.mode = "dual";
+        state.wizard.data = {
+          ap_ssid: "",
+          ap_password: "",
+          router_ssid: "",
+          router_password: "",
+        };
+        updateWizardInputs();
+        renderWizard();
+        document.getElementById("wizardStatus").textContent =
+          "Wizard ripristinato.";
+      }
+
+      function wizardCollectStepData() {
+        state.wizard.mode = document.querySelector(
+          'input[name="wizard_mode"]:checked'
+        ).value;
+        state.wizard.data.ap_ssid = document
+          .getElementById("wizard_ap_ssid")
+          .value.trim();
+        state.wizard.data.ap_password =
+          document.getElementById("wizard_ap_password").value;
+        state.wizard.data.router_ssid = document
+          .getElementById("wizard_router_ssid")
+          .value.trim();
+        state.wizard.data.router_password =
+          document.getElementById("wizard_router_password").value;
+
+        if (state.wizard.mode !== "dual") {
+          state.wizard.data.router_ssid = "";
+          state.wizard.data.router_password = "";
+        }
+      }
+
+      function setupWizard() {
+        document.querySelectorAll(".wizard-option").forEach((option) => {
+          option.addEventListener("click", () => {
+            state.wizard.mode = option.getAttribute("data-mode");
+            updateWizardInputs();
+          });
+        });
+
+        document
+          .getElementById("wizardNextButton")
+          .addEventListener("click", () => {
+            if (state.wizard.step === 1) {
+              wizardCollectStepData();
+              state.wizard.step = 2;
+              renderWizard();
+              return;
+            }
+            if (state.wizard.step === 2) {
+              wizardCollectStepData();
+              state.wizard.step = 3;
+              renderWizard();
+            }
+          });
+
+        document
+          .getElementById("wizardBackButton")
+          .addEventListener("click", () => {
+            if (state.wizard.step > 1) {
+              state.wizard.step -= 1;
+              renderWizard();
+            }
+          });
+
+        document
+          .getElementById("wizardFinishButton")
+          .addEventListener("click", async () => {
+            wizardCollectStepData();
+            document.getElementById("wizardStatus").textContent =
+              "Invio configurazione...";
+            const payload = {
+              wifi: {
+                ap_ssid: state.wizard.data.ap_ssid,
+                ap_password: state.wizard.data.ap_password,
+                router_ssid: state.wizard.data.router_ssid,
+                router_password: state.wizard.data.router_password,
+              },
+            };
+            await submitWifiConfig(
+              payload,
+              document.getElementById("wizardStatus")
+            );
+            state.wifi.lastUpdated = new Date();
+            updateWifiUpdatedLabel();
+            showToast(
+              "Configurazione inviata. Il dispositivo potrebbe riavviarsi.",
+              "success"
+            );
+          });
+
+        document
+          .getElementById("wizardResetButton")
+          .addEventListener("click", resetWizard);
+      }
+
+      function resetWifiForm() {
+        const wifi = state.wifi.original.wifi || {};
+        document.getElementById("ap_ssid").value = wifi.ap_ssid || "";
+        document.getElementById("ap_password").value = wifi.ap_password || "";
+        document.getElementById("router_ssid").value =
+          wifi.router_ssid || "";
+        document.getElementById("router_password").value =
+          wifi.router_password || "";
+        document.getElementById("wifiFormStatus").textContent =
+          "Valori ripristinati.";
+      }
+
+      function sendFormValuesToWizard() {
+        const wifi = gatherWifiDataFromForm();
+        hydrateWizardFromWifi(wifi);
+        document.getElementById("wizardStatus").textContent =
+          "Valori importati dal form.";
+        showToast("Valori importati nel wizard.", "info");
+      }
+
+      /* Combo editor setup */
+      function computePos(text, index) {
+        const lines = text.slice(0, index).split("\n");
+        const line = lines.length - 1;
+        const ch = lines[lines.length - 1].length;
+        return CodeMirror.Pos(line, ch);
+      }
+
+      if (supportsCodeMirror) {
+        CodeMirror.registerHelper("lint", "json", function (text) {
+          const found = [];
+          try {
+            jsonlint.parse(text);
+            state.combos.errorCount = 0;
+          } catch (e) {
+            const match = e.message.match(/line (\d+) column (\d+)/);
+            if (match) {
+              const line = parseInt(match[1], 10) - 1;
+              const ch = parseInt(match[2], 10) - 1;
+              found.push({
+                from: CodeMirror.Pos(line, ch),
+                to: CodeMirror.Pos(line, ch + 1),
+                message: e.message,
+                severity: "error",
+              });
+            } else {
+              found.push({
+                from: CodeMirror.Pos(0, 0),
+                to: CodeMirror.Pos(0, 1),
+                message: e.message,
+                severity: "error",
+              });
+            }
+            state.combos.errorCount = 1;
+          }
+
+          const regex = /"([^"\\]*(?:\\.[^"\\]*)*)"\s*:/g;
+          const keys = {};
+          let m;
+          while ((m = regex.exec(text)) !== null) {
+            const key = m[1];
+            if (keys[key]) {
+              const pos = computePos(text, m.index);
+              found.push({
+                from: pos,
+                to: CodeMirror.Pos(pos.line, pos.ch + key.length + 2),
+                message: `Duplicate key: ${key}`,
+                severity: "error",
+              });
+              state.combos.errorCount++;
+            } else {
+              keys[key] = true;
+            }
+          }
+
+          updateComboErrorIndicator();
+          return found;
+        });
+      } else {
+        console.warn(
+          "CodeMirror non disponibile: linting avanzato disabilitato."
+        );
+      }
+
+      function updateComboErrorIndicator() {
+        const el = document.getElementById("comboErrorIndicator");
+        const count = state.combos.errorCount;
+        if (count === 0) {
+          el.textContent = "0 errori";
+          el.style.color = "#d4ffd4";
+        } else {
+          el.textContent = `${count} errore${count > 1 ? "i" : ""}`;
+          el.style.color = "#ffd4d4";
+        }
+      }
+
+      function setupComboEditor() {
+        const textarea = document.getElementById("comboEditor");
+
+        if (supportsCodeMirror) {
+          state.combos.editor = CodeMirror.fromTextArea(textarea, {
+            mode: { name: "javascript", json: true },
+            theme: "dracula",
+            lineNumbers: true,
+            tabSize: 2,
+            indentWithTabs: false,
+            autoCloseBrackets: true,
+            matchBrackets: true,
+            styleActiveLine: true,
+            lint: true,
+            gutters: ["CodeMirror-lint-markers"],
+            extraKeys: {
+              "Ctrl-S": () => saveCurrentComboFile(),
+              "Cmd-S": () => saveCurrentComboFile(),
+            },
+          });
+
+          state.combos.editor.on("cursorActivity", () => {
+            const cursor = state.combos.editor.getCursor();
+            document.getElementById(
+              "comboCursor"
+            ).textContent = `Ln ${cursor.line + 1}, Col ${cursor.ch + 1}`;
+          });
+        } else {
+          console.warn(
+            "Editor avanzato non disponibile, si utilizza la textarea di base."
+          );
+          textarea.classList.add("form-control");
+          textarea.style.height = "calc(100vh - 340px)";
+          state.combos.editor = {
+            getValue: () => textarea.value,
+            setValue: (val) => {
+              textarea.value = val;
+            },
+            focus: () => textarea.focus(),
+            on: () => {},
+          };
+          document.getElementById("comboCursor").textContent = "Plain textarea";
+        }
+
+        document.getElementById("comboFormatIndicator").textContent = hasPrettier
+          ? "JSON (Prettier)"
+          : "JSON";
+
+        document
+          .getElementById("comboSaveButton")
+          .addEventListener("click", saveCurrentComboFile);
+        document
+          .getElementById("comboFormatButton")
+          .addEventListener("click", formatComboEditor);
+        document
+          .getElementById("comboClearLog")
+          .addEventListener(
+            "click",
+            () => (document.getElementById("comboLogContainer").innerHTML = "")
+          );
+        document
+          .getElementById("comboReconnectLog")
+          .addEventListener("click", () => {
+            if (state.combos.eventSource) {
+              state.combos.eventSource.close();
+            }
+            setupComboLogs();
+          });
+        document
+          .getElementById("reloadCombos")
+          .addEventListener("click", () => loadComboFiles(true));
+
+        document.addEventListener("keydown", (event) => {
+          if ((event.ctrlKey || event.metaKey) && event.key === "s") {
+            event.preventDefault();
+            saveCurrentComboFile();
+          }
+        });
+      }
+
+      function updateComboTabs() {
+        const tabBar = document.getElementById("comboTabBar");
+        tabBar.innerHTML = "";
+
+        const grouped = {};
+        state.combos.files.forEach((file, index) => {
+          if (!grouped[file.type]) {
+            grouped[file.type] = [];
+          }
+          grouped[file.type].push({ file, index });
+        });
+
+        const types = Object.keys(grouped).sort((a, b) => {
+          const orderA = comboTypeOrder.hasOwnProperty(a)
+            ? comboTypeOrder[a]
+            : comboTypeOrder.unknown;
+          const orderB = comboTypeOrder.hasOwnProperty(b)
+            ? comboTypeOrder[b]
+            : comboTypeOrder.unknown;
+          if (orderA !== orderB) {
+            return orderA - orderB;
+          }
+          const labelA = comboTypeLabels[a] || a;
+          const labelB = comboTypeLabels[b] || b;
+          return labelA.localeCompare(labelB);
+        });
+
+        types.forEach((type) => {
+          const entries = grouped[type];
+          if (!entries || entries.length === 0) {
+            return;
+          }
+          const group = document.createElement("div");
+          group.className = "combo-tab-group";
+
+          const title = document.createElement("div");
+          title.className = "combo-tab-group-title";
+          title.textContent = comboTypeLabels[type] || type;
+          group.appendChild(title);
+
+          entries.forEach(({ file, index }) => {
+            const tab = document.createElement("div");
+            tab.className = "combo-tab";
+            tab.dataset.index = index;
+            tab.dataset.type = type;
+            tab.textContent = file.label || file.name;
+            tab.title = file.name;
+            tab.addEventListener("click", () => {
+              state.combos.currentIndex = index;
+              highlightActiveComboTab();
+              loadCurrentComboFile();
+            });
+            group.appendChild(tab);
+          });
+
+          tabBar.appendChild(group);
+        });
+
+        highlightActiveComboTab();
+      }
+
+      function highlightActiveComboTab() {
+        document.querySelectorAll(".combo-tab").forEach((tab) => {
+          const index = parseInt(tab.dataset.index, 10);
+          tab.classList.toggle("active", index === state.combos.currentIndex);
+        });
+      }
+
+      function loadCurrentComboFile() {
+        const file = getCurrentComboFile();
+        if (!file) {
+          state.combos.editor.setValue("{}");
+          document.getElementById("comboStatus").textContent =
+            "Nessun file combo disponibile.";
+          return;
+        }
+
+        const typeLabel = comboTypeLabels[file.type] || file.type || "";
+
+        try {
+          const formatted = formatJsonValue(file.content || "{}", {
+            silent: true,
+          });
+          state.combos.editor.setValue(formatted);
+          document.getElementById("comboStatus").textContent =
+            typeLabel && typeLabel.length
+              ? `${file.label || file.name} (${typeLabel}) caricato.`
+              : `${file.label || file.name} caricato.`;
+        } catch (error) {
+          console.error(error);
+          state.combos.editor.setValue(file.content || "{}");
+          document.getElementById("comboStatus").textContent =
+            typeLabel && typeLabel.length
+              ? `${file.label || file.name} (${typeLabel}) caricato senza formattazione.`
+              : `${file.label || file.name} caricato senza formattazione.`;
+        }
+        setTimeout(() => state.combos.editor.focus(), 100);
+      }
+
+      async function loadComboFiles(preserveSelection = true) {
+        const statusEl = document.getElementById("comboStatus");
+        const previousFile = preserveSelection ? getCurrentComboFile() : null;
+        statusEl.textContent = "Caricamento file combo...";
+
+        try {
+          console.log("📂 Fetching combo files from /combo_files.json...");
+          const response = await fetch("/combo_files.json", {
+            cache: "no-cache",
+          });
+          if (!response.ok) throw new Error("Errore nel recupero dei file combo");
+          const rawText = await response.text();
+          console.log("📂 Response size:", rawText.length, "bytes");
+          console.log("📂 First 200 chars:", rawText.substring(0, 200));
+          const data = JSON.parse(rawText);
+          console.log("📂 Received data:", data);
+          console.log("📂 data.files type:", typeof data.files, "isArray:", Array.isArray(data.files));
+          const files = Array.isArray(data.files) ? data.files : [];
+          console.log("📂 Parsed files array:", files);
+
+          state.combos.files = files
+            .map((file) => ({
+              name: file.name,
+              label: file.label || prettifyComboFileLabel(file.name, file.type),
+              type: file.type || "custom",
+              content: file.content || "{}",
+            }))
+            .sort((a, b) => {
+              const orderA = comboTypeOrder.hasOwnProperty(a.type)
+                ? comboTypeOrder[a.type]
+                : comboTypeOrder.unknown;
+              const orderB = comboTypeOrder.hasOwnProperty(b.type)
+                ? comboTypeOrder[b.type]
+                : comboTypeOrder.unknown;
+              if (orderA !== orderB) {
+                return orderA - orderB;
+              }
+              return a.name.localeCompare(b.name);
+            });
+
+          if (state.combos.files.length === 0) {
+            console.warn("⚠️ No combo files found!");
+            state.combos.currentIndex = 0;
+            updateComboTabs();
+            loadCurrentComboFile();
+            statusEl.textContent = "Nessun file combo trovato.";
+            return;
+          }
+
+          console.log("📂 Total files after mapping:", state.combos.files.length);
+          const preservedIndex = previousFile
+            ? state.combos.files.findIndex((file) => file.name === previousFile.name)
+            : -1;
+          state.combos.currentIndex =
+            preservedIndex >= 0 ? preservedIndex : 0;
+
+          console.log("📂 Updating combo tabs...");
+          updateComboTabs();
+          console.log("📂 Loading current combo file...");
+          loadCurrentComboFile();
+          statusEl.textContent = "File combo caricati.";
+          console.log("✅ Combo files loaded successfully");
+        } catch (error) {
+          console.error("❌ Error loading combo files:", error);
+          statusEl.textContent = "Errore nel caricamento dei file combo.";
+          showToast("Errore nel caricamento dei file combo.", "error");
+        }
+      }
+
+      async function saveCurrentComboFile() {
+        const file = getCurrentComboFile();
+        if (!file) {
+          showToast("Nessun file selezionato.", "error");
+          return;
+        }
+
+        let parsed;
+        try {
+          parsed = JSON.parse(state.combos.editor.getValue());
+        } catch (error) {
+          showToast("JSON non valido. Correggi gli errori.", "error");
+          return;
+        }
+
+        const prettyContent = JSON.stringify(parsed, null, 2);
+
+        document.getElementById("comboStatus").textContent =
+          `Salvataggio di ${file.name} in corso...`;
+        let saveSuccessful = false;
+
+        try {
+          const fetchPromise = fetch("/combo_files.json", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: file.name,
+              content: prettyContent,
+            }),
+          });
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("timeout")), 5000)
+          );
+          const response = await Promise.race([fetchPromise, timeoutPromise]);
+          const message = response ? await response.text() : "";
+          document.getElementById("comboStatus").textContent =
+            message || `File ${file.name} salvato.`;
+          showToast(`File ${file.name} salvato.`, "success");
+          saveSuccessful = true;
+        } catch (error) {
+          if (error.message === "timeout") {
+            document.getElementById("comboStatus").textContent =
+              `File ${file.name} salvato (timeout).`;
+            showToast(
+              "Salvataggio completato. Il dispositivo potrebbe essersi riavviato.",
+              "success"
+            );
+            saveSuccessful = true;
+          } else {
+            console.error(error);
+            document.getElementById("comboStatus").textContent =
+              `Errore nel salvataggio di ${file.name}.`;
+            showToast("Errore nel salvataggio del file.", "error");
+          }
+        }
+
+        if (saveSuccessful) {
+          file.content = prettyContent;
+          if (state.combos.eventSource) {
+            state.combos.eventSource.close();
+          }
+          setTimeout(setupComboLogs, 3000);
+        }
+      }
+
+      function formatComboEditor() {
+        const currentValue = state.combos.editor.getValue();
+        try {
+          const formatted = formatJsonValue(currentValue);
+          state.combos.editor.setValue(formatted);
+          showToast(
+            hasPrettier
+              ? "JSON formattato con Prettier."
+              : "JSON formattato in modo basilare.",
+            hasPrettier ? "info" : "success"
+          );
+        } catch (error) {
+          console.error(error);
+          showToast("Impossibile formattare il JSON.", "error");
+        }
+      }
+
+      function setupComboLogs() {
+        const logContainer = document.getElementById("comboLogContainer");
+        logContainer.innerHTML = "";
+        state.combos.eventSource = new EventSource("/log");
+
+        state.combos.eventSource.onopen = () => {
+          const entry = document.createElement("div");
+          entry.textContent = "Connessione ai log stabilita.";
+          entry.style.color = "#8f8";
+          logContainer.appendChild(entry);
+          logContainer.scrollTop = logContainer.scrollHeight;
+        };
+
+        state.combos.eventSource.onmessage = (event) => {
+          const entry = document.createElement("div");
+          entry.textContent = event.data;
+          logContainer.appendChild(entry);
+          logContainer.scrollTop = logContainer.scrollHeight;
+        };
+
+        state.combos.eventSource.onerror = () => {
+          const entry = document.createElement("div");
+          entry.textContent =
+            "Connessione ai log interrotta. Premi Riconnetti per riprovare.";
+          entry.style.color = "#f88";
+          logContainer.appendChild(entry);
+          logContainer.scrollTop = logContainer.scrollHeight;
+          state.combos.eventSource.close();
+        };
+      }
+
+      function initializeEventHandlers() {
+        document
+          .getElementById("wifiForm")
+          .addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const wifi = gatherWifiDataFromForm();
+            await submitWifiConfig({ wifi }, document.getElementById("wifiFormStatus"));
+            state.wifi.lastUpdated = new Date();
+            updateWifiUpdatedLabel();
+            updateWifiModeLabel(wifi);
+            showToast("Configurazione inviata. Il dispositivo potrebbe riavviarsi.", "success");
+          });
+
+        document
+          .getElementById("resetWifiForm")
+          .addEventListener("click", resetWifiForm);
+
+        document
+          .getElementById("refreshWifiData")
+          .addEventListener("click", async () => {
+            await Promise.all([
+              refreshDeviceStatus(true),
+              loadWifiConfig(true),
+            ]);
+          });
+
+        document
+          .getElementById("fillWizardFromForm")
+          .addEventListener("click", sendFormValuesToWizard);
+      }
+
+      async function init() {
+        setupTabs();
+        setupWizard();
+        initializeEventHandlers();
+        setupComboEditor();
+        await refreshDeviceStatus();
+        await loadWifiConfig();
+        await loadComboFiles();
+        setupComboLogs();
+      }
+
+      document.addEventListener("DOMContentLoaded", init);
     </script>
   </body>
 </html>
