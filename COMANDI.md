@@ -79,8 +79,27 @@ Il MacroPad ESP32 supporta una vasta gamma di comandi configurabili attraverso c
 
 #### 6. Gesti
 ```json
-"G_ID:0": ["S_B:CTRL+SUPER,RIGHT_ARROW"]  // Gesto ID 0
-"G_ID:1": ["S_B:CTRL+SUPER,LEFT_ARROW"]   // Gesto ID 1
+"G_TILT_LEFT": ["S_B:CTRL+SUPER,LEFT_ARROW"],
+"G_TILT_RIGHT": ["S_B:CTRL+SUPER,RIGHT_ARROW"],
+"G_TILT_FORWARD": ["S_B:PAGE_UP"],
+"G_TILT_BACKWARD": ["S_B:PAGE_DOWN"],
+"G_ROTATE_90_CW": ["S_B:CTRL+ALT,RIGHT_ARROW"],
+"G_ROTATE_90_CCW": ["S_B:CTRL+ALT,LEFT_ARROW"],
+"G_ROTATE_180": ["S_B:CTRL+ALT,DOWN_ARROW"],
+"G_FACE_UP": ["S_B:HOME"],
+"G_FACE_DOWN": ["S_B:END"],
+"G_SPIN": ["S_B:SUPER+l"],
+"G_SHAKE_X": ["S_B:SUPER+q"],
+"G_SHAKE_Y": ["S_B:CTRL+SUPER,UP_ARROW"],
+"G_SHAKE_Z": ["S_B:CTRL+SUPER,DOWN_ARROW"],
+"G_LINE": ["S_B:CTRL+SHIFT,LEFT_ARROW"],
+"G_CIRCLE": ["S_B:CTRL+A"],
+"G_TRIANGLE": ["S_B:CTRL+SHIFT,S"],
+"G_SQUARE": ["S_B:CTRL+S"],
+"G_ZIGZAG": ["S_B:CTRL+Z"],
+"G_INFINITY": ["S_B:CTRL+SHIFT,Z"],
+"G_SPIRAL": ["S_B:CTRL+Y"],
+"G_ARC": ["S_B:CTRL+P"]
 ```
 
 ---
@@ -488,19 +507,21 @@ Il MacroPad supporta il riconoscimento gesti personalizzati usando l'acceleromet
 
 | Comando | Descrizione |
 |---------|-------------|
-| `TRAIN_GESTURE` | Modalità addestramento gesto |
+| `TRAIN_GESTURE` | Modalità addestramento gesto (solo recognizer legacy) |
 | `EXECUTE_GESTURE` | Esegui gesto riconosciuto |
 | `CALIBRATE_SENSOR` | Calibra accelerometro |
 | `TOGGLE_SAMPLING` | Attiva/disattiva campionamento sensore |
 
 **Esempi:**
 ```json
-"BUTTON": ["TRAIN_GESTURE"]          // Addestra nuovo gesto
+"BUTTON": ["TRAIN_GESTURE"]          // Addestra nuovo gesto (solo se supportato)
 "BUTTON": ["EXECUTE_GESTURE"]        // Esegui gesto
 "1+5+9": ["CALIBRATE_SENSOR"]        // Calibra accelerometro
 ```
 
 ### Come Addestrare un Gesto
+
+> Disponibile solo se il recognizer corrente supporta il training (modalità legacy KNN). Con i recognizer predefiniti per MPU6050/ADXL345 il comando `TRAIN_GESTURE` viene ignorato.
 
 **1. Configurazione Iniziale:**
 ```json

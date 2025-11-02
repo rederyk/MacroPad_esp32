@@ -88,6 +88,7 @@ bool RotaryEncoder::processInput() {
         currentEvent.value1 = 0;
         currentEvent.value2 = encoderValue;
         currentEvent.state = false;
+        currentEvent.text = "";
         waitingForRelease = false;
         hasNewEvent = true;
     }
@@ -99,6 +100,7 @@ bool RotaryEncoder::processInput() {
         currentEvent.value1 = direction * config->stepValue;
         currentEvent.value2 = encoderValue + (direction * config->stepValue);
         currentEvent.state = true;
+        currentEvent.text = "";
         encoderValue += direction * config->stepValue;
         lastRotationTime = currentTime;
         waitingForRelease = true;
@@ -112,6 +114,7 @@ bool RotaryEncoder::processInput() {
         currentEvent.value1 = 0;
         currentEvent.value2 = 0;
         currentEvent.state = (reading == LOW);
+        currentEvent.text = "";
         lastButtonState = reading;
         hasNewEvent = true;
     }

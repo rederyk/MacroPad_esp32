@@ -97,6 +97,7 @@ bool Keypad::processInput() {
                     currentEvent.value1 = r * config->cols + c; // Unique key code
                     currentEvent.value2 = config->keys[r][c];   // Key character
                     currentEvent.state = currentState;
+                    currentEvent.text = "";
                     hasEvent = true;
                     return true;
                 }

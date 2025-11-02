@@ -302,39 +302,6 @@ String getComboFileType(const String &fullPath)
     return "unknown";
 }
 
-// Legge il file gesture_features.json
-String readGestureFeatureFile()
-{
-    File file = LittleFS.open("/gesture_features.json", "r");
-    if (!file)
-    {
-        Logger::getInstance().log("⚠️ Failed to open gesture_features.json");
-        return "{}"; // Ritorna un JSON vuoto
-    }
-    String json = file.readString();
-    file.close();
-    if (json.length() == 0)
-    {
-        Logger::getInstance().log("⚠️ gesture_features.json is empty!");
-        return "{}";
-    }
-    return json;
-}
-
-// Scrive il file gesture_features.json
-bool writeGestureFeatureFile(const String &json)
-{
-    File file = LittleFS.open("/gesture_features.json", "w");
-    if (!file)
-    {
-        Logger::getInstance().log("⚠️ Failed to open gesture_features.json for writing.");
-        return false;
-    }
-    file.print(json);
-    file.close();
-    return true;
-}
-
 configWebServer::configWebServer() : server(80) {}
 
 void configWebServer::begin()
@@ -966,43 +933,6 @@ void configWebServer::setupRoutes()
         file.close();
         request->send(200, "text/html", html); });
 
-    // Endpoint per gestire gesture_features.json
-    // GET: restituisce il contenuto del file gesture_features.json
-    server.on("/gesture_features.json", HTTP_GET, [](AsyncWebServerRequest *request)
-              { request->send(200, "application/json", readGestureFeatureFile()); });
-
-    // POST: aggiorna il file gesture_features.json con il nuovo contenuto JSON
-    server.on("/gesture_features.json", HTTP_POST, [](AsyncWebServerRequest *request) {}, nullptr, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
-              {
-        String newBody = "";
-        for (size_t i = 0; i < len; i++) {
-            newBody += (char)data[i];
-        }
-        Logger::getInstance().log("📥 Received gesture_features update:");
-        Logger::getInstance().log(newBody);
-
-        if (writeGestureFeatureFile(newBody)) {
-            Logger::getInstance().log("💾 Saved gesture_features configuration:");
-            Logger::getInstance().log(newBody);
-            request->send(200, "text/plain", "✅ Gesture feature configuration updated successfully! Restarting...");
-             vTaskDelay(pdMS_TO_TICKS(1000)); // Dai tempo al tempo
-            ESP.restart();
-        } else {
-            request->send(500, "text/plain", "❌ Failed to save gesture feature configuration.");
-        } });
-
-    // Endpoint per servire la pagina HTML per gesture_features.json
-    server.on("/gesture_features.html", HTTP_GET, [](AsyncWebServerRequest *request)
-              {
-        File file = LittleFS.open("/gesture_features.html", "r");
-        if (!file) {
-            request->send(404, "text/plain", "❌ gesture_features.html not found");
-            return;
-        }
-        String html = file.readString();
-        file.close();
-        request->send(200, "text/html", html); });
-
     // --- Special Actions Endpoints ---
     server.on("/resetDevice", HTTP_POST, [](AsyncWebServerRequest *request)
               {
@@ -1015,67 +945,6 @@ void configWebServer::setupRoutes()
         Logger::getInstance().log(" calibrating Sensor...");
         specialAction.calibrateSensor();
         request->send(200, "text/plain", "✅ Calibrating Sensor..."); });
-
-    server.on("/toggleSampling", HTTP_POST, [](AsyncWebServerRequest *request)
-              {
-        String pressedParam = request->arg("pressed");
-        bool pressed = (pressedParam == "true");
-        Logger::getInstance().log(" toggling Sampling...");
-        specialAction.toggleSampling(pressed);
-        request->send(200, "text/plain", "✅ Toggling Sampling..."); });
-
-    server.on("/clearAllGestures", HTTP_POST, [](AsyncWebServerRequest *request)
-              {
-        Logger::getInstance().log(" clearing All Gestures...");
-        specialAction.clearAllGestures();
-        request->send(200, "text/plain", "✅ Clearing All Gestures..."); });
-
-    // Endpoint aggiornato per clearGestureWithID
-    server.on("/clearGestureWithID", HTTP_POST, [](AsyncWebServerRequest *request)
-              {
-        if (request->hasArg("key")) {
-            int key = request->arg("key").toInt();
-            Logger::getInstance().log(" clearing Gesture With ID " + String(key) + "...");
-            specialAction.clearGestureWithID(key);
-            request->send(200, "text/plain", "✅ Clearing Gesture With ID " + String(key) + "...");
-        } else {
-            Logger::getInstance().log("⚠️ Missing 'key' parameter for clearGestureWithID");
-            request->send(400, "text/plain", "❌ Missing key parameter.");
-        } });
-
-    server.on("/convertJsonToBinary", HTTP_POST, [](AsyncWebServerRequest *request)
-              {
-        Logger::getInstance().log(" converting Json To Binary...");
-        specialAction.convertJsonToBinary();
-        request->send(200, "text/plain", "✅ converting Json To Binary..."); });
-
-    server.on("/printJson", HTTP_POST, [](AsyncWebServerRequest *request)
-              {
-        Logger::getInstance().log(" printing Json...");
-        specialAction.printJson();
-        request->send(200, "text/plain", "✅ printing Json..."); });
-
-    server.on("/trainGesture", HTTP_POST, [](AsyncWebServerRequest *request)
-              {
-        String pressedParam = request->arg("pressed");
-        bool pressed = (pressedParam == "true");
-        
-        if (!pressed) { // When training stops, a key is required.
-            if (!request->hasArg("key")) {
-                Logger::getInstance().log("⚠️ Missing 'key' parameter for trainGesture when pressed is false");
-                request->send(400, "text/plain", "❌ Missing key parameter when stopping training.");
-                return;
-            }
-            int key = request->arg("key").toInt();
-            Logger::getInstance().log(" training Gesture stop with key " + String(key) + "...");
-            // Call the version that accepts a key parameter. Make sure to implement this.
-            specialAction.trainGesture(pressed, key);
-            request->send(200, "text/plain", "✅ Training gesture stopped with key " + String(key) + "...");
-        } else {
-            Logger::getInstance().log(" training Gesture start...");
-            specialAction.trainGesture(pressed);
-            request->send(200, "text/plain", "✅ Training gesture started...");
-        } });
 
     server.on("/executeGesture", HTTP_POST, [](AsyncWebServerRequest *request)
               {

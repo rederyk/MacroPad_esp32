@@ -1182,11 +1182,7 @@ Questi colori sono temporanei (150-300ms) e poi tornano al colore normale.
 - Monitoraggio gesti (score KNN)
 - Status componenti
 
-**Gesture Features (gesture_features.html):**
-- Visualizza gesti salvati
-- Rimuovi gesti
-- Converti JSON to Binary
-- Copia/incolla per backup
+**Gesture Features:** non più configurabili – i recognizer utilizzano set predefiniti.
 
 **Config Editor (config.html):**
 - Modifica config.json

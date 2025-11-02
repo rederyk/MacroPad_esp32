@@ -45,10 +45,15 @@ struct OrientationFeatures {
     // Total rotation
     float totalRotation;      // Sum of all angular changes
 
-    // Gyroscope features
+    // Gyroscope features (magnitude)
     float gyroMagnitudeMean;  // Average angular velocity
     float gyroMagnitudeMax;   // Peak angular velocity
     float gyroMagnitudeStd;   // Variation in angular velocity
+
+    // Raw gyroscope axis features (for motion-based gestures)
+    float gyroXMean, gyroXMax, gyroXStd;  // X-axis (roll) rotation rate
+    float gyroYMean, gyroYMax, gyroYStd;  // Y-axis (pitch) rotation rate
+    float gyroZMean, gyroZMax, gyroZStd;  // Z-axis (yaw) rotation rate
 
     // Final orientation
     float finalRoll;          // Ending roll
@@ -62,6 +67,9 @@ struct OrientationFeatures {
         yawMean = yawStd = 0;
         totalRotation = 0;
         gyroMagnitudeMean = gyroMagnitudeMax = gyroMagnitudeStd = 0;
+        gyroXMean = gyroXMax = gyroXStd = 0;
+        gyroYMean = gyroYMax = gyroYStd = 0;
+        gyroZMean = gyroZMax = gyroZStd = 0;
         finalRoll = finalPitch = finalYaw = 0;
     }
 };
@@ -94,6 +102,8 @@ enum OrientationType {
  */
 class OrientationFeatureExtractor {
 public:
+    static constexpr uint16_t MAX_HISTORY_SAMPLES = 320;
+
     OrientationFeatureExtractor();
 
     /**

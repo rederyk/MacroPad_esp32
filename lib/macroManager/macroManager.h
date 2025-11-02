@@ -74,6 +74,7 @@ private:
     unsigned long lastActionTime;
     unsigned long encoderReleaseTime; // Tempo per il rilascio dell'encoder
     std::string pendingCombination;
+    std::string pendingGestureFallback;
     std::string lastAction;
     std::string lastExecutedAction;
     std::string currentActivationCombo; // Combo che ha attivato l'azione corrente
@@ -101,6 +102,7 @@ private:
     std::string getOrderAwareCombination();
     std::string getCurrentKeyCombination(); // Get only key combination without encoder/button actions
     void processKeyCombination();
+    bool executeCombinationActions(const std::string &comboKey);
     void releaseGestureActions();
 
     // Flashlight mode state

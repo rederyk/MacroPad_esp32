@@ -45,7 +45,7 @@ struct GestureRecognitionResult {
 
     GestureRecognitionResult()
         : gestureID(-1), confidence(0.0f), sensorMode(SENSOR_MODE_AUTO),
-          gestureName("unknown"), modeSpecificData(nullptr) {}
+          gestureName("G_UNKNOWN"), modeSpecificData(nullptr) {}
 };
 
 /**
@@ -67,19 +67,6 @@ public:
      * @return Recognition result with ID, confidence, and metadata
      */
     virtual GestureRecognitionResult recognize(SampleBuffer* buffer) = 0;
-
-    /**
-     * Train/save a custom gesture with given ID
-     * @param buffer Sample buffer containing gesture data
-     * @param gestureID Custom gesture ID (0-8)
-     * @return true if saved successfully
-     */
-    virtual bool trainCustomGesture(SampleBuffer* buffer, uint8_t gestureID) = 0;
-
-    /**
-     * Check if this recognizer supports custom gesture training
-     */
-    virtual bool supportsCustomTraining() const = 0;
 
     /**
      * Get sensor mode name for logging

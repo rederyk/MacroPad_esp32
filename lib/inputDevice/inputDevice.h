@@ -29,11 +29,12 @@ struct InputEvent {
         BUTTON,
         MOTION
     };
-    
-    EventType type;
-    int value1;  // For key codes, rotation direction, etc.
-    int value2;  // For additional data (e.g., acceleration values)
-    bool state;  // Pressed/released, button state, etc.
+
+    EventType type{EventType::KEY_PRESS};
+    int value1{0};   // For key codes, rotation direction, etc.
+    int value2{0};   // For additional data (e.g., acceleration values)
+    bool state{false};  // Pressed/released, button state, etc.
+    String text;     // Optional textual payload (e.g., gesture name)
 };
 
 class InputDevice {

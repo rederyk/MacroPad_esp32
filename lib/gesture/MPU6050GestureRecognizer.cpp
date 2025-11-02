@@ -20,7 +20,10 @@
 #include "Logger.h"
 
 MPU6050GestureRecognizer::MPU6050GestureRecognizer()
-    : _confidenceThreshold(0.5f) {
+    : _shapeRecognizer(),
+      _confidenceThreshold(0.5f) {
+    _shapeRecognizer.setMinMotionStdDev(0.25f);
+    _shapeRecognizer.setUseMadgwick(true);
 }
 
 MPU6050GestureRecognizer::~MPU6050GestureRecognizer() {
@@ -42,52 +45,45 @@ GestureRecognitionResult MPU6050GestureRecognizer::recognize(SampleBuffer* buffe
         return GestureRecognitionResult();
     }
 
-    // Try both recognition modes
-    GestureRecognitionResult shapeResult = recognizeShape(buffer);
-    GestureRecognitionResult orientationResult = recognizeOrientation(buffer);
+    // Fast check: prioritize orientation-based gestures if significant gyro activity
+    float gyroActivity = calculateGyroActivity(buffer);
 
-    // Select best result
-    GestureRecognitionResult result = selectBestResult(shapeResult, orientationResult);
+    GestureRecognitionResult result;
+
+    // If significant rotation detected, try orientation first (more efficient)
+    if (gyroActivity > 0.5f) {
+        result = recognizeOrientation(buffer);
+
+        // If orientation fails, try shape as fallback
+        if (result.gestureID < 0) {
+            result = recognizeShape(buffer);
+        }
+    } else {
+        // For low gyro activity, try shape first
+        result = recognizeShape(buffer);
+
+        // If shape fails, try orientation as fallback
+        if (result.gestureID < 0) {
+            result = recognizeOrientation(buffer);
+        }
+    }
+
+    if (result.gestureID >= 0 && result.confidence < _confidenceThreshold) {
+        Logger::getInstance().log("MPU6050GestureRecognizer: Discarded low confidence gesture (" +
+                                  String(result.confidence, 2) + ")");
+        return GestureRecognitionResult();
+    }
 
     return result;
 }
 
 GestureRecognitionResult MPU6050GestureRecognizer::recognizeShape(SampleBuffer* buffer) {
-    GestureRecognitionResult result;
-    result.sensorMode = SENSOR_MODE_MPU6050;
+    GestureRecognitionResult result = _shapeRecognizer.recognize(buffer, SENSOR_MODE_MPU6050);
 
-    if (!hasSignificantMotion(buffer)) {
-        return result;
+    if (result.gestureID >= 0) {
+        Logger::getInstance().log(String("MPU6050 Shape: ") + result.gestureName +
+                                  " (conf: " + String(result.confidence, 2) + ")");
     }
-
-    // Apply low-pass filter directly to buffer
-    applyLowPassFilter(buffer, 5.0f);
-
-    // Integrate motion to get path
-    MotionPath path;
-    if (!_motionIntegrator.integrate(buffer, path)) {
-        Logger::getInstance().log("MPU6050: Motion integration failed");
-        return result;
-    }
-
-    // Analyze shape
-    ShapeFeatures features;
-    if (!_shapeAnalyzer.analyze(path, features)) {
-        return result;
-    }
-
-    // Classify shape
-    ShapeType shapeType = _shapeAnalyzer.classifyShape(features);
-    result.confidence = _shapeAnalyzer.getConfidence();
-    result.gestureID = shapeTypeToID(shapeType);
-    result.gestureName = shapeTypeToName(shapeType);
-
-    // Store shape type in mode-specific data
-    ShapeType* storedShape = new ShapeType(shapeType);
-    result.modeSpecificData = storedShape;
-
-    Logger::getInstance().log(String("MPU6050 Shape: ") + result.gestureName +
-                            " (conf: " + String(result.confidence, 2) + ")");
 
     return result;
 }
@@ -110,12 +106,12 @@ GestureRecognitionResult MPU6050GestureRecognizer::recognizeOrientation(SampleBu
     // Classify orientation
     OrientationType orientationType = _orientationExtractor.classify(features);
     result.confidence = _orientationExtractor.getConfidence();
+    if (orientationType == ORIENT_UNKNOWN || result.confidence <= 0.0f) {
+        Logger::getInstance().log("MPU6050 Orientation: No valid orientation detected");
+        return result;
+    }
     result.gestureID = orientationTypeToID(orientationType);
     result.gestureName = orientationTypeToName(orientationType);
-
-    // Store orientation type in mode-specific data
-    OrientationType* storedOrientation = new OrientationType(orientationType);
-    result.modeSpecificData = storedOrientation;
 
     Logger::getInstance().log(String("MPU6050 Orientation: ") + result.gestureName +
                             " (conf: " + String(result.confidence, 2) + ")");
@@ -123,67 +119,35 @@ GestureRecognitionResult MPU6050GestureRecognizer::recognizeOrientation(SampleBu
     return result;
 }
 
-GestureRecognitionResult MPU6050GestureRecognizer::selectBestResult(
-    const GestureRecognitionResult& shape,
-    const GestureRecognitionResult& orientation) {
+float MPU6050GestureRecognizer::calculateGyroActivity(SampleBuffer* buffer) const {
+    if (!buffer || buffer->sampleCount < 3) return 0.0f;
 
-    // Return result with higher confidence
-    if (shape.confidence >= orientation.confidence && shape.gestureID >= 0) {
-        return shape;
-    } else if (orientation.gestureID >= 0) {
-        return orientation;
-    }
-
-    // Both failed
-    return GestureRecognitionResult();
-}
-
-bool MPU6050GestureRecognizer::trainCustomGesture(SampleBuffer* buffer, uint8_t gestureID) {
-    Logger::getInstance().log("MPU6050: Custom training not supported - use predefined gestures only");
-    return false;
-}
-
-bool MPU6050GestureRecognizer::hasSignificantMotion(SampleBuffer* buffer) const {
-    if (!buffer || buffer->sampleCount < 5) return false;
-
-    float totalAccel = 0.0f;
-    for (uint16_t i = 0; i < buffer->sampleCount; i++) {
-        float mag = sqrt(buffer->samples[i].x * buffer->samples[i].x +
-                        buffer->samples[i].y * buffer->samples[i].y +
-                        buffer->samples[i].z * buffer->samples[i].z);
-        totalAccel += mag;
-    }
-
-    float avgAccel = totalAccel / buffer->sampleCount;
-    return avgAccel > 1.5f; // More than 1.5 G average
-}
-
-bool MPU6050GestureRecognizer::hasOrientationChange(SampleBuffer* buffer) const {
-    if (!buffer || buffer->sampleCount < 5) return false;
-
-    // Check if gyro data is available
-    bool hasGyro = false;
+    float maxGyro = 0.0f;
     float totalGyro = 0.0f;
+    uint16_t validCount = 0;
 
     for (uint16_t i = 0; i < buffer->sampleCount; i++) {
         if (buffer->samples[i].gyroValid) {
-            hasGyro = true;
-            float gyroMag = sqrt(buffer->samples[i].gyroX * buffer->samples[i].gyroX +
-                               buffer->samples[i].gyroY * buffer->samples[i].gyroY +
-                               buffer->samples[i].gyroZ * buffer->samples[i].gyroZ);
+            float gyroMag = sqrtf(buffer->samples[i].gyroX * buffer->samples[i].gyroX +
+                                 buffer->samples[i].gyroY * buffer->samples[i].gyroY +
+                                 buffer->samples[i].gyroZ * buffer->samples[i].gyroZ);
             totalGyro += gyroMag;
+            if (gyroMag > maxGyro) maxGyro = gyroMag;
+            validCount++;
         }
     }
 
-    if (!hasGyro) return false;
+    if (validCount == 0) return 0.0f;
 
-    float avgGyro = totalGyro / buffer->sampleCount;
-    return avgGyro > 0.3f; // Significant rotation (rad/s)
+    // Return average of mean and max to capture both sustained and peak rotation
+    float avgGyro = totalGyro / validCount;
+    return (avgGyro + maxGyro) * 0.5f;
 }
 
-int MPU6050GestureRecognizer::shapeTypeToID(ShapeType shape) const {
-    // IDs 100-199 for shapes
-    return 100 + static_cast<int>(shape);
+bool MPU6050GestureRecognizer::hasOrientationChange(SampleBuffer* buffer) const {
+    float activity = calculateGyroActivity(buffer);
+    // Lower threshold for better detection (was 0.3)
+    return activity > 0.2f; // ~11.5 degrees/sec average rotation
 }
 
 int MPU6050GestureRecognizer::orientationTypeToID(OrientationType orientation) const {
@@ -191,29 +155,21 @@ int MPU6050GestureRecognizer::orientationTypeToID(OrientationType orientation) c
     return 200 + static_cast<int>(orientation);
 }
 
-String MPU6050GestureRecognizer::shapeTypeToName(ShapeType shape) const {
-    switch (shape) {
-        case SHAPE_CIRCLE: return "circle";
-        case SHAPE_LINE: return "line";
-        case SHAPE_TRIANGLE: return "triangle";
-        case SHAPE_SQUARE: return "square";
-        case SHAPE_ZIGZAG: return "zigzag";
-        case SHAPE_INFINITY: return "infinity";
-        case SHAPE_SPIRAL: return "spiral";
-        case SHAPE_ARC: return "arc";
-        default: return "unknown";
-    }
-}
-
 String MPU6050GestureRecognizer::orientationTypeToName(OrientationType orientation) const {
     switch (orientation) {
-        case ORIENT_ROTATE_90_CW: return "rotate_cw";
-        case ORIENT_ROTATE_90_CCW: return "rotate_ccw";
-        case ORIENT_ROTATE_180: return "rotate_180";
-        case ORIENT_TILT_FORWARD: return "tilt_forward";
-        case ORIENT_TILT_BACKWARD: return "tilt_backward";
-        case ORIENT_TILT_LEFT: return "tilt_left";
-        case ORIENT_TILT_RIGHT: return "tilt_right";
-        default: return "unknown";
+        case ORIENT_ROTATE_90_CW: return "G_ROTATE_90_CW";
+        case ORIENT_ROTATE_90_CCW: return "G_ROTATE_90_CCW";
+        case ORIENT_ROTATE_180: return "G_ROTATE_180";
+        case ORIENT_TILT_FORWARD: return "G_TILT_FORWARD";
+        case ORIENT_TILT_BACKWARD: return "G_TILT_BACKWARD";
+        case ORIENT_TILT_LEFT: return "G_TILT_LEFT";
+        case ORIENT_TILT_RIGHT: return "G_TILT_RIGHT";
+        case ORIENT_FACE_UP: return "G_FACE_UP";
+        case ORIENT_FACE_DOWN: return "G_FACE_DOWN";
+        case ORIENT_SPIN: return "G_SPIN";
+        case ORIENT_SHAKE_X: return "G_SHAKE_X";
+        case ORIENT_SHAKE_Y: return "G_SHAKE_Y";
+        case ORIENT_SHAKE_Z: return "G_SHAKE_Z";
+        default: return "G_UNKNOWN_ORIENT";
     }
 }

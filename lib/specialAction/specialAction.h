@@ -32,19 +32,6 @@ public:
 
     /// Sensor management
     void calibrateSensor();
-    void toggleSampling(bool pressed);
-
-    /// Gesture handling
-    bool saveGesture(int id); // Returns success status
-    void clearAllGestures();
-    void clearGestureWithID(int key = -1);
-
-    /// Data conversion
-    bool convertJsonToBinary(); // Returns success status
-    void printJson();           // Prints JSON data
-
-    /// Gesture training
-    void trainGesture(bool pressed, int key = -1);
     String getGestureID();
 
     void printMemoryInfo();

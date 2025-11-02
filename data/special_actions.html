@@ -54,111 +54,9 @@
             <button class="btn btn-primary" onclick="calibrateSensor()">
               Calibrate Sensor
             </button>
-            <!--<div class="d-flex">
-                <button
-                class="btn btn-success flex-fill me-1"
-                onclick="toggleSampling(true)"
-              >
-                Start Sampling
-              </button>
-              <button
-                class="btn btn-danger flex-fill ms-1"
-                onclick="toggleSampling(false)"
-              >
-                Stop Sampling
-              </button>
-            </div>-->
-            <button class="btn btn-warning" onclick="clearAllGestures()">
-              Clear All Gestures
-            </button>
-            <!-- Pulsante per cancellare un gesto tramite tastierino -->
-            <button class="btn btn-warning" onclick="clearGestureWithID()">
-              Clear Gesture with ID (tastierino)
-            </button>
-
-            <button class="btn btn-secondary" onclick="convertJsonToBinary()">
-              Convert JSON to Binary
-            </button>
-            <button class="btn btn-info" onclick="printJson()">
-              Print JSON
-            </button>
-            <!-- Sezione con tastiera numerica per l'inserimento della key -->
-            <div class="panel mt-3">
-              <h4>Inserisci il numero</h4>
-              <!-- Area per mostrare il messaggio in attesa della key -->
-              <div id="keypadStatus" class="keypad-status"></div>
-              <div class="btn-group" role="group" aria-label="Numeric Keypad">
-                <button
-                  class="btn btn-outline-primary"
-                  onclick="onKeypadPress(0)"
-                >
-                  0
-                </button>
-                <button
-                  class="btn btn-outline-primary"
-                  onclick="onKeypadPress(1)"
-                >
-                  1
-                </button>
-                <button
-                  class="btn btn-outline-primary"
-                  onclick="onKeypadPress(2)"
-                >
-                  2
-                </button>
-                <button
-                  class="btn btn-outline-primary"
-                  onclick="onKeypadPress(3)"
-                >
-                  3
-                </button>
-                <button
-                  class="btn btn-outline-primary"
-                  onclick="onKeypadPress(4)"
-                >
-                  4
-                </button>
-                <button
-                  class="btn btn-outline-primary"
-                  onclick="onKeypadPress(5)"
-                >
-                  5
-                </button>
-                <button
-                  class="btn btn-outline-primary"
-                  onclick="onKeypadPress(6)"
-                >
-                  6
-                </button>
-                <button
-                  class="btn btn-outline-primary"
-                  onclick="onKeypadPress(7)"
-                >
-                  7
-                </button>
-                <button
-                  class="btn btn-outline-primary"
-                  onclick="onKeypadPress(8)"
-                >
-                  8
-                </button>
-              </div>
-            </div>
-            <div class="d-flex">
-              <!-- Quando si clicca su Start Training viene attivata la modalità trainingActive -->
-              <button
-                class="btn btn-success flex-fill me-1"
-                onclick="trainGesture(true)"
-              >
-                Start Training
-              </button>
-              <!-- Se vuoi mantenere il pulsante Stop Training come opzione alternativa, puoi lasciarlo -->
-              <!-- <button
-                class="btn btn-danger flex-fill ms-1"
-                onclick="trainGesture(false)"
-              >
-                Stop Training (tastierino)
-              </button>-->
+            <div class="alert alert-info">
+              Gesture training and manual storage have been retired. The
+              predefined motion library is always active.
             </div>
             <div class="d-flex">
               <button
@@ -218,9 +116,10 @@
               <button
                 type="button"
                 class="btn btn-outline-warning btn-sm w-100"
-                onclick="window.location.href='/gesture_features.html'"
+                disabled
+                title="Gesture features are fixed for predefined recognizers"
               >
-                Manage Gesture Features
+                Gesture Features (Fixed)
               </button>
             </div>
           </div>
@@ -262,92 +161,12 @@
         }
       }
 
-      // Variabili globali per la gestione della key pendente e del training
-      let pendingKeyAction = null;
-      let pendingActionDescription = "";
-      let trainingActive = false;
-
-      function setPendingKeyAction(action, description) {
-        pendingKeyAction = action;
-        pendingActionDescription = description;
-        document.getElementById("keypadStatus").textContent =
-          "Inserisci la key per: " + description;
-      }
-
-      function clearPendingKeyAction() {
-        pendingKeyAction = null;
-        pendingActionDescription = "";
-        document.getElementById("keypadStatus").textContent = "";
-      }
-
-      // Questa funzione viene chiamata al click di un tasto della tastiera
-      function onKeypadPress(num) {
-        // Se il training è attivo, la pressione del tasto lo ferma direttamente
-        if (trainingActive) {
-          trainingActive = false;
-          sendRequest(
-            "/trainGesture?pressed=false&key=" + encodeURIComponent(num)
-          );
-          document.getElementById("keypadStatus").textContent = "";
-          return;
-        }
-        if (pendingKeyAction) {
-          pendingKeyAction(num);
-          clearPendingKeyAction();
-        } else {
-          // Se non è in attesa di una key, usiamo l'azione predefinita per clearGesture
-          clearGestureWithIDNumber(num);
-        }
-      }
-
       // Funzioni per i pulsanti
       function resetDevice() {
         sendRequest("/resetDevice");
       }
       function calibrateSensor() {
         sendRequest("/calibrateSensor");
-      }
-      function toggleSampling(pressed) {
-        sendRequest("/toggleSampling?pressed=" + pressed);
-      }
-      function clearAllGestures() {
-        sendRequest("/clearAllGestures");
-      }
-      // Imposta l'azione pendente per la cancellazione di un gesto
-      function clearGestureWithID() {
-        setPendingKeyAction(function (key) {
-          sendRequest("/clearGestureWithID?key=" + encodeURIComponent(key));
-        }, "Clear Gesture");
-      }
-      // Azione di default se l'utente clicca direttamente sul tastierino senza azione pendente
-      function clearGestureWithIDNumber(num) {
-        sendRequest("/clearGestureWithID?key=" + encodeURIComponent(num));
-      }
-      function convertJsonToBinary() {
-        sendRequest("/convertJsonToBinary");
-      }
-      function printJson() {
-        sendRequest("/printJson");
-      }
-      // Funzione per il training del gesto:
-      // - Con 'start' (true) viene attivato il training e si attende che il tastierino lo fermi
-      // - Con 'stop' (false) (ad es. dal pulsante alternativo) si imposta l'azione pendente
-      function trainGesture(start) {
-        if (start) {
-          trainingActive = true;
-          document.getElementById("keypadStatus").textContent =
-            "Training iniziato. Premi un tasto per fermarlo.";
-          sendRequest("/trainGesture?pressed=" + start);
-        } else {
-          setPendingKeyAction(function (key) {
-            sendRequest(
-              "/trainGesture?pressed=" +
-                start +
-                "&key=" +
-                encodeURIComponent(key)
-            );
-          }, "Stop Training");
-        }
       }
       function executeGesture(pressed) {
         sendRequest("/executeGesture?pressed=" + pressed);

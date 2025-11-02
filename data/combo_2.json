@@ -15,10 +15,10 @@
   "5+6": ["S_B:MOUSE_MOVE_20_0_0_0"],
   "1,CW": ["S_B:MOUSE_MOVE_0_0_1_0"],
   "1,CCW": ["S_B:MOUSE_MOVE_0_0_-1_0"],
-  "G_ID:1": ["S_B:' '"],
-  "G_ID:2": ["S_B:' '"],
-  "G_ID:0": ["S_B:BACKSPACE"],
-  "G_ID:3": ["S_B:STOP"],
+  "G_TILT_LEFT": ["S_B:' '"],
+  "G_TILT_RIGHT": ["S_B:' '"],
+  "G_TILT_FORWARD": ["S_B:BACKSPACE"],
+  "G_TILT_BACKWARD": ["S_B:STOP"],
   "CW": ["S_B:F10"],
   "CCW": ["S_B:F9"]
 }

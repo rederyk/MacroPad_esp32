@@ -248,21 +248,21 @@ int InputHub::getLastGestureId() const
     return gestureDevice->getLastGestureId();
 }
 
+String InputHub::getLastGestureName() const
+{
+    if (!gestureDevice)
+    {
+        return "";
+    }
+    return gestureDevice->getLastGestureName();
+}
+
 void InputHub::clearLastGesture()
 {
     if (gestureDevice)
     {
         gestureDevice->clearLastGesture();
     }
-}
-
-bool InputHub::saveGestureSample(uint8_t id)
-{
-    if (!gestureDevice)
-    {
-        return false;
-    }
-    return gestureDevice->saveGesture(id);
 }
 
 void InputHub::enqueue(const InputEvent &event)

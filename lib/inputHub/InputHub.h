@@ -95,8 +95,8 @@ public:
     bool stopGestureCapture();
     bool isGestureCapturing() const;
     int getLastGestureId() const;
+    String getLastGestureName() const;
     void clearLastGesture();
-    bool saveGestureSample(uint8_t id);
 
     // Reactive lighting controls
     void setReactiveLightingEnabled(bool enable);

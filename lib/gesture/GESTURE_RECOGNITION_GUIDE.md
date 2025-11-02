@@ -11,12 +11,12 @@ Il sistema di riconoscimento gesture del MacroPad ESP32 è stato completamente s
 - **Training**: ❌ NON supportato - usa solo gesture predefinite
 - **File storage**: Nessuno (non richiede training)
 
-### 2. **ADXL345 System** (KNN Custom)
+### 2. **ADXL345 System** (Shape Only)
 - **Sensore**: ADXL345 solo accelerometro
-- **Metodo**: K-Nearest Neighbors con feature extraction
-- **Gesture**: Personalizzate (da registrare con TRAIN_GESTURE)
-- **Training**: ✅ Supportato - registra fino a 9 gesture custom (ID 0-8)
-- **File storage**: `/gesture_features_adxl345.json` e `/gestures_adxl345.bin`
+- **Metodo**: Riconoscimento forme predefinite (stesso engine del MPU6050)
+- **Gesture**: Forme ID 101-108 (nessuna gesture di orientamento)
+- **Training**: ❌ Non richiesto né supportato
+- **File storage**: Nessuno
 
 ---
 
@@ -102,7 +102,9 @@ Nel file `config.json`:
 
 ---
 
-## ADXL345: Gesture Personalizzate
+## ADXL345 (Legacy KNN) - Facoltativo
+
+> Questa sezione è rilevante solo se abiliti manualmente `gestureMode: "legacy_knn"` per utilizzare il vecchio sistema con training personalizzato. Nel flusso predefinito non è necessario né disponibile il comando `TRAIN_GESTURE`.
 
 ### Custom Gestures (ID 0-8)
 
@@ -176,19 +178,16 @@ Dopo aver registrato, configura il macro:
 }
 ```
 
-### Best Practices per Training ADXL345
+### Best Practices per ADXL345 (predefinito)
 
-1. **Registra 3-5 sample per gesture**: Per migliore accuratezza, registra la stessa gesture più volte
-2. **Gesture distinte**: Usa movimenti molto diversi tra loro (es: su/giù, cerchio, scuoti)
-3. **Consistenza**: Esegui la gesture sempre nello stesso modo
-4. **Durata**: 1-2 secondi di movimento (né troppo veloce né troppo lento)
-5. **Test**: Testa il riconoscimento con `EXECUTE_GESTURE` prima di configurare i macro
+1. **Movimenti rapidi**: esegui la forma in <1s mantenendo accelerazioni nette
+2. **Ampiezza costante**: ripeti la gesture con ampiezza simile per risultati stabili
+3. **Allineamento**: orienta il dispositivo nella stessa posizione iniziale
+4. **Log seriale**: abilita i log per verificare la confidenza calcolata
 
-### Cancellare Gesture Salvate
+### Modalità legacy (opzionale)
 
-Per ricominciare da zero, elimina i file:
-- `/gesture_features_adxl345.json`
-- `/gestures_adxl345.bin`
+Se abiliti manualmente `gestureMode: "legacy_knn"`, il sistema tornerà al vecchio training KNN. In tal caso dovrai gestire manualmente i file `/gesture_features_adxl345.json` e `/gestures_adxl345.bin`, ma questa modalità non è più consigliata. Nel setup standard questi file non vengono creati né utilizzati.
 
 ---
 
@@ -277,6 +276,8 @@ Per ricominciare da zero, elimina i file:
 
 ## Differenze tra i Sistemi
 
+> Confronto riferito al sistema legacy KNN (solo se utilizzi `gestureMode: "legacy_knn"`). Nel percorso predefinito entrambi i sensori usano gesture preconfigurate senza training.
+
 | Caratteristica            | MPU6050                  | ADXL345                  |
 |---------------------------|--------------------------|--------------------------|
 | Sensore richiesto         | MPU6050 (accel + gyro)   | ADXL345 (solo accel)     |
@@ -303,6 +304,8 @@ Per ricominciare da zero, elimina i file:
 - Esegui gesture più lentamente e con movimenti ampi
 - Riduci confidence threshold: `analyzer.setConfidenceThreshold(0.4)`
 - Verifica gyro funzionante: controlla log "gyroValid"
+
+> Le seguenti note ADXL si applicano solo alla modalità legacy con training.
 
 ### ADXL345: "Training già attivo"
 

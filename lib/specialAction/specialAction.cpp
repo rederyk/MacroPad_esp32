@@ -21,7 +21,6 @@
 #include <Arduino.h>
 #include <gestureRead.h>
 #include <gestureAnalyze.h>
-#include <gestureStorage.h>
 #include <LittleFS.h>
 #include "keypad.h"
 #include "Logger.h"
@@ -38,7 +37,6 @@ extern InputHub inputHub;
 
 extern GestureRead gestureSensor;
 extern GestureAnalyze gestureAnalyzer;
-extern GestureStorage gestureStorage;
 extern PowerManager powerManager;
 extern ConfigurationManager configManager;
 
@@ -399,95 +397,22 @@ String SpecialAction::getGestureID()
     {
         return ""; // No gesture recognized yet
     }
-    else
-    {
-        int gestureId = inputHub.getLastGestureId();
-        if (gestureId < 0)
-        {
-            return "";
-        }
-        String result = "G_ID:";
-        result += String(gestureId);
-        return result;
-    }
-}
+    int gestureId = inputHub.getLastGestureId();
+    String gestureName = inputHub.getLastGestureName();
 
-void SpecialAction::toggleSampling(bool pressed)
-{
-    if (!configManager.getAccelerometerConfig().active || !inputHub.hasGestureSensor())
+    if (gestureName.length() > 0)
     {
-        Logger::getInstance().log("Accelerometer disabled");
-        return;
-    }
-    if (pressed)
-    {
-        if (inputHub.startGestureCapture())
-        {
-            Logger::getInstance().log("Sampling started");
-        }
-        else
-        {
-            Logger::getInstance().log("Sampling already started or failed to start");
-        }
-    }
-    else
-    {
-        if (inputHub.stopGestureCapture())
-        {
-            Logger::getInstance().log("Sampling stopped");
-        }
-        else
-        {
-            Logger::getInstance().log("Sampling already stopped");
-        }
-    }
-}
-
-bool SpecialAction::saveGesture(int id)
-{
-    if (!configManager.getAccelerometerConfig().active || !inputHub.hasGestureSensor())
-    {
-        Logger::getInstance().log("Accelerometer disabled");
-        return false;
-    }
-    // Basic ID validation inline
-    if (id < 0 || id > 8)
-    {
-        Logger::getInstance().log("Invalid ID (0-8 only)");
-        return false;
+        return gestureName;
     }
 
-    return inputHub.saveGestureSample(static_cast<uint8_t>(id));
-}
+    if (gestureId < 0)
+    {
+        return "";
+    }
 
-bool SpecialAction::convertJsonToBinary()
-{
-    size_t numGestures, numSamples, numFeatures;
-    float ***matrix = gestureStorage.convertJsonToMatrix3D(numGestures, numSamples, numFeatures);
-
-    if (!matrix)
-        return false;
-
-    bool success = gestureStorage.saveMatrixToBinary(
-        "/gestures.bin",
-        matrix,
-        numGestures,
-        numSamples,
-        numFeatures);
-
-    // Memory cleanup handled by saveMatrixToBinary() (DONT_REMOVE_THIS)
-    return success;
-}
-
-void SpecialAction::clearAllGestures()
-{
-    gestureStorage.clearGestureFeatures();
-}
-
-void SpecialAction::printJson()
-{
-    gestureStorage.printJsonFeatures();
-    return;
+    String result = "G_ID:";
+    result += String(gestureId);
+    return result;
 }
 
 void SpecialAction::printMemoryInfo()
@@ -689,27 +614,6 @@ void SpecialAction::toggleAP(bool toggle)
     Logger::getInstance().log(String("ap_autostart set to: ") + (toggle ? "false" : "true"));
 }
 
-void SpecialAction::clearGestureWithID(int key)
-{
-    Logger::getInstance().log("Press key 1-9 to delete gesture");
-
-    key = getKeypadInput(5000);
-
-    if (key < 0 || key > 8)
-    {
-        return;
-    }
-
-    if (gestureStorage.clearGestureFeatures(key))
-    {
-        Logger::getInstance().log(String("Gesture ") + String(key).c_str() + String(" deleted"));
-    }
-    else
-    {
-        Logger::getInstance().log("Failed to delete gesture");
-    }
-}
-
 void SpecialAction::executeGesture(bool pressed)
 {
     if (!configManager.getAccelerometerConfig().active || !inputHub.hasGestureSensor())
@@ -738,68 +642,29 @@ void SpecialAction::executeGesture(bool pressed)
         }
 
         int gestureID = inputHub.getLastGestureId();
-        if (gestureID >= 0)
-        {
-            String result = "gesture_ID:";
-            result += String(gestureID);
-            Logger::getInstance().log(String("Recognized gesture ID: ") + result.c_str());
-        }
-        else
+        String gestureName = inputHub.getLastGestureName();
+
+        if (gestureID < 0 && gestureName.length() == 0)
         {
             Logger::getInstance().log("No gesture recognized");
-        }
-    }
-}
-void SpecialAction::trainGesture(bool pressed, int key)
-{
-    if (!configManager.getAccelerometerConfig().active || !inputHub.hasGestureSensor())
-    {
-        Logger::getInstance().log("Accelerometer disabled");
-        return;
-    }
-
-    if (pressed)
-    {
-        if (inputHub.startGestureCapture(false))
-        {
-            Logger::getInstance().log("Training started - make your gesture");
-        }
-        else
-        {
-            Logger::getInstance().log("Training already active");
-        }
-    }
-    else
-    {
-        if (!inputHub.stopGestureCapture())
-        {
-            Logger::getInstance().log("Training stop requested but gesture capture inactive");
             return;
         }
 
-        Logger::getInstance().log("Press key 1-9 to save gesture");
-        Logger::getInstance().processBuffer();
-
-        key = getKeypadInput(5000);
-
-        if (key < 0 || key > 8)
+        String message = "Recognized gesture";
+        if (gestureName.length() > 0)
         {
-            Logger::getInstance().log("Training timeout");
-            return;
+            message += ": ";
+            message += gestureName;
         }
-
-        // Save gesture with ID (0-8)
-        if (saveGesture(key))
+        if (gestureID >= 0)
         {
-            Logger::getInstance().log(String("Gesture saved with ID: ") + String(key).c_str());
+            message += " (G_ID:";
+            message += String(gestureID);
+            message += ")";
         }
-        else
-        {
-            Logger::getInstance().log("Failed to save gesture");
-        }
+        Logger::getInstance().log(message);
     }
 }
-
 // ==================== IR REMOTE CONTROL FUNCTIONS ====================
 // Toggle pattern: activation starts immediate scan, waits for IR signal, then saves
 

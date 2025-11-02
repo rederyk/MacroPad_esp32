@@ -15,10 +15,10 @@ Il sistema ora ha **due recognizer completamente indipendenti**:
    - Zero configurazione richiesta
 
 2. **ADXL345GestureRecognizer**
-   - Gesture **personalizzate** (KNN-based)
-   - **Supporta training con TRAIN_GESTURE**
-   - Fino a 9 gesture custom (ID 0-8)
-   - Richiede registrazione iniziale
+   - Gesture **predefinite** basate sulle forme
+   - **NON richiede né supporta training**
+   - Stesso set di gesture shape del MPU6050
+   - Ottimizzato per accelerometro puro (niente giroscopio)
 
 ---
 
@@ -43,9 +43,9 @@ Il sistema ora ha **due recognizer completamente indipendenti**:
         │                 │
         ▼                 ▼
 ┌──────────────┐  ┌──────────────┐
-│ Shape +      │  │ KNN Feature  │
-│ Orientation  │  │ Extraction   │
-│ (Predefined) │  │ (Custom)     │
+│ Shape +      │  │ Solo Shape   │
+│ Orientation  │  │ Recognition  │
+│ (Predefined) │  │ (Predefined) │
 └──────────────┘  └──────────────┘
 ```
 
@@ -66,15 +66,19 @@ Il sistema ora ha **due recognizer completamente indipendenti**:
 
 3. **`lib/gesture/ADXL345GestureRecognizer.h/.cpp`**
    - Recognizer per ADXL345
-   - KNN-based recognition
-   - Full training support
+   - Shape-only recognition
+   - Zero training richiesto
 
-4. **`data/gesture_commands_examples.json`**
+4. **`lib/gesture/PredefinedShapeRecognizer.h/.cpp`**
+   - Helper condiviso per il riconoscimento shape
+   - Evita duplicazione codice tra sensori
+
+5. **`data/gesture_commands_examples.json`**
    - Esempi di configurazione gesture
    - Mapping gesture → azioni
    - Best practices
 
-5. **`lib/gesture/GESTURE_RECOGNITION_GUIDE.md`**
+6. **`lib/gesture/GESTURE_RECOGNITION_GUIDE.md`**
    - Guida completa aggiornata
    - Esempi pratici
    - Troubleshooting
@@ -123,7 +127,7 @@ Il sistema ora ha **due recognizer completamente indipendenti**:
 |----------------|--------------------------------------------------|
 | `"auto"`       | Selezione automatica basata su `type` (default) |
 | `"mpu6050"`    | Forza MPU6050 recognizer (shape+orientation)    |
-| `"adxl345"`    | Forza ADXL345 recognizer (KNN custom)           |
+| `"adxl345"`    | Forza ADXL345 recognizer (shape-only)           |
 | `"shape"`      | Solo shape recognition                          |
 | `"orientation"`| Solo orientation recognition                    |
 
@@ -156,14 +160,20 @@ Il sistema ora ha **due recognizer completamente indipendenti**:
 | 107 | `spiral`   | 🌀      | Spirale          | Zoom             |
 | 108 | `arc`      | ⌒       | Arco             | Swipe, Tab       |
 
-### ADXL345 - Custom Gestures (ID 0-8)
+### ADXL345 - Shape Gestures (ID 100-199)
 
-| ID | Nome       | Descrizione                    |
-|----|------------|--------------------------------|
-| 0  | `custom_0` | Gesture personalizzata 1       |
-| 1  | `custom_1` | Gesture personalizzata 2       |
-| ... | ...       | ...                            |
-| 8  | `custom_8` | Gesture personalizzata 9       |
+| ID  | Nome       | Simbolo | Descrizione      | Note                |
+|-----|------------|---------|------------------|---------------------|
+| 101 | `circle`   | ⭕      | Cerchio          | Disponibile         |
+| 102 | `line`     | ➖      | Linea            | Disponibile         |
+| 103 | `triangle` | 🔺      | Triangolo        | Disponibile         |
+| 104 | `square`   | ⬜      | Quadrato         | Disponibile         |
+| 105 | `zigzag`   | ⚡      | Zigzag           | Disponibile         |
+| 106 | `infinity` | ∞       | Infinito         | Disponibile         |
+| 107 | `spiral`   | 🌀      | Spirale          | Disponibile         |
+| 108 | `arc`      | ⌒       | Arco             | Disponibile         |
+
+> ℹ️ Le gesture di orientamento (ID 200-299) richiedono il giroscopio e restano quindi esclusive del MPU6050.
 
 ---
 
@@ -192,47 +202,41 @@ Il sistema ora ha **due recognizer completamente indipendenti**:
 - Ruota **CCW** → Traccia precedente
 - **Cerchio** → Play/Pause
 
-### Esempio 2: Training ADXL345
+### Esempio 2: ADXL345 con gesture shape
 
-**Passo 1: Configura tasto training**
+**Configurazione macro:**
 ```json
 {
-  "profile": "default",
-  "key": "1",
-  "press": "TRAIN_GESTURE"
+  "profile": "adxl_demo",
+  "macros": {
+    "gesture_101": "MEDIA_PLAY_PAUSE",
+    "gesture_102": "MEDIA_NEXT_TRACK",
+    "gesture_105": "UNDO"
+  }
 }
 ```
 
-**Passo 2: Registra gesture**
-1. Tieni premuto tasto `1`
-2. Esegui gesture (es: scuoti il device)
-3. Rilascia tasto `1`
-4. Premi tasto numerico `1-9` per salvare
+**Uso:**
+- Disegna un **cerchio** → Play/Pause
+- Disegna una **linea** → Traccia successiva
+- Disegna uno **zigzag** → Undo
 
-**Passo 3: Configura azione**
-```json
-{
-  "profile": "custom",
-  "key": "gesture_0",
-  "action": "LAUNCH_APP",
-  "app": "chrome.exe"
-}
-```
+> Suggerimento: mantieni i movimenti compatti (<1s) per ottenere il riconoscimento più preciso possibile con l'ADXL345.
 
 ---
 
 ## Differenze Chiave tra i Sistemi
 
-| Caratteristica       | MPU6050                    | ADXL345                  |
-|----------------------|----------------------------|--------------------------|
-| **Sensore**          | Accelerometro + Giroscopio | Solo Accelerometro       |
-| **Gesture**          | 15+ predefinite            | Max 9 personalizzate     |
-| **Training**         | ❌ NON supportato          | ✅ Supportato (TRAIN_GESTURE) |
-| **Setup**            | Plug & Play                | Richiede registrazione   |
-| **Precisione**       | Alta (95%+)                | Media (80-90%)           |
-| **Drift**            | Zero (orientation mode)    | Possibile dopo 3 sec     |
-| **Storage**          | Nessuno                    | JSON + BIN (~10KB)       |
-| **Tempo riconosc.**  | 130-280ms                  | 180-380ms                |
+| Caratteristica       | MPU6050                         | ADXL345                          |
+|----------------------|---------------------------------|----------------------------------|
+| **Sensore**          | Accelerometro + Giroscopio      | Solo Accelerometro               |
+| **Gesture**          | Shape + orientation predefinite | Solo shape predefinite           |
+| **Training**         | ❌ Non supportato                | ❌ Non richiesto                  |
+| **Setup**            | Plug & Play                     | Plug & Play                      |
+| **Precisione**       | Alta (~95% con gyro attivo)     | Media (~85% con gesti netti)     |
+| **Drift**            | Compensato via gyro/Madgwick    | Limitato da filtri shape         |
+| **Storage**          | Nessuno                         | Nessuno                          |
+| **Tempo riconosc.**  | 130-280 ms                      | 150-300 ms                       |
 
 ---
 
@@ -284,12 +288,12 @@ pio device monitor
 
 ### ❌ ADXL345: Gesture non riconosciute
 
-**Causa**: Gesture non registrate o sample insufficienti
+**Causa**: Movimento troppo debole o gesture eseguita lentamente
 
 **Soluzione**:
-1. Verifica file esistenti: `/gesture_features_adxl345.json`
-2. Registra 3-5 sample per gesture
-3. Usa gesture molto diverse tra loro
+1. Mantieni i movimenti compatti (<1s) e con accelerazioni nette
+2. Ripeti la forma con ampiezza maggiore
+3. Verifica log seriale per messaggi `[ShapeRecognizer] Motion below threshold`
 
 ### ❌ "No recognizer initialized"
 

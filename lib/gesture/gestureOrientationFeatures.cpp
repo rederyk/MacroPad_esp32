@@ -20,13 +20,16 @@
 
 #include "gestureOrientationFeatures.h"
 #include "Logger.h"
+#include <algorithm>
 #include <cmath>
+#include <memory>
+#include <new>
 
 OrientationFeatureExtractor::OrientationFeatureExtractor()
     : _madgwick(100.0f, 0.1f),
-      _rotationThreshold(70.0f * M_PI / 180.0f),
-      _tiltThreshold(30.0f * M_PI / 180.0f),
-      _shakeThreshold(2.0f),
+      _rotationThreshold(50.0f * M_PI / 180.0f),  // Reduced from 70° to 50°
+      _tiltThreshold(20.0f * M_PI / 180.0f),      // Reduced from 30° to 20°
+      _shakeThreshold(1.0f),                      // Reduced from 2.0 to 1.0 rad/s
       _confidence(0.0f)
 {
 }
@@ -63,14 +66,21 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
     // Reset filter
     _madgwick.reset();
 
-    // Arrays to store angle history
-    float* rollHistory = new float[buffer->sampleCount];
-    float* pitchHistory = new float[buffer->sampleCount];
-    float* yawHistory = new float[buffer->sampleCount];
-    float* gyroMagnitudes = new float[buffer->sampleCount];
+    const uint16_t totalSamples = buffer->sampleCount;
+    const uint16_t sampleCount = std::min<uint16_t>(totalSamples, MAX_HISTORY_SAMPLES);
+    const uint16_t startIndex = totalSamples > sampleCount ? totalSamples - sampleCount : 0;
 
-    if (!rollHistory || !pitchHistory || !yawHistory || !gyroMagnitudes) {
-        Logger::getInstance().log("[OrientationFeatures] Failed to allocate history arrays");
+    std::unique_ptr<float[]> rollHistory(new (std::nothrow) float[sampleCount]);
+    std::unique_ptr<float[]> pitchHistory(new (std::nothrow) float[sampleCount]);
+    std::unique_ptr<float[]> yawHistory(new (std::nothrow) float[sampleCount]);
+    std::unique_ptr<float[]> gyroMagnitudes(new (std::nothrow) float[sampleCount]);
+    std::unique_ptr<float[]> gyroXHistory(new (std::nothrow) float[sampleCount]);
+    std::unique_ptr<float[]> gyroYHistory(new (std::nothrow) float[sampleCount]);
+    std::unique_ptr<float[]> gyroZHistory(new (std::nothrow) float[sampleCount]);
+
+    if (!rollHistory || !pitchHistory || !yawHistory || !gyroMagnitudes ||
+        !gyroXHistory || !gyroYHistory || !gyroZHistory) {
+        Logger::getInstance().log("[OrientationFeatures] Failed to allocate history arrays (OOM)");
         return false;
     }
 
@@ -78,8 +88,8 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
     float initialRoll = 0, initialPitch = 0, initialYaw = 0;
 
     // Process each sample through Madgwick filter
-    for (uint16_t i = 0; i < buffer->sampleCount; i++) {
-        const Sample& s = buffer->samples[i];
+    for (uint16_t i = 0; i < sampleCount; i++) {
+        const Sample& s = buffer->samples[startIndex + i];
 
         // Only update if gyro data is valid
         if (s.gyroValid) {
@@ -89,10 +99,15 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
             float roll, pitch, yaw;
             _madgwick.getEulerAngles(roll, pitch, yaw);
 
-            // Store history
+            // Store orientation history
             rollHistory[i] = roll;
             pitchHistory[i] = pitch;
             yawHistory[i] = yaw;
+
+            // Store raw gyro data (for motion-based gesture detection)
+            gyroXHistory[i] = s.gyroX;
+            gyroYHistory[i] = s.gyroY;
+            gyroZHistory[i] = s.gyroZ;
 
             // Calculate gyro magnitude
             gyroMagnitudes[i] = sqrtf(s.gyroX * s.gyroX + s.gyroY * s.gyroY + s.gyroZ * s.gyroZ);
@@ -108,26 +123,33 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
             pitchHistory[i] = 0;
             yawHistory[i] = 0;
             gyroMagnitudes[i] = 0;
+            gyroXHistory[i] = 0;
+            gyroYHistory[i] = 0;
+            gyroZHistory[i] = 0;
         }
     }
 
     // Calculate final orientation and deltas
-    features.finalRoll = rollHistory[buffer->sampleCount - 1];
-    features.finalPitch = pitchHistory[buffer->sampleCount - 1];
-    features.finalYaw = yawHistory[buffer->sampleCount - 1];
+    features.finalRoll = rollHistory[sampleCount - 1];
+    features.finalPitch = pitchHistory[sampleCount - 1];
+    features.finalYaw = yawHistory[sampleCount - 1];
 
     features.deltaRoll = angleDifference(features.finalRoll, initialRoll);
     features.deltaPitch = angleDifference(features.finalPitch, initialPitch);
     features.deltaYaw = angleDifference(features.finalYaw, initialYaw);
 
-    // Calculate statistics for each angle
+    // Calculate statistics for each angle and gyro axis
     float sumRoll = 0, sumRollSq = 0;
     float sumPitch = 0, sumPitchSq = 0;
     float sumYaw = 0, sumYawSq = 0;
     float sumGyro = 0, sumGyroSq = 0;
     float maxGyro = 0;
 
-    for (uint16_t i = 0; i < buffer->sampleCount; i++) {
+    float sumGyroX = 0, sumGyroXSq = 0, maxGyroX = 0;
+    float sumGyroY = 0, sumGyroYSq = 0, maxGyroY = 0;
+    float sumGyroZ = 0, sumGyroZSq = 0, maxGyroZ = 0;
+
+    for (uint16_t i = 0; i < sampleCount; i++) {
         sumRoll += rollHistory[i];
         sumRollSq += rollHistory[i] * rollHistory[i];
 
@@ -143,9 +165,26 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
         if (gyroMagnitudes[i] > maxGyro) {
             maxGyro = gyroMagnitudes[i];
         }
+
+        // Raw gyro axis statistics
+        float absGyroX = fabsf(gyroXHistory[i]);
+        float absGyroY = fabsf(gyroYHistory[i]);
+        float absGyroZ = fabsf(gyroZHistory[i]);
+
+        sumGyroX += absGyroX;
+        sumGyroXSq += absGyroX * absGyroX;
+        if (absGyroX > maxGyroX) maxGyroX = absGyroX;
+
+        sumGyroY += absGyroY;
+        sumGyroYSq += absGyroY * absGyroY;
+        if (absGyroY > maxGyroY) maxGyroY = absGyroY;
+
+        sumGyroZ += absGyroZ;
+        sumGyroZSq += absGyroZ * absGyroZ;
+        if (absGyroZ > maxGyroZ) maxGyroZ = absGyroZ;
     }
 
-    uint16_t n = buffer->sampleCount;
+    uint16_t n = sampleCount;
 
     // Calculate means
     features.rollMean = sumRoll / n;
@@ -154,35 +193,48 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
     features.gyroMagnitudeMean = sumGyro / n;
     features.gyroMagnitudeMax = maxGyro;
 
+    features.gyroXMean = sumGyroX / n;
+    features.gyroYMean = sumGyroY / n;
+    features.gyroZMean = sumGyroZ / n;
+    features.gyroXMax = maxGyroX;
+    features.gyroYMax = maxGyroY;
+    features.gyroZMax = maxGyroZ;
+
     // Calculate standard deviations
     float rollVar = (sumRollSq / n) - (features.rollMean * features.rollMean);
     float pitchVar = (sumPitchSq / n) - (features.pitchMean * features.pitchMean);
     float yawVar = (sumYawSq / n) - (features.yawMean * features.yawMean);
     float gyroVar = (sumGyroSq / n) - (features.gyroMagnitudeMean * features.gyroMagnitudeMean);
 
+    float gyroXVar = (sumGyroXSq / n) - (features.gyroXMean * features.gyroXMean);
+    float gyroYVar = (sumGyroYSq / n) - (features.gyroYMean * features.gyroYMean);
+    float gyroZVar = (sumGyroZSq / n) - (features.gyroZMean * features.gyroZMean);
+
     features.rollStd = sqrtf(fmaxf(rollVar, 0.0f));
     features.pitchStd = sqrtf(fmaxf(pitchVar, 0.0f));
     features.yawStd = sqrtf(fmaxf(yawVar, 0.0f));
     features.gyroMagnitudeStd = sqrtf(fmaxf(gyroVar, 0.0f));
 
+    features.gyroXStd = sqrtf(fmaxf(gyroXVar, 0.0f));
+    features.gyroYStd = sqrtf(fmaxf(gyroYVar, 0.0f));
+    features.gyroZStd = sqrtf(fmaxf(gyroZVar, 0.0f));
+
     // Calculate total rotation (sum of absolute angle changes)
     features.totalRotation = 0;
-    for (uint16_t i = 1; i < buffer->sampleCount; i++) {
+    for (uint16_t i = 1; i < sampleCount; i++) {
         float dr = fabsf(angleDifference(rollHistory[i], rollHistory[i - 1]));
         float dp = fabsf(angleDifference(pitchHistory[i], pitchHistory[i - 1]));
         float dy = fabsf(angleDifference(yawHistory[i], yawHistory[i - 1]));
         features.totalRotation += dr + dp + dy;
     }
 
-    // Cleanup
-    delete[] rollHistory;
-    delete[] pitchHistory;
-    delete[] yawHistory;
-    delete[] gyroMagnitudes;
-
     Logger::getInstance().log("[OrientationFeatures] dRoll=" + String(features.deltaRoll * 180 / M_PI, 1) +
                              "° dPitch=" + String(features.deltaPitch * 180 / M_PI, 1) +
                              "° dYaw=" + String(features.deltaYaw * 180 / M_PI, 1) + "°");
+    Logger::getInstance().log("[OrientationFeatures] Gyro: X(max=" + String(features.gyroXMax, 2) +
+                             " mean=" + String(features.gyroXMean, 2) + ") Y(max=" + String(features.gyroYMax, 2) +
+                             " mean=" + String(features.gyroYMean, 2) + ") Z(max=" + String(features.gyroZMax, 2) +
+                             " mean=" + String(features.gyroZMean, 2) + ")");
 
     return true;
 }
@@ -236,19 +288,41 @@ OrientationType OrientationFeatureExtractor::classify(const OrientationFeatures&
         return ORIENT_FACE_DOWN;
     }
 
-    // Check for shake (high gyro variation but low net rotation)
-    if (features.gyroMagnitudeMax > _shakeThreshold && features.gyroMagnitudeStd > _shakeThreshold * 0.5f) {
-        // Determine shake axis based on which has highest variation
-        if (features.rollStd > features.pitchStd && features.rollStd > features.yawStd) {
-            _confidence = 0.75f;
+    // Check for shake using RAW gyroscope data
+    // Shake = rapid rotation around one axis independent of device orientation
+    // Use peak values to detect quick movements
+    float shakeThresholdPeak = _shakeThreshold * 1.5f;  // Higher threshold for peak detection
+    float shakeThresholdMean = _shakeThreshold * 0.5f;  // Lower threshold for sustained motion
+
+    // Check each axis independently using raw gyro data
+    bool xShake = (features.gyroXMax > shakeThresholdPeak) ||
+                  (features.gyroXMean > shakeThresholdMean && features.gyroXStd > _shakeThreshold * 0.3f);
+    bool yShake = (features.gyroYMax > shakeThresholdPeak) ||
+                  (features.gyroYMean > shakeThresholdMean && features.gyroYStd > _shakeThreshold * 0.3f);
+    bool zShake = (features.gyroZMax > shakeThresholdPeak) ||
+                  (features.gyroZMean > shakeThresholdMean && features.gyroZStd > _shakeThreshold * 0.3f);
+
+    if (xShake || yShake || zShake) {
+        // Determine which axis has the strongest shake
+        // Use combination of peak and mean for robustness
+        float xStrength = features.gyroXMax * 0.6f + features.gyroXMean * 0.4f;
+        float yStrength = features.gyroYMax * 0.6f + features.gyroYMean * 0.4f;
+        float zStrength = features.gyroZMax * 0.6f + features.gyroZMean * 0.4f;
+
+        float maxStrength = fmaxf(xStrength, fmaxf(yStrength, zStrength));
+
+        // Require dominant axis to be significantly stronger (20% more)
+        if (xStrength >= maxStrength * 0.8f && xStrength > yStrength * 1.2f && xStrength > zStrength * 1.2f) {
+            _confidence = 0.75f + fminf(xStrength / (shakeThresholdPeak * 2.0f), 0.15f);
             return ORIENT_SHAKE_X;
-        } else if (features.pitchStd > features.yawStd) {
-            _confidence = 0.75f;
+        } else if (yStrength >= maxStrength * 0.8f && yStrength > xStrength * 1.2f && yStrength > zStrength * 1.2f) {
+            _confidence = 0.75f + fminf(yStrength / (shakeThresholdPeak * 2.0f), 0.15f);
             return ORIENT_SHAKE_Y;
-        } else {
-            _confidence = 0.75f;
+        } else if (zStrength >= maxStrength * 0.8f && zStrength > xStrength * 1.2f && zStrength > yStrength * 1.2f) {
+            _confidence = 0.75f + fminf(zStrength / (shakeThresholdPeak * 2.0f), 0.15f);
             return ORIENT_SHAKE_Z;
         }
+        // If no clear dominant axis, fall through to unknown
     }
 
     return ORIENT_UNKNOWN;

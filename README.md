@@ -349,10 +349,28 @@ L'ultimo comando spegne tutto: TV → aspetta 1s → LED strip → aspetta 500ms
 {
   "BUTTON": ["EXECUTE_GESTURE"],
 
-  "G_ID:0": ["S_B:CTRL+SUPER,RIGHT_ARROW"],  // Swipe destra → workspace →
-  "G_ID:1": ["S_B:CTRL+SUPER,LEFT_ARROW"],   // Swipe sinistra → workspace ←
-  "G_ID:2": ["S_B:SUPER+q"],                 // Shake → chiudi app
-  "G_ID:3": ["S_B:SUPER+l"],                 // Twist → blocca schermo
+  "G_TILT_LEFT": ["S_B:CTRL+SUPER,LEFT_ARROW"],
+  "G_TILT_RIGHT": ["S_B:CTRL+SUPER,RIGHT_ARROW"],
+  "G_TILT_FORWARD": ["S_B:PAGE_UP"],
+  "G_TILT_BACKWARD": ["S_B:PAGE_DOWN"],
+  "G_ROTATE_90_CW": ["S_B:CTRL+ALT,RIGHT_ARROW"],
+  "G_ROTATE_90_CCW": ["S_B:CTRL+ALT,LEFT_ARROW"],
+  "G_ROTATE_180": ["S_B:CTRL+ALT,DOWN_ARROW"],
+  "G_FACE_UP": ["S_B:HOME"],
+  "G_FACE_DOWN": ["S_B:END"],
+  "G_SPIN": ["S_B:SUPER+l"],
+  "G_SHAKE_X": ["S_B:SUPER+q"],
+  "G_SHAKE_Y": ["S_B:CTRL+SUPER,UP_ARROW"],
+  "G_SHAKE_Z": ["S_B:CTRL+SUPER,DOWN_ARROW"],
+
+  "G_LINE": ["S_B:CTRL+SHIFT,LEFT_ARROW"],
+  "G_CIRCLE": ["S_B:CTRL+A"],
+  "G_TRIANGLE": ["S_B:CTRL+SHIFT,S"],
+  "G_SQUARE": ["S_B:CTRL+S"],
+  "G_ZIGZAG": ["S_B:CTRL+Z"],
+  "G_INFINITY": ["S_B:CTRL+SHIFT,Z"],
+  "G_SPIRAL": ["S_B:CTRL+Y"],
+  "G_ARC": ["S_B:CTRL+P"],
 
   "1+5+9": ["CALIBRATE_SENSOR"]
 }
@@ -546,8 +564,8 @@ Per modificare i colori:
 
 ### Limiti
 - **Max Combinazioni per file:** ~100-150 (limite JSON in RAM)
-- **Max Gesti:** 10 (ID 0-9)
-- **Max Campioni per Gesto:** ~20 (limite memoria)
+- **Gesture supportate:** 8 shape (ADXL/MPU) + 7 orientation (solo MPU6050)
+- **Campioni gesture:** ~3s buffer circolare (configurabile)
 - **Max Lunghezza Comando Concatenato:** ~500 caratteri
 - **WiFi:** Solo 2.4 GHz (limitazione ESP32)
 
@@ -569,7 +587,7 @@ MacroPad_esp32/
 │   ├── gesture/                    # Sistema riconoscimento gesti
 │   │   ├── gestureRead.cpp
 │   │   ├── gestureAnalyze.cpp
-│   │   ├── gestureFeatures.cpp
+│   │   ├── PredefinedShapeRecognizer.cpp
 │   │   ├── MotionSensor.cpp
 │   │   └── ...
 │   ├── inputDevice/                # Astrazione input

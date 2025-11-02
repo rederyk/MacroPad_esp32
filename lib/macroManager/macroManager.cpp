@@ -266,24 +266,9 @@ void MacroManager::pressAction(const std::string &action)
     {
         specialAction.calibrateSensor();
     }
-
-    else if (action == "CONVERT_JSON_BINARY")
-    {
-        specialAction.convertJsonToBinary();
-    }
-
-    else if (action == "TRAIN_GESTURE")
-    {
-        specialAction.trainGesture(true);
-        is_action_locked = true;
-    }
     else if (action == "MEM_INFO")
     {
         specialAction.printMemoryInfo();
-    }
-    else if (action == "PRINT_JSON")
-    {
-        specialAction.printJson();
     }
     else if (action == "HOP_BLE_DEVICE")
     {
@@ -631,7 +616,7 @@ void MacroManager::releaseAction(const std::string &action)
     String logMessage = "Released action: " + String(action.c_str());
 
     // If action is locked but this is part of our command queue, let it proceed
-    if (is_action_locked && !(action == "TRAIN_GESTURE" || action == "EXECUTE_GESTURE" || processingCommandQueue))
+    if (is_action_locked && !(action == "EXECUTE_GESTURE" || processingCommandQueue))
     {
         Logger::getInstance().log("Action locked, skipping action: insideRealeaseactionvoid " + String(action.c_str()));
         return;
@@ -654,22 +639,6 @@ void MacroManager::releaseAction(const std::string &action)
     }
 
     // IR Remote Control no longer needs release actions (now using toggle pattern)
-
-    else if (action == "TOGGLE_SAMPLING")
-    {
-        specialAction.toggleSampling(false);
-    }
-    else if (action == "TRAIN_GESTURE")
-    {
-
-        specialAction.trainGesture(false);
-
-        is_action_locked = false;
-    }
-    else if (action == "CLEAR_A_GESTURE")
-    {
-        specialAction.clearGestureWithID();
-    }
     else if (action == "TOGGLE_BLE_WIFI")
     {
         specialAction.toggleBleWifi();
@@ -785,6 +754,7 @@ void MacroManager::handleInputEvent(const InputEvent &event)
             // Resto del codice originale
             lastKeyPressTime = millis();
             pendingCombination = getCurrentCombination();
+            pendingGestureFallback.clear();
             lastCombinationTime = millis();
             newKeyPressed = true;
         }
@@ -904,6 +874,7 @@ void MacroManager::handleInputEvent(const InputEvent &event)
 
             lastAction = "BUTTON";
             pendingCombination = getCurrentCombination();
+            pendingGestureFallback.clear();
             lastCombinationTime = millis();
             newKeyPressed = true; // Flag that a new input was registered
         }
@@ -924,12 +895,49 @@ void MacroManager::handleInputEvent(const InputEvent &event)
     case InputEvent::EventType::MOTION:
         if (event.state && event.value1 >= 0)
         {
-            pendingCombination = "G_ID:" + std::to_string(event.value1);
+            std::string gestureKey;
+            if (event.text.length() > 0)
+            {
+                gestureKey = event.text.c_str();
+            }
+
+            pendingGestureFallback.clear();
+            if (event.value1 >= 0)
+            {
+                pendingGestureFallback = "G_ID:" + std::to_string(event.value1);
+            }
+
+            if (!gestureKey.empty())
+            {
+                pendingCombination = gestureKey;
+            }
+            else
+            {
+                pendingCombination = pendingGestureFallback;
+                pendingGestureFallback.clear();
+            }
+
             lastCombinationTime = millis();
             newKeyPressed = true;
             gestureExecuted = true;
             gestureExecutionTime = millis();
-            Logger::getInstance().log("Gesture event recognized: " + String(pendingCombination.c_str()));
+            String logMessage = "Gesture event recognized: ";
+            if (!gestureKey.empty())
+            {
+                logMessage += event.text;
+                if (event.value1 >= 0)
+                {
+                    logMessage += " (G_ID:";
+                    logMessage += String(event.value1);
+                    logMessage += ")";
+                }
+            }
+            else
+            {
+                logMessage += "G_ID:";
+                logMessage += String(event.value1);
+            }
+            Logger::getInstance().log(logMessage);
         }
         break;
 
@@ -1122,60 +1130,76 @@ void MacroManager::setUseKeyPressOrder(bool useOrder)
     }
 }
 
+bool MacroManager::executeCombinationActions(const std::string &comboKey)
+{
+    if (comboKey.empty())
+    {
+        return false;
+    }
+
+    auto it = combinations.find(comboKey);
+    if (it == combinations.end())
+    {
+        return false;
+    }
+
+    currentActivationCombo = comboKey;
+
+    if (!lastExecutedAction.empty())
+    {
+        releaseAction(lastExecutedAction);
+        lastExecutedAction.clear();
+    }
+
+    bool hasChainedCommands = false;
+    for (const std::string &action : it->second)
+    {
+        if (action.find('<') != std::string::npos && action.find('>') != std::string::npos)
+        {
+            hasChainedCommands = true;
+            enqueueCommands(action);
+            break;
+        }
+    }
+
+    if (!hasChainedCommands)
+    {
+        for (const std::string &action : it->second)
+        {
+            pressAction(action);
+            lastExecutedAction = action;
+        }
+    }
+
+    return true;
+}
+
 void MacroManager::processKeyCombination()
 {
-    // Only execute if a new key was pressed and the combo is valid
-    if (newKeyPressed && !pendingCombination.empty())
+    if (newKeyPressed && (!pendingCombination.empty() || !pendingGestureFallback.empty()))
     {
-        // Check if there is a valid combination
-        if (combinations.find(pendingCombination) != combinations.end())
+        bool executed = executeCombinationActions(pendingCombination);
+
+        if (!executed && !pendingGestureFallback.empty())
         {
-            // Save the activation combo for IR commands
-            currentActivationCombo = pendingCombination;
-
-            // Release previous action if exists
-            if (!lastExecutedAction.empty())
-            {
-                releaseAction(lastExecutedAction);
-                lastExecutedAction.clear();
-            }
-
-            // Check if any action contains <> syntax
-            bool hasChainedCommands = false;
-            for (const std::string &action : combinations[pendingCombination])
-            {
-                if (action.find('<') != std::string::npos && action.find('>') != std::string::npos)
-                {
-                    hasChainedCommands = true;
-                    enqueueCommands(action);
-                    break;
-                }
-            }
-
-            // If no chained commands, execute normally
-            if (!hasChainedCommands)
-            {
-                for (const std::string &action : combinations[pendingCombination])
-                {
-                    pressAction(action);
-                    lastExecutedAction = action;
-                }
-            }
+            executed = executeCombinationActions(pendingGestureFallback);
         }
-        else
+
+        if (!executed)
         {
-            // Release previous action if exists
             if (!lastExecutedAction.empty())
             {
                 releaseAction(lastExecutedAction);
                 lastExecutedAction.clear();
             }
 
-            Logger::getInstance().log(String("combinazione non impostata") + String(pendingCombination.c_str()));
+            std::string missingKey = !pendingCombination.empty() ? pendingCombination : pendingGestureFallback;
+            Logger::getInstance().log(String("combinazione non impostata") + String(missingKey.c_str()));
         }
 
         pendingCombination.clear();
-        newKeyPressed = false; // Reset the flag
+        pendingGestureFallback.clear();
+        newKeyPressed = false;
     }
 }
 
@@ -1185,6 +1209,7 @@ void MacroManager::clearActiveKeys()
     activeKeysMask = 0;
     previousKeysMask = 0;
     pendingCombination.clear();
+    pendingGestureFallback.clear();
     newKeyPressed = false;
     keyPressOrder.clear(); // Pulisci anche l'ordine di pressione
 
@@ -1265,7 +1290,8 @@ void MacroManager::update()
     }
 
     // Process pending combination if the combo_delay has passed and a new key was pressed
-    if (!pendingCombination.empty() && newKeyPressed &&
+    if (newKeyPressed &&
+        (!pendingCombination.empty() || !pendingGestureFallback.empty()) &&
         (currentTime - lastCombinationTime >= combo_delay))
     {
         processKeyCombination();

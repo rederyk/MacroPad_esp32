@@ -164,62 +164,17 @@
     ]
   },
 
-  "adxl345_custom_gestures": {
-    "_description": "Gesture personalizzate KNN (ADXL345 - solo accelerometro)",
-    "_training_required": true,
+  "adxl345_shape_gestures": {
+    "_description": "ADXL345 utilizza le shape predefinite (ID 101-108). Nessun training richiesto.",
     "gestures": [
-      {
-        "id": 0,
-        "name": "custom_0",
-        "description": "Gesture personalizzata 1 - da registrare con TRAIN_GESTURE",
-        "training_steps": [
-          "1. Assegna TRAIN_GESTURE ad un tasto",
-          "2. Tieni premuto il tasto",
-          "3. Esegui la gesture",
-          "4. Rilascia il tasto",
-          "5. Premi tasto '1' (per ID 0)"
-        ]
-      },
-      {
-        "id": 1,
-        "name": "custom_1",
-        "description": "Gesture personalizzata 2"
-      },
-      {
-        "id": 2,
-        "name": "custom_2",
-        "description": "Gesture personalizzata 3"
-      },
-      {
-        "id": 3,
-        "name": "custom_3",
-        "description": "Gesture personalizzata 4"
-      },
-      {
-        "id": 4,
-        "name": "custom_4",
-        "description": "Gesture personalizzata 5"
-      },
-      {
-        "id": 5,
-        "name": "custom_5",
-        "description": "Gesture personalizzata 6"
-      },
-      {
-        "id": 6,
-        "name": "custom_6",
-        "description": "Gesture personalizzata 7"
-      },
-      {
-        "id": 7,
-        "name": "custom_7",
-        "description": "Gesture personalizzata 8"
-      },
-      {
-        "id": 8,
-        "name": "custom_8",
-        "description": "Gesture personalizzata 9"
-      }
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108
     ]
   },
 
@@ -243,19 +198,19 @@
         },
         {
           "profile": "media",
-          "key": "gesture_204",
+          "key": "G_TILT_FORWARD",
           "action": "MEDIA_VOLUME_DOWN",
           "note": "Inclina avanti per volume giù"
         },
         {
           "profile": "media",
-          "key": "gesture_205",
+          "key": "G_TILT_BACKWARD",
           "action": "MEDIA_VOLUME_UP",
           "note": "Inclina indietro per volume su"
         },
         {
           "profile": "media",
-          "key": "gesture_101",
+          "key": "G_CIRCLE",
           "action": "MEDIA_PLAY_PAUSE",
           "note": "Cerchio per play/pause"
         }
@@ -267,21 +222,21 @@
       "macros": [
         {
           "profile": "desktop",
-          "key": "gesture_207",
+          "key": "G_TILT_LEFT",
           "action": "KEY_COMBO",
           "keys": ["CTRL", "WIN", "LEFT"],
           "note": "Tilt left = Workspace a sinistra"
         },
         {
           "profile": "desktop",
-          "key": "gesture_208",
+          "key": "G_TILT_RIGHT",
           "action": "KEY_COMBO",
           "keys": ["CTRL", "WIN", "RIGHT"],
           "note": "Tilt right = Workspace a destra"
         },
         {
           "profile": "desktop",
-          "key": "gesture_204",
+          "key": "G_TILT_FORWARD",
           "action": "KEY_COMBO",
           "keys": ["CTRL", "DOWN"],
           "note": "Tilt forward = Mostra tutti workspace"
@@ -294,21 +249,21 @@
       "macros": [
         {
           "profile": "photoshop",
-          "key": "gesture_101",
+          "key": "G_CIRCLE",
           "action": "KEY_COMBO",
           "keys": ["CTRL", "A"],
           "note": "Cerchio = Seleziona tutto"
         },
         {
           "profile": "photoshop",
-          "key": "gesture_104",
+          "key": "G_SQUARE",
           "action": "KEY_COMBO",
           "keys": ["CTRL", "SHIFT", "S"],
           "note": "Quadrato = Salva con nome"
         },
         {
           "profile": "photoshop",
-          "key": "gesture_105",
+          "key": "G_ZIGZAG",
           "action": "KEY_COMBO",
           "keys": ["CTRL", "Z"],
           "note": "Zigzag = Undo"

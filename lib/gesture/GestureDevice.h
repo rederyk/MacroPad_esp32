@@ -43,9 +43,8 @@ public:
     void setSensorAvailable(bool available);
 
     int getLastGestureId() const { return lastGestureId; }
+    const String& getLastGestureName() const { return lastGestureName; }
     void clearLastGesture();
-
-    bool saveGesture(uint8_t id);
     void setRecognitionEnabled(bool enable);
     bool isRecognitionEnabled() const { return recognitionEnabled; }
 
@@ -73,8 +72,8 @@ private:
     bool eventReady;
 
     int lastGestureId;
+    String lastGestureName;
     bool recognitionEnabled;
-    static constexpr int kDefaultKnnNeighbors = 6;
 };
 
 #endif // GESTURE_DEVICE_H
