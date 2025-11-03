@@ -79,10 +79,6 @@ struct AccelerometerConfig
     uint8_t motionWakeDuration;
     uint8_t motionWakeHighPass;
     uint8_t motionWakeCycleRate;
-    bool autoCalibrateEnabled;
-    float autoCalibrateGyroThreshold;
-    uint16_t autoCalibrateStableSamples;
-    float autoCalibrateSmoothing;
     String gestureMode; // "auto", "mpu6050", "adxl345", "shape", "orientation"
 };
 

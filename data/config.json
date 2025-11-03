@@ -74,11 +74,11 @@
   "accelerometer": {
     "sdaPin": 19,
     "sclPin": 23,
-    "sensitivity": 2.0,
+    "sensitivity": 4.0,
     "sampleRate": 100,
     "threshold": 500,
-    "axisMap": "xyz",
-    "axisDir": "+-+",
+    "axisMap": "xzy",
+    "axisDir": "---",
     "active": true,
     "type": "mpu6050",
     "address": 104,
@@ -87,10 +87,6 @@
     "motionWakeDuration": 1,
     "motionWakeHighPass": 1,
     "motionWakeCycleRate": 0,
-    "autoCalibrate": true,
-    "autoCalibrateGyroThreshold": 0.12,
-    "autoCalibrateStableSamples": 0,
-    "autoCalibrateSmoothing": 0.05,
     "gestureMode": "auto"
   }
 }

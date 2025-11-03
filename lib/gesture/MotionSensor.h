@@ -55,17 +55,11 @@ public:
     static uint32_t sampleIntervalMs(uint16_t hz);
 
 private:
-    void applyAxisMap(const String &axisMap, const String &axisDir);
-    float getAxisValue(uint8_t axisIndex) const;
-    float getGyroAxisValue(uint8_t axisIndex) const;
-
     TwoWire *_wire;
     AccelerometerConfig _config;
     bool _configLoaded;
     bool _expectGyro;
     bool _motionWakeEnabled;
-    String _axisMap;
-    String _axisDir;
     uint16_t _sampleHz;
     std::unique_ptr<AccelerometerDriver> _driver;
 };

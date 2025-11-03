@@ -13,6 +13,7 @@ constexpr uint32_t kGyroReadyPollDelayMs = 5;
 constexpr float kGyroReadyMinAccelSum = 0.05f;
 constexpr float kGyroReadyNoiseFloor = 1e-4f;
 constexpr uint8_t kGyroReadyZeroTolerance = 5;
+constexpr uint32_t kMinSamplingTimeMs = 100; // Minimum sampling time in ms (10 samples at 100Hz)
 
 GestureRead::GestureRead(TwoWire *wire)
     : _sensor(new MotionSensor(wire)),
@@ -22,6 +23,7 @@ GestureRead::GestureRead(TwoWire *wire)
       _isSampling(false),
       _bufferFull(false),
       lastSampleTime(0),
+      samplingStartTime(0),
       _motionWakeEnabled(false),
       _expectGyro(false)
 {
@@ -39,12 +41,6 @@ GestureRead::GestureRead(TwoWire *wire)
     _sampleBuffer.sampleCount = 0;
     _sampleBuffer.maxSamples = _maxSamples;
     _sampleBuffer.sampleHZ = _sampleHZ;
-
-    _autoCalib.enabled = true;
-    _autoCalib.gyroStillThreshold = 0.12f; // ~7 deg/s
-    _autoCalib.minStableSamples = 15;       // ~150 ms at 100 Hz
-    _autoCalib.smoothingFactor = 0.05f;
-    resetAutoCalibrationState();
 }
 
 GestureRead::~GestureRead()
@@ -78,12 +74,7 @@ bool GestureRead::begin(const AccelerometerConfig &config)
     _sampleHZ = MotionSensor::clampSampleRate(_config.sampleRate > 0 ? _config.sampleRate : MotionSensor::kDefaultSampleHz);
     _sampleBuffer.sampleHZ = _sampleHZ;
 
-    const uint16_t defaultStableSamples = std::max<uint16_t>(static_cast<uint16_t>(_sampleHZ / 6), static_cast<uint16_t>(5));
-    const uint16_t stableSamples = _config.autoCalibrateStableSamples > 0 ? _config.autoCalibrateStableSamples : defaultStableSamples;
-    const float gyroThreshold = _config.autoCalibrateGyroThreshold > 0.0f ? _config.autoCalibrateGyroThreshold : _autoCalib.gyroStillThreshold;
-    const float smoothing = (_config.autoCalibrateSmoothing > 0.0f && _config.autoCalibrateSmoothing <= 1.0f) ? _config.autoCalibrateSmoothing : _autoCalib.smoothingFactor;
-    setAutoCalibrationParameters(gyroThreshold, stableSamples, smoothing);
-    setAutoCalibrationEnabled(_config.autoCalibrateEnabled);
+    // Auto-calibration disabled - using manual calibration only
 
     float desiredSeconds = 3.0f;
     uint16_t desiredSamples = static_cast<uint16_t>(_sampleHZ * desiredSeconds);
@@ -112,6 +103,8 @@ bool GestureRead::begin(const AccelerometerConfig &config)
     }
 
     _config = _sensor->config(); // sync resolved address
+
+    Logger::getInstance().log("Auto-calibration is DISABLED. Use manual calibration command.");
 
     _motionWakeEnabled = false;
     if (_config.motionWakeEnabled)
@@ -161,6 +154,13 @@ void GestureRead::clearMemory()
     }
 }
 
+void GestureRead::flushSensorBuffer()
+{
+    // This function is now handled by startSampling()
+    // Kept for API compatibility but does nothing
+    // The flush is now done at the start of sampling to ensure fresh data
+}
+
 bool GestureRead::calibrate(uint16_t calibrationSamples)
 {
     if (!_sensor || !_sensor->isReady())
@@ -170,7 +170,7 @@ bool GestureRead::calibrate(uint16_t calibrationSamples)
 
     if (calibrationSamples == 0)
     {
-        calibrationSamples = 2;
+        calibrationSamples = 10;  // Increased from 2 to 10
     }
 
     if (!wakeup())
@@ -183,26 +183,137 @@ bool GestureRead::calibrate(uint16_t calibrationSamples)
         return false;
     }
 
+    Logger::getInstance().log("=== CALIBRATION STARTED ===");
+    Logger::getInstance().log("IMPORTANT: Position the device as you normally use it");
+    Logger::getInstance().log("  (e.g., flat on desk, or vertical/tilted if that's your normal usage)");
+    Logger::getInstance().log("Keep the device VERY STILL");
+    Logger::getInstance().log("Collecting " + String(calibrationSamples) + " samples...");
+
     float sumX = 0;
     float sumY = 0;
     float sumZ = 0;
+    float sumGyroX = 0;
+    float sumGyroY = 0;
+    float sumGyroZ = 0;
+    uint16_t validGyroSamples = 0;
+
+    // Wait for sensor to stabilize
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    uint16_t validSamples = 0;
 
     for (uint16_t i = 0; i < calibrationSamples; i++)
     {
+        // Wait for new data to be ready
+        vTaskDelay(pdMS_TO_TICKS(15));  // At 100Hz, samples come every 10ms
+
         if (_sensor->update())
         {
-            sumX += getMappedX();
-            sumY += getMappedY();
-            sumZ += getMappedZ();
+            // Get sensor values (already oriented correctly by driver)
+            float accelX = getMappedX();
+            float accelY = getMappedY();
+            float accelZ = getMappedZ();
+
+            // Check if data is valid (not zero)
+            float accelMag = sqrtf(accelX*accelX + accelY*accelY + accelZ*accelZ);
+            if (accelMag < 0.1f) {
+                Logger::getInstance().log("Sample " + String(i) + ": INVALID (magnitude=" + String(accelMag, 4) + "g) - SKIPPING");
+                continue;  // Skip invalid samples
+            }
+
+            sumX += accelX;
+            sumY += accelY;
+            sumZ += accelZ;
+
+            // Collect gyro data for diagnostics
+            if (_sensor->hasGyro())
+            {
+                float gyroX, gyroY, gyroZ;
+                getMappedGyro(gyroX, gyroY, gyroZ);
+                sumGyroX += gyroX;
+                sumGyroY += gyroY;
+                sumGyroZ += gyroZ;
+                validGyroSamples++;
+            }
+
+            // Log ALL samples for detailed diagnostic
+            Logger::getInstance().log("Sample " + String(validSamples) +
+                ": accel=[" + String(accelX, 4) + "," + String(accelY, 4) + "," + String(accelZ, 4) +
+                "] mag=" + String(accelMag, 4) + "g");
+
+            validSamples++;
         }
-        vTaskDelay(pdMS_TO_TICKS(10));
+        else
+        {
+            Logger::getInstance().log("Sample " + String(i) + ": sensor.update() FAILED");
+        }
     }
 
-    _calibrationOffset.x = sumX / calibrationSamples;
-    _calibrationOffset.y = sumY / calibrationSamples;
-    _calibrationOffset.z = sumZ / calibrationSamples;
+    if (validSamples == 0) {
+        Logger::getInstance().log("ERROR: No valid calibration samples collected!");
+        return false;
+    }
+
+    Logger::getInstance().log("Collected " + String(validSamples) + "/" + String(calibrationSamples) + " valid samples");
+
+    _calibrationOffset.x = sumX / validSamples;
+    _calibrationOffset.y = sumY / validSamples;
+    _calibrationOffset.z = sumZ / validSamples;
 
     _isCalibrated = true;
+
+    // Diagnostic logs
+    Logger::getInstance().log("=== CALIBRATION COMPLETE ===");
+    Logger::getInstance().log("Calibration offset: [" + String(_calibrationOffset.x, 4) + "," +
+                             String(_calibrationOffset.y, 4) + "," + String(_calibrationOffset.z, 4) + "]");
+
+    // Calculate magnitude to verify sensor is working correctly
+    float magnitude = sqrtf(_calibrationOffset.x * _calibrationOffset.x +
+                           _calibrationOffset.y * _calibrationOffset.y +
+                           _calibrationOffset.z * _calibrationOffset.z);
+    Logger::getInstance().log("Magnitude: " + String(magnitude, 4) + "g (should be ~1.0g)");
+
+    if (magnitude < 0.8f || magnitude > 1.2f) {
+        Logger::getInstance().log("WARNING: Magnitude outside expected range!");
+        Logger::getInstance().log("  - Check sensor orientation and mounting");
+        Logger::getInstance().log("  - For ADXL345: verify axisMap/axisDir in config.json");
+        Logger::getInstance().log("  - For MPU6050: sensor fusion will auto-correct orientation");
+    }
+
+    Logger::getInstance().log("Sensor type: " + String(_sensor->driverName()));
+    if (_sensor->expectsGyro()) {
+        Logger::getInstance().log("NOTE: MPU6050 uses gyroscope for orientation - axis mapping ignored");
+    } else {
+        Logger::getInstance().log("Current axisMap: \"" + _sensor->config().axisMap + "\"");
+        Logger::getInstance().log("Current axisDir: \"" + _sensor->config().axisDir + "\"");
+    }
+    Logger::getInstance().log("================================");
+
+    if (validGyroSamples > 0)
+    {
+        float avgGyroX = sumGyroX / validGyroSamples;
+        float avgGyroY = sumGyroY / validGyroSamples;
+        float avgGyroZ = sumGyroZ / validGyroSamples;
+        float gyroMag = sqrtf(avgGyroX * avgGyroX + avgGyroY * avgGyroY + avgGyroZ * avgGyroZ);
+
+        Logger::getInstance().log("Gyro average: [" + String(avgGyroX, 4) + "," +
+                                 String(avgGyroY, 4) + "," + String(avgGyroZ, 4) + "]");
+        Logger::getInstance().log("Gyro magnitude: " + String(gyroMag, 4) + " rad/s (should be ~0.00 if still)");
+
+        if (gyroMag > 0.1f)
+        {
+            Logger::getInstance().log("WARNING: Device is MOVING during calibration! Keep it STILL.");
+        }
+    }
+
+    // Log axis breakdown to help identify orientation
+    Logger::getInstance().log("Axis breakdown:");
+    Logger::getInstance().log("  X: " + String(fabsf(_calibrationOffset.x), 4) + "g " +
+                             (fabsf(_calibrationOffset.x) > 0.8f ? "<-- VERTICAL AXIS" : ""));
+    Logger::getInstance().log("  Y: " + String(fabsf(_calibrationOffset.y), 4) + "g " +
+                             (fabsf(_calibrationOffset.y) > 0.8f ? "<-- VERTICAL AXIS" : ""));
+    Logger::getInstance().log("  Z: " + String(fabsf(_calibrationOffset.z), 4) + "g " +
+                             (fabsf(_calibrationOffset.z) > 0.8f ? "<-- VERTICAL AXIS" : ""));
 
     return standby();
 }
@@ -224,16 +335,22 @@ bool GestureRead::startSampling()
         return false;
     }
 
-    if (!waitForGyroReady(kGyroReadyTimeoutMs))
+    // Flush stale data from sensor's FIFO buffer
+    // Wait for at least one fresh sample to be ready
+    // This prevents capturing old data from previous gesture
+    const uint8_t maxFlushAttempts = 10;
+    for (uint8_t i = 0; i < maxFlushAttempts; i++)
     {
-        Logger::getInstance().log("Aborting sampling start: gyro not ready.");
-        standby();
-        return false;
+        _sensor->update(); // Read and discard
+        vTaskDelay(pdMS_TO_TICKS(5)); // Wait for new data (at 100Hz, ~10ms per sample)
     }
 
-    resetAutoCalibrationState();
+    // Do one final read to prime the data registers with fresh values
+    _sensor->update();
+
     clearMemory();
     _isSampling = true;
+    samplingStartTime = millis(); // Record when sampling started
     return true;
 }
 
@@ -241,6 +358,42 @@ bool GestureRead::isSampling()
 {
     std::lock_guard<std::mutex> lock(_bufferMutex);
     return _isSampling;
+}
+
+void GestureRead::ensureMinimumSamplingTime()
+{
+    // Lock the buffer to check sampling state atomically
+    std::unique_lock<std::mutex> lock(_bufferMutex);
+
+    if (!_isSampling)
+    {
+        return;
+    }
+
+    // Minimum sampling time to ensure we capture a meaningful gesture
+    // Even if user releases button early, wait until minimum duration has elapsed
+    const unsigned long elapsed = millis() - samplingStartTime;
+
+    if (elapsed < kMinSamplingTimeMs)
+    {
+        // Too early - wait for minimum time to pass
+        const uint32_t remainingTime = kMinSamplingTimeMs - elapsed;
+        Logger::getInstance().log("Waiting " + String(remainingTime) + "ms more for minimum sampling time...");
+
+        // Continue sampling during the wait to collect more samples
+        const unsigned long waitEnd = millis() + remainingTime;
+
+        // Release lock before delay to allow updateSampling() to continue
+        lock.unlock();
+
+        // Keep the sensor active and continue sampling until minimum time
+        while (millis() < waitEnd)
+        {
+            vTaskDelay(pdMS_TO_TICKS(5)); // Short delays to allow updateSampling() to run
+        }
+
+        // Lock will be released automatically when function exits
+    }
 }
 
 bool GestureRead::stopSampling()
@@ -251,7 +404,6 @@ bool GestureRead::stopSampling()
     }
 
     _isSampling = false;
-    resetAutoCalibrationState();
 
     const bool bufferWasFull = _sampleBuffer.sampleCount >= _maxSamples;
     if (bufferWasFull)
@@ -417,46 +569,6 @@ void GestureRead::getMappedGyro(float &x, float &y, float &z)
     _sensor->getMappedGyro(x, y, z);
 }
 
-void GestureRead::resetAutoCalibrationState()
-{
-    _autoCalib.stableCount = 0;
-}
-
-void GestureRead::updateAutoCalibration(const float rawAccel[3], const float mappedGyro[3], bool gyroValid)
-{
-    if (!_autoCalib.enabled || !gyroValid)
-    {
-        _autoCalib.stableCount = 0;
-        return;
-    }
-
-    const float gyroMagnitudeSq = (mappedGyro[0] * mappedGyro[0]) +
-                                  (mappedGyro[1] * mappedGyro[1]) +
-                                  (mappedGyro[2] * mappedGyro[2]);
-    const float gyroMagnitude = sqrtf(gyroMagnitudeSq);
-
-    if (!isfinite(gyroMagnitude) || gyroMagnitude > _autoCalib.gyroStillThreshold)
-    {
-        _autoCalib.stableCount = 0;
-        return;
-    }
-
-    if (_autoCalib.stableCount < 0xFFFF)
-    {
-        _autoCalib.stableCount++;
-    }
-
-    if (_autoCalib.stableCount < _autoCalib.minStableSamples)
-    {
-        return;
-    }
-
-    const float alpha = _autoCalib.smoothingFactor;
-    _calibrationOffset.x = (1.0f - alpha) * _calibrationOffset.x + alpha * rawAccel[0];
-    _calibrationOffset.y = (1.0f - alpha) * _calibrationOffset.y + alpha * rawAccel[1];
-    _calibrationOffset.z = (1.0f - alpha) * _calibrationOffset.z + alpha * rawAccel[2];
-}
-
 bool GestureRead::waitForGyroReady(uint32_t timeoutMs)
 {
     if (!_sensor || !_sensor->isReady())
@@ -546,12 +658,13 @@ void GestureRead::updateSampling()
 
     if (sampling && count < _maxSamples)
     {
+        // Try to update sensor - this may fail if no new data is ready yet
         if (_sensor->update())
         {
             Sample &sample = _sampleBuffer.samples[count];
-            const float rawX = getMappedX();
-            const float rawY = getMappedY();
-            const float rawZ = getMappedZ();
+            const float mappedX = getMappedX();
+            const float mappedY = getMappedY();
+            const float mappedZ = getMappedZ();
 
             float mappedGyroX = 0.0f;
             float mappedGyroY = 0.0f;
@@ -562,13 +675,10 @@ void GestureRead::updateSampling()
                 getMappedGyro(mappedGyroX, mappedGyroY, mappedGyroZ);
             }
 
-            const float rawAccel[3] = {rawX, rawY, rawZ};
-            const float mappedGyro[3] = {mappedGyroX, mappedGyroY, mappedGyroZ};
-            updateAutoCalibration(rawAccel, mappedGyro, gyroAvailable);
-
-            sample.x = rawX - _calibrationOffset.x;
-            sample.y = rawY - _calibrationOffset.y;
-            sample.z = rawZ - _calibrationOffset.z;
+            // Apply calibration offset (set during manual calibration)
+            sample.x = mappedX - _calibrationOffset.x;
+            sample.y = mappedY - _calibrationOffset.y;
+            sample.z = mappedZ - _calibrationOffset.z;
 
             sample.gyroValid = gyroAvailable;
             if (sample.gyroValid)
@@ -588,6 +698,7 @@ void GestureRead::updateSampling()
             sample.temperature = sample.temperatureValid ? _sensor->readTemperatureC() : 0.0f;
 
             _sampleBuffer.sampleCount = count + 1;
+            // Only update lastSampleTime when we successfully got new data
             lastSampleTime = currentTime;
 
             static uint16_t debugLogEmitted = 0;
@@ -599,9 +710,9 @@ void GestureRead::updateSampling()
             if (debugLogEmitted < 5)
             {
                 String logMsg = "gesture_sample idx=" + String(count) +
-                                " raw=[" + String(rawX, 4) + "," + String(rawY, 4) + "," + String(rawZ, 4) + "]" +
+                                " mapped=[" + String(mappedX, 4) + "," + String(mappedY, 4) + "," + String(mappedZ, 4) + "]" +
                                 " offset=[" + String(_calibrationOffset.x, 4) + "," + String(_calibrationOffset.y, 4) + "," + String(_calibrationOffset.z, 4) + "]" +
-                                " accel=[" + String(sample.x, 4) + "," + String(sample.y, 4) + "," + String(sample.z, 4) + "]";
+                                " calibrated=[" + String(sample.x, 4) + "," + String(sample.y, 4) + "," + String(sample.z, 4) + "]";
 
                 if (sample.gyroValid)
                 {
@@ -625,13 +736,14 @@ void GestureRead::updateSampling()
             float y = fabsf(sample.y);
             float z = fabsf(sample.z);
 
-            x = x > 4.0f ? 4.0f : x;
-            y = y > 4.0f ? 4.0f : y;
-            z = z > 4.0f ? 4.0f : z;
+            const float maxRange = _config.sensitivity;
+            x = x > maxRange ? maxRange : x;
+            y = y > maxRange ? maxRange : y;
+            z = z > maxRange ? maxRange : z;
 
-            const int r = static_cast<int>(x * 255.0f / 4.0f);
-            const int g = static_cast<int>(y * 255.0f / 4.0f);
-            const int b = static_cast<int>(z * 255.0f / 4.0f);
+            const int r = static_cast<int>(x * 255.0f / maxRange);
+            const int g = static_cast<int>(y * 255.0f / maxRange);
+            const int b = static_cast<int>(z * 255.0f / maxRange);
 
             Led::getInstance().setColor(r, g, b, false);
         }
@@ -647,35 +759,4 @@ void GestureRead::updateSampling()
         Led::getInstance().setColor(true);
         stopSampling();
     }
-}
-
-void GestureRead::setAutoCalibrationEnabled(bool enable)
-{
-    _autoCalib.enabled = enable;
-    if (!enable)
-    {
-        resetAutoCalibrationState();
-    }
-}
-
-void GestureRead::setAutoCalibrationParameters(float gyroStillThresholdRad, uint16_t minStableSamples, float smoothingFactor)
-{
-    if (gyroStillThresholdRad > 0.0f)
-    {
-        _autoCalib.gyroStillThreshold = gyroStillThresholdRad;
-    }
-    if (minStableSamples > 0)
-    {
-        _autoCalib.minStableSamples = minStableSamples;
-    }
-    if (smoothingFactor > 0.0f && smoothingFactor <= 1.0f)
-    {
-        _autoCalib.smoothingFactor = smoothingFactor;
-    }
-    resetAutoCalibrationState();
-}
-
-bool GestureRead::isAutoCalibrationEnabled() const
-{
-    return _autoCalib.enabled;
 }

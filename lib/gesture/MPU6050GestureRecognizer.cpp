@@ -167,9 +167,12 @@ String MPU6050GestureRecognizer::orientationTypeToName(OrientationType orientati
         case ORIENT_FACE_UP: return "G_FACE_UP";
         case ORIENT_FACE_DOWN: return "G_FACE_DOWN";
         case ORIENT_SPIN: return "G_SPIN";
-        case ORIENT_SHAKE_X: return "G_SHAKE_X";
-        case ORIENT_SHAKE_Y: return "G_SHAKE_Y";
-        case ORIENT_SHAKE_Z: return "G_SHAKE_Z";
+        case ORIENT_SHAKE_X_POS: return "G_SHAKE_X_POS";
+        case ORIENT_SHAKE_X_NEG: return "G_SHAKE_X_NEG";
+        case ORIENT_SHAKE_Y_POS: return "G_SHAKE_Y_POS";
+        case ORIENT_SHAKE_Y_NEG: return "G_SHAKE_Y_NEG";
+        case ORIENT_SHAKE_Z_POS: return "G_SHAKE_Z_POS";
+        case ORIENT_SHAKE_Z_NEG: return "G_SHAKE_Z_NEG";
         default: return "G_UNKNOWN_ORIENT";
     }
 }

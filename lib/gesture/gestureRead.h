@@ -79,10 +79,12 @@ public:
 
     // New methods for continuous sampling
     bool startSampling();
+    void ensureMinimumSamplingTime(); // Wait if sampling hasn't reached minimum time yet
     bool stopSampling();
     bool isSampling();
     SampleBuffer &getCollectedSamples();
     void clearMemory();
+    void flushSensorBuffer(); // Flush hardware buffer to discard stale data
 
     // Mapped axis accessors
     float getMappedX();
@@ -91,18 +93,11 @@ public:
 
     void updateSampling(); // Call this regularly from main loop
 
-    // Auto-calibration controls
-    void setAutoCalibrationEnabled(bool enable);
-    void setAutoCalibrationParameters(float gyroStillThresholdRad, uint16_t minStableSamples, float smoothingFactor);
-    bool isAutoCalibrationEnabled() const;
-
     // Get underlying motion sensor (for axis calibration)
     MotionSensor* getMotionSensor() { return _sensor.get(); }
 
 private:
     void getMappedGyro(float &x, float &y, float &z);
-    void resetAutoCalibrationState();
-    void updateAutoCalibration(const float rawAccel[3], const float mappedGyro[3], bool gyroValid);
     bool waitForGyroReady(uint32_t timeoutMs);
 
     std::unique_ptr<MotionSensor> _sensor;
@@ -117,21 +112,13 @@ private:
     bool _isSampling;
     bool _bufferFull;
     unsigned long lastSampleTime;
+    unsigned long samplingStartTime;
     bool _motionWakeEnabled;
     bool _expectGyro;
 
     SampleBuffer _sampleBuffer;
     uint16_t _maxSamples;
     uint16_t _sampleHZ;
-
-    struct AutoCalibrationState
-    {
-        bool enabled;
-        float gyroStillThreshold;
-        uint16_t minStableSamples;
-        float smoothingFactor;
-        uint16_t stableCount;
-    } _autoCalib;
 };
 
 extern GestureRead gestureSensor; // Dichiarazione extern per l'istanza globale

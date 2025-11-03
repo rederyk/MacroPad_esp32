@@ -148,6 +148,10 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
     float sumGyroX = 0, sumGyroXSq = 0, maxGyroX = 0;
     float sumGyroY = 0, sumGyroYSq = 0, maxGyroY = 0;
     float sumGyroZ = 0, sumGyroZSq = 0, maxGyroZ = 0;
+    float sumSignedGyroX = 0, sumSignedGyroY = 0, sumSignedGyroZ = 0;
+    float maxGyroXPos = 0, maxGyroXNeg = 0;
+    float maxGyroYPos = 0, maxGyroYNeg = 0;
+    float maxGyroZPos = 0, maxGyroZNeg = 0;
 
     for (uint16_t i = 0; i < sampleCount; i++) {
         sumRoll += rollHistory[i];
@@ -167,21 +171,34 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
         }
 
         // Raw gyro axis statistics
-        float absGyroX = fabsf(gyroXHistory[i]);
-        float absGyroY = fabsf(gyroYHistory[i]);
-        float absGyroZ = fabsf(gyroZHistory[i]);
+        float rawGyroX = gyroXHistory[i];
+        float rawGyroY = gyroYHistory[i];
+        float rawGyroZ = gyroZHistory[i];
+
+        float absGyroX = fabsf(rawGyroX);
+        float absGyroY = fabsf(rawGyroY);
+        float absGyroZ = fabsf(rawGyroZ);
 
         sumGyroX += absGyroX;
         sumGyroXSq += absGyroX * absGyroX;
         if (absGyroX > maxGyroX) maxGyroX = absGyroX;
+        sumSignedGyroX += rawGyroX;
+        if (rawGyroX > maxGyroXPos) maxGyroXPos = rawGyroX;
+        if (-rawGyroX > maxGyroXNeg) maxGyroXNeg = -rawGyroX;
 
         sumGyroY += absGyroY;
         sumGyroYSq += absGyroY * absGyroY;
         if (absGyroY > maxGyroY) maxGyroY = absGyroY;
+        sumSignedGyroY += rawGyroY;
+        if (rawGyroY > maxGyroYPos) maxGyroYPos = rawGyroY;
+        if (-rawGyroY > maxGyroYNeg) maxGyroYNeg = -rawGyroY;
 
         sumGyroZ += absGyroZ;
         sumGyroZSq += absGyroZ * absGyroZ;
         if (absGyroZ > maxGyroZ) maxGyroZ = absGyroZ;
+        sumSignedGyroZ += rawGyroZ;
+        if (rawGyroZ > maxGyroZPos) maxGyroZPos = rawGyroZ;
+        if (-rawGyroZ > maxGyroZNeg) maxGyroZNeg = -rawGyroZ;
     }
 
     uint16_t n = sampleCount;
@@ -199,6 +216,15 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
     features.gyroXMax = maxGyroX;
     features.gyroYMax = maxGyroY;
     features.gyroZMax = maxGyroZ;
+    features.gyroXSignedMean = sumSignedGyroX / n;
+    features.gyroYSignedMean = sumSignedGyroY / n;
+    features.gyroZSignedMean = sumSignedGyroZ / n;
+    features.gyroXPosPeak = maxGyroXPos;
+    features.gyroXNegPeak = maxGyroXNeg;
+    features.gyroYPosPeak = maxGyroYPos;
+    features.gyroYNegPeak = maxGyroYNeg;
+    features.gyroZPosPeak = maxGyroZPos;
+    features.gyroZNegPeak = maxGyroZNeg;
 
     // Calculate standard deviations
     float rollVar = (sumRollSq / n) - (features.rollMean * features.rollMean);
@@ -231,10 +257,30 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
     Logger::getInstance().log("[OrientationFeatures] dRoll=" + String(features.deltaRoll * 180 / M_PI, 1) +
                              "° dPitch=" + String(features.deltaPitch * 180 / M_PI, 1) +
                              "° dYaw=" + String(features.deltaYaw * 180 / M_PI, 1) + "°");
+
+    // Log first raw sample for axis mapping diagnostic
+    if (buffer && buffer->sampleCount > 0) {
+        const Sample& firstSample = buffer->samples[0];
+        Logger::getInstance().log("[GYRO_RAW] First sample: gyroX=" + String(firstSample.gyroX, 3) +
+                                 " gyroY=" + String(firstSample.gyroY, 3) +
+                                 " gyroZ=" + String(firstSample.gyroZ, 3));
+    }
+
     Logger::getInstance().log("[OrientationFeatures] Gyro: X(max=" + String(features.gyroXMax, 2) +
-                             " mean=" + String(features.gyroXMean, 2) + ") Y(max=" + String(features.gyroYMax, 2) +
-                             " mean=" + String(features.gyroYMean, 2) + ") Z(max=" + String(features.gyroZMax, 2) +
-                             " mean=" + String(features.gyroZMean, 2) + ")");
+                             " mean=" + String(features.gyroXMean, 2) +
+                             " pos=" + String(features.gyroXPosPeak, 2) +
+                             " neg=" + String(features.gyroXNegPeak, 2) +
+                             " signed=" + String(features.gyroXSignedMean, 2) + ") " +
+                             "Y(max=" + String(features.gyroYMax, 2) +
+                             " mean=" + String(features.gyroYMean, 2) +
+                             " pos=" + String(features.gyroYPosPeak, 2) +
+                             " neg=" + String(features.gyroYNegPeak, 2) +
+                             " signed=" + String(features.gyroYSignedMean, 2) + ") " +
+                             "Z(max=" + String(features.gyroZMax, 2) +
+                             " mean=" + String(features.gyroZMean, 2) +
+                             " pos=" + String(features.gyroZPosPeak, 2) +
+                             " neg=" + String(features.gyroZNegPeak, 2) +
+                             " signed=" + String(features.gyroZSignedMean, 2) + ")");
 
     return true;
 }
@@ -263,16 +309,7 @@ OrientationType OrientationFeatureExtractor::classify(const OrientationFeatures&
         }
     }
 
-    // Check for tilts (pitch/roll changes)
-    if (fabsf(features.deltaPitch) > _tiltThreshold) {
-        _confidence = 0.85f;
-        return features.deltaPitch > 0 ? ORIENT_TILT_FORWARD : ORIENT_TILT_BACKWARD;
-    }
-
-    if (fabsf(features.deltaRoll) > _tiltThreshold) {
-        _confidence = 0.85f;
-        return features.deltaRoll > 0 ? ORIENT_TILT_LEFT : ORIENT_TILT_RIGHT;
-    }
+    // Tilt gestures intentionally disabled to reduce false positives
 
     // Check for face up/down (based on final orientation)
     const float faceUpPitch = -M_PI / 2.0f;   // -90° (face up)
@@ -311,16 +348,51 @@ OrientationType OrientationFeatureExtractor::classify(const OrientationFeatures&
 
         float maxStrength = fmaxf(xStrength, fmaxf(yStrength, zStrength));
 
-        // Require dominant axis to be significantly stronger (20% more)
-        if (xStrength >= maxStrength * 0.8f && xStrength > yStrength * 1.2f && xStrength > zStrength * 1.2f) {
+        auto chooseDirection = [&](OrientationType posType, OrientationType negType,
+                                   float posPeak, float negPeak, float signedMean) -> OrientationType {
+            const float dominanceFactor = 1.15f;  // Reduced from 1.25 to 1.15 for symmetric gestures
+            const float meanBias = _shakeThreshold * 0.15f;  // Reduced from 0.2 to 0.15 for better direction detection
+
+            if (posPeak <= 0.0f && negPeak <= 0.0f) {
+                return ORIENT_UNKNOWN;
+            }
+            if (posPeak >= negPeak * dominanceFactor) {
+                return posType;
+            }
+            if (negPeak >= posPeak * dominanceFactor) {
+                return negType;
+            }
+            if (fabsf(signedMean) > meanBias) {
+                return signedMean >= 0.0f ? posType : negType;
+            }
+            return (posPeak >= negPeak) ? posType : negType;
+        };
+
+        // Require dominant axis to be stronger (15% more) - reduced from 20% for better detection
+        if (xStrength >= maxStrength * 0.8f && xStrength > yStrength * 1.15f && xStrength > zStrength * 1.15f) {
             _confidence = 0.75f + fminf(xStrength / (shakeThresholdPeak * 2.0f), 0.15f);
-            return ORIENT_SHAKE_X;
-        } else if (yStrength >= maxStrength * 0.8f && yStrength > xStrength * 1.2f && yStrength > zStrength * 1.2f) {
+            OrientationType dir = chooseDirection(ORIENT_SHAKE_X_POS, ORIENT_SHAKE_X_NEG,
+                                                  features.gyroXPosPeak, features.gyroXNegPeak,
+                                                  features.gyroXSignedMean);
+            if (dir != ORIENT_UNKNOWN) {
+                return dir;
+            }
+        } else if (yStrength >= maxStrength * 0.8f && yStrength > xStrength * 1.15f && yStrength > zStrength * 1.15f) {
             _confidence = 0.75f + fminf(yStrength / (shakeThresholdPeak * 2.0f), 0.15f);
-            return ORIENT_SHAKE_Y;
-        } else if (zStrength >= maxStrength * 0.8f && zStrength > xStrength * 1.2f && zStrength > yStrength * 1.2f) {
+            OrientationType dir = chooseDirection(ORIENT_SHAKE_Y_POS, ORIENT_SHAKE_Y_NEG,
+                                                  features.gyroYPosPeak, features.gyroYNegPeak,
+                                                  features.gyroYSignedMean);
+            if (dir != ORIENT_UNKNOWN) {
+                return dir;
+            }
+        } else if (zStrength >= maxStrength * 0.8f && zStrength > xStrength * 1.15f && zStrength > yStrength * 1.15f) {
             _confidence = 0.75f + fminf(zStrength / (shakeThresholdPeak * 2.0f), 0.15f);
-            return ORIENT_SHAKE_Z;
+            OrientationType dir = chooseDirection(ORIENT_SHAKE_Z_POS, ORIENT_SHAKE_Z_NEG,
+                                                  features.gyroZPosPeak, features.gyroZNegPeak,
+                                                  features.gyroZSignedMean);
+            if (dir != ORIENT_UNKNOWN) {
+                return dir;
+            }
         }
         // If no clear dominant axis, fall through to unknown
     }
@@ -353,9 +425,12 @@ const char* getOrientationName(OrientationType type)
         case ORIENT_FACE_UP:         return "Face Up";
         case ORIENT_FACE_DOWN:       return "Face Down";
         case ORIENT_SPIN:            return "Spin";
-        case ORIENT_SHAKE_X:         return "Shake X";
-        case ORIENT_SHAKE_Y:         return "Shake Y";
-        case ORIENT_SHAKE_Z:         return "Shake Z";
+        case ORIENT_SHAKE_X_POS:     return "Shake X+";
+        case ORIENT_SHAKE_X_NEG:     return "Shake X-";
+        case ORIENT_SHAKE_Y_POS:     return "Shake Y+";
+        case ORIENT_SHAKE_Y_NEG:     return "Shake Y-";
+        case ORIENT_SHAKE_Z_POS:     return "Shake Z+";
+        case ORIENT_SHAKE_Z_NEG:     return "Shake Z-";
         default:                     return "Unknown";
     }
 }

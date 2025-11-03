@@ -73,10 +73,6 @@ bool ConfigurationManager::loadConfig()
     accelerometerConfig.motionWakeDuration = 20;
     accelerometerConfig.motionWakeHighPass = 4; // default to MPU6050_HIGHPASS_0_63_HZ
     accelerometerConfig.motionWakeCycleRate = 1; // default to MPU6050_CYCLE_5_HZ
-    accelerometerConfig.autoCalibrateEnabled = true;
-    accelerometerConfig.autoCalibrateGyroThreshold = 0.12f;
-    accelerometerConfig.autoCalibrateStableSamples = 0;
-    accelerometerConfig.autoCalibrateSmoothing = 0.05f;
     wifiConfig = WifiConfig();
     ledConfig = LedConfig();
 
@@ -296,14 +292,6 @@ bool ConfigurationManager::loadConfig()
             this->accelerometerConfig.motionWakeHighPass = accelerometerConfig["motionWakeHighPass"];
         if (accelerometerConfig.containsKey("motionWakeCycleRate"))
             this->accelerometerConfig.motionWakeCycleRate = accelerometerConfig["motionWakeCycleRate"];
-        if (accelerometerConfig.containsKey("autoCalibrate"))
-            this->accelerometerConfig.autoCalibrateEnabled = accelerometerConfig["autoCalibrate"];
-        if (accelerometerConfig.containsKey("autoCalibrateGyroThreshold"))
-            this->accelerometerConfig.autoCalibrateGyroThreshold = accelerometerConfig["autoCalibrateGyroThreshold"];
-        if (accelerometerConfig.containsKey("autoCalibrateStableSamples"))
-            this->accelerometerConfig.autoCalibrateStableSamples = accelerometerConfig["autoCalibrateStableSamples"];
-        if (accelerometerConfig.containsKey("autoCalibrateSmoothing"))
-            this->accelerometerConfig.autoCalibrateSmoothing = accelerometerConfig["autoCalibrateSmoothing"];
         if (accelerometerConfig.containsKey("gestureMode"))
             this->accelerometerConfig.gestureMode = accelerometerConfig["gestureMode"].as<String>();
         else

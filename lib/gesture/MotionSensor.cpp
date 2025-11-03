@@ -177,14 +177,19 @@ namespace
     constexpr uint8_t MPU6050_REG_MOT_DETECT_CTRL = 0x69;
     constexpr uint8_t MPU6050_REG_ACCEL_XOUT_H = 0x3B;
     constexpr uint8_t MPU6050_INT_MOTION_BIT = 0x40;
+    constexpr uint8_t MPU6050_INT_DATA_RDY_BIT = 0x01;
 
     class ADXL345Driver final : public AccelerometerDriver
     {
     public:
-        ADXL345Driver(TwoWire *wire, uint8_t address)
+        ADXL345Driver(TwoWire *wire, uint8_t address, const String &axisMap, const String &axisDir)
             : _address(address ? address : ADXL345_ALT),
-              _sensor(_address, wire)
+              _sensor(_address, wire),
+              _axisMap("xyz"),
+              _axisDir("+++")
         {
+            // Parse and apply axis mapping (ADXL345 needs this, MPU6050 doesn't)
+            applyAxisMapping(axisMap, axisDir);
         }
 
         const char *name() const override
@@ -198,7 +203,8 @@ namespace
             {
                 return false;
             }
-            _sensor.writeRange(ADXL345_RANGE_4G);
+            // NOTE: setRange will be called by MotionSensor::begin() with config.sensitivity
+            // Don't set it here to avoid conflicts
             _sensor.writeRate(ADXL345_RATE_100HZ);
             return _sensor.stop();
         }
@@ -220,17 +226,17 @@ namespace
 
         float readX() const override
         {
-            return _sensor.getX();
+            return getAxisValue(0);
         }
 
         float readY() const override
         {
-            return _sensor.getY();
+            return getAxisValue(1);
         }
 
         float readZ() const override
         {
-            return _sensor.getZ();
+            return getAxisValue(2);
         }
 
         bool setSampleRate(uint16_t hz, bool lowPower) override
@@ -282,8 +288,92 @@ namespace
         }
 
     private:
+        void applyAxisMapping(const String &axisMap, const String &axisDir)
+        {
+            char axes[4] = {'x', 'y', 'z', '\0'};
+            char dirs[4] = {'+', '+', '+', '\0'};
+            char currentSign = '+';
+            uint8_t axisCount = 0;
+
+            // Parse axisMap string (e.g., "xzy", "-x+y-z")
+            for (uint16_t i = 0; i < axisMap.length() && axisCount < 3; ++i)
+            {
+                char c = axisMap.charAt(i);
+                if (c == '+' || c == '-')
+                {
+                    currentSign = c;
+                    continue;
+                }
+
+                c = tolower(c);
+                if (c == 'x' || c == 'y' || c == 'z')
+                {
+                    axes[axisCount] = c;
+                    dirs[axisCount] = currentSign;
+                    currentSign = '+';
+                    axisCount++;
+                }
+            }
+
+            // Override with explicit axisDir if provided
+            if (axisDir.length() >= 3)
+            {
+                for (uint8_t i = 0; i < 3; ++i)
+                {
+                    char dirChar = axisDir.charAt(i);
+                    if (dirChar == '+' || dirChar == '-')
+                    {
+                        dirs[i] = dirChar;
+                    }
+                }
+            }
+
+            if (axisCount == 3)
+            {
+                _axisMap = String(axes);
+                _axisDir = String(dirs);
+            }
+        }
+
+        float getAxisValue(uint8_t index) const
+        {
+            if (_axisMap.length() < 3 || _axisDir.length() < 3)
+            {
+                return 0.0f;
+            }
+
+            // Get raw sensor value based on axis mapping
+            char axis = tolower(_axisMap[index]);
+            float value = 0.0f;
+
+            switch (axis)
+            {
+            case 'x':
+                value = _sensor.getX();
+                break;
+            case 'y':
+                value = _sensor.getY();
+                break;
+            case 'z':
+                value = _sensor.getZ();
+                break;
+            default:
+                return 0.0f;
+            }
+
+            // Apply direction inversion if needed
+            if (_axisDir[index] == '-')
+            {
+                value = -value;
+            }
+
+            return value;
+        }
+
         uint8_t _address;
         mutable ADXL345 _sensor;
+        String _axisMap;
+        String _axisDir;
     };
 
     class MPU6050Driver final : public AccelerometerDriver
@@ -311,7 +401,8 @@ namespace
                 if (_sensor.begin(_address, _wire))
                 {
                     _sensor.setFilterBandwidth(MPU6050_BAND_94_HZ);
-                    _sensor.setAccelerometerRange(MPU6050_RANGE_4_G);
+                    // NOTE: setRange will be called by MotionSensor::begin() with config.sensitivity
+                    // Don't set it here to avoid conflicts
                     _sensor.enableCycle(false);
                     _sensor.enableSleep(true);
                     return true;
@@ -573,10 +664,8 @@ namespace
                 return false;
             }
 
-            if (!setRange(4.0f))
-            {
-                return false;
-            }
+            // NOTE: setRange will be called by MotionSensor::begin() with config.sensitivity
+            // Don't set it here to avoid conflicts
 
             if (!setSampleRate(MotionSensor::kDefaultSampleHz, false))
             {
@@ -625,6 +714,17 @@ namespace
             int16_t rawGyroX = static_cast<int16_t>((data[8] << 8) | data[9]);
             int16_t rawGyroY = static_cast<int16_t>((data[10] << 8) | data[11]);
             int16_t rawGyroZ = static_cast<int16_t>((data[12] << 8) | data[13]);
+
+            // DEBUG: Log first NON-ZERO update to verify sensor is reading correctly
+            static bool firstUpdate = true;
+            if (firstUpdate && (rawX != 0 || rawY != 0 || rawZ != 0)) {
+                Logger::getInstance().log("[MPU6050Clone] First update - RAW values:");
+                Logger::getInstance().log("  rawX=" + String(rawX) + " rawY=" + String(rawY) + " rawZ=" + String(rawZ));
+                Logger::getInstance().log("  _scale=" + String(_scale, 2) + " (should be 8192.00 for ±4g)");
+                Logger::getInstance().log("  Expected: accelX=" + String(rawX / 8192.0f, 4) + "g");
+                Logger::getInstance().log("  Actual:   accelX=" + String(rawX / _scale, 4) + "g");
+                firstUpdate = false;
+            }
 
             _accelX = static_cast<float>(rawX) / _scale;
             _accelY = static_cast<float>(rawY) / _scale;
@@ -731,12 +831,33 @@ namespace
                 scale = 2048.0f;
             }
 
+            Logger::getInstance().log("[MPU6050Clone] setRange(" + String(g, 1) + "g) -> configValue=0x" +
+                                     String(configValue, HEX) + ", scale=" + String(scale, 2));
+
             if (!writeRegister(_wire, _address, MPU6050_REG_ACCEL_CONFIG, configValue))
             {
+                Logger::getInstance().log("[MPU6050Clone] ERROR: Failed to write ACCEL_CONFIG register!");
                 return false;
             }
 
+            // Verify the register was written correctly
+            uint8_t readback = 0;
+            if (readRegister(_wire, _address, MPU6050_REG_ACCEL_CONFIG, readback))
+            {
+                Logger::getInstance().log("[MPU6050Clone] ACCEL_CONFIG readback: 0x" + String(readback, HEX) +
+                                         " (expected: 0x" + String(configValue, HEX) + ")");
+                if (readback != configValue)
+                {
+                    Logger::getInstance().log("[MPU6050Clone] WARNING: Readback mismatch! Register may not be set correctly.");
+                }
+            }
+            else
+            {
+                Logger::getInstance().log("[MPU6050Clone] WARNING: Failed to read back ACCEL_CONFIG register!");
+            }
+
             _scale = scale;
+            Logger::getInstance().log("[MPU6050Clone] _scale updated to " + String(_scale, 2));
             return true;
         }
 
@@ -930,6 +1051,7 @@ namespace
 
         if (normalizedType == "mpu6050")
         {
+            // MPU6050 has gyro - no axis mapping needed (uses sensor fusion)
             if (useCloneDriver)
             {
                 return std::unique_ptr<AccelerometerDriver>(new MPU6050CloneDriver(wire, config.address));
@@ -937,7 +1059,8 @@ namespace
             return std::unique_ptr<AccelerometerDriver>(new MPU6050Driver(wire, config.address));
         }
 
-        return std::unique_ptr<AccelerometerDriver>(new ADXL345Driver(wire, config.address));
+        // ADXL345 needs axis mapping (no gyro for auto-orientation)
+        return std::unique_ptr<AccelerometerDriver>(new ADXL345Driver(wire, config.address, config.axisMap, config.axisDir));
     }
 
     AccelerometerProbeResult resolveAccelerometerAddress(const AccelerometerConfig &config, TwoWire *wire)
@@ -1065,8 +1188,6 @@ MotionSensor::MotionSensor(TwoWire *wire)
       _configLoaded(false),
       _expectGyro(false),
       _motionWakeEnabled(false),
-      _axisMap("xyz"),
-      _axisDir("+++"),
       _sampleHz(kDefaultSampleHz)
 {
 }
@@ -1080,8 +1201,6 @@ bool MotionSensor::begin(const AccelerometerConfig &config)
     String normalizedType = _config.type;
     normalizedType.toLowerCase();
     _expectGyro = (normalizedType == "mpu6050");
-
-    applyAxisMap(config.axisMap, config.axisDir);
 
     _sampleHz = clampSampleRate(config.sampleRate > 0 ? config.sampleRate : kDefaultSampleHz);
 
@@ -1180,17 +1299,29 @@ bool MotionSensor::update()
 
 float MotionSensor::getMappedX() const
 {
-    return getAxisValue(0);
+    if (!_driver)
+    {
+        return 0.0f;
+    }
+    return _driver->readX();
 }
 
 float MotionSensor::getMappedY() const
 {
-    return getAxisValue(1);
+    if (!_driver)
+    {
+        return 0.0f;
+    }
+    return _driver->readY();
 }
 
 float MotionSensor::getMappedZ() const
 {
-    return getAxisValue(2);
+    if (!_driver)
+    {
+        return 0.0f;
+    }
+    return _driver->readZ();
 }
 
 void MotionSensor::getMappedAcceleration(float &x, float &y, float &z) const
@@ -1202,10 +1333,18 @@ void MotionSensor::getMappedAcceleration(float &x, float &y, float &z) const
 
 void MotionSensor::getMappedGyro(float &x, float &y, float &z) const
 {
-    x = getGyroAxisValue(0);
-    y = getGyroAxisValue(1);
-    z = getGyroAxisValue(2);
+    if (!_driver)
+    {
+        x = y = z = 0.0f;
+        return;
+    }
+    // Gyro values are NOT mapped - gyroscope measures angular velocity
+    // in the sensor's physical reference frame
+    x = _driver->readGyroX();
+    y = _driver->readGyroY();
+    z = _driver->readGyroZ();
 }
+
 
 bool MotionSensor::hasGyro() const
 {
@@ -1304,123 +1443,4 @@ uint16_t MotionSensor::clampSampleRate(uint16_t hz)
 uint32_t MotionSensor::sampleIntervalMs(uint16_t hz)
 {
     return sampleIntervalMsImpl(hz);
-}
-
-void MotionSensor::applyAxisMap(const String &axisMap, const String &axisDir)
-{
-    char axes[4] = {'z', 'y', 'x', '\0'};
-    char dirs[4] = {'+', '+', '-', '\0'};
-    char currentSign = '+';
-    uint8_t axisCount = 0;
-
-    for (uint16_t i = 0; i < axisMap.length() && axisCount < 3; ++i)
-    {
-        char c = axisMap.charAt(i);
-        if (c == '+' || c == '-')
-        {
-            currentSign = c;
-            continue;
-        }
-
-        c = tolower(c);
-        if (c == 'x' || c == 'y' || c == 'z')
-        {
-            axes[axisCount] = c;
-            dirs[axisCount] = currentSign;
-            currentSign = '+';
-            axisCount++;
-        }
-    }
-
-    if (axisDir.length() >= 3)
-    {
-        for (uint8_t i = 0; i < 3; ++i)
-        {
-            char dirChar = axisDir.charAt(i);
-            if (dirChar == '+' || dirChar == '-')
-            {
-                dirs[i] = dirChar;
-            }
-        }
-    }
-
-    if (axisCount == 3)
-    {
-        _axisMap = String(axes);
-    }
-    else
-    {
-        _axisMap = "zyx";
-        dirs[0] = '+';
-        dirs[1] = '+';
-        dirs[2] = '-';
-    }
-
-    _axisDir = String(dirs);
-}
-
-float MotionSensor::getAxisValue(uint8_t index) const
-{
-    if (!_driver || _axisMap.length() < 3 || _axisDir.length() < 3)
-    {
-        return 0.0f;
-    }
-
-    char axis = tolower(_axisMap[index]);
-    float value = 0.0f;
-
-    switch (axis)
-    {
-    case 'x':
-        value = _driver->readX();
-        break;
-    case 'y':
-        value = _driver->readY();
-        break;
-    case 'z':
-        value = _driver->readZ();
-        break;
-    default:
-        return 0.0f;
-    }
-
-    if (_axisDir[index] == '-')
-    {
-        value = -value;
-    }
-
-    return value;
-}
-
-float MotionSensor::getGyroAxisValue(uint8_t index) const
-{
-    if (!_driver || _axisMap.length() < 3 || _axisDir.length() < 3)
-    {
-        return 0.0f;
-    }
-
-    char axis = tolower(_axisMap[index]);
-    float value = 0.0f;
-
-    switch (axis)
-    {
-    case 'x':
-        value = _driver->readGyroX();
-        break;
-    case 'y':
-        value = _driver->readGyroY();
-        break;
-    case 'z':
-        value = _driver->readGyroZ();
-        break;
-    default:
-        return 0.0f;
-    }
-
-    if (_axisDir[index] == '-')
-    {
-        value = -value;
-    }
-
-    return value;
 }

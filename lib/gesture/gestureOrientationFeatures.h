@@ -51,9 +51,13 @@ struct OrientationFeatures {
     float gyroMagnitudeStd;   // Variation in angular velocity
 
     // Raw gyroscope axis features (for motion-based gestures)
-    float gyroXMean, gyroXMax, gyroXStd;  // X-axis (roll) rotation rate
-    float gyroYMean, gyroYMax, gyroYStd;  // Y-axis (pitch) rotation rate
-    float gyroZMean, gyroZMax, gyroZStd;  // Z-axis (yaw) rotation rate
+    float gyroXMean, gyroXMax, gyroXStd;  // X-axis (roll) rotation magnitude
+    float gyroYMean, gyroYMax, gyroYStd;  // Y-axis (pitch) rotation magnitude
+    float gyroZMean, gyroZMax, gyroZStd;  // Z-axis (yaw) rotation magnitude
+    float gyroXSignedMean, gyroYSignedMean, gyroZSignedMean;
+    float gyroXPosPeak, gyroXNegPeak;
+    float gyroYPosPeak, gyroYNegPeak;
+    float gyroZPosPeak, gyroZNegPeak;
 
     // Final orientation
     float finalRoll;          // Ending roll
@@ -70,6 +74,10 @@ struct OrientationFeatures {
         gyroXMean = gyroXMax = gyroXStd = 0;
         gyroYMean = gyroYMax = gyroYStd = 0;
         gyroZMean = gyroZMax = gyroZStd = 0;
+        gyroXSignedMean = gyroYSignedMean = gyroZSignedMean = 0;
+        gyroXPosPeak = gyroXNegPeak = 0;
+        gyroYPosPeak = gyroYNegPeak = 0;
+        gyroZPosPeak = gyroZNegPeak = 0;
         finalRoll = finalPitch = finalYaw = 0;
     }
 };
@@ -89,9 +97,12 @@ enum OrientationType {
     ORIENT_FACE_UP,             // Device face up
     ORIENT_FACE_DOWN,           // Device face down
     ORIENT_SPIN,                // Continuous spinning
-    ORIENT_SHAKE_X,             // Shake along X axis
-    ORIENT_SHAKE_Y,             // Shake along Y axis
-    ORIENT_SHAKE_Z              // Shake along Z axis
+    ORIENT_SHAKE_X_POS,         // Shake along +X axis (roll+)
+    ORIENT_SHAKE_X_NEG,         // Shake along -X axis (roll-)
+    ORIENT_SHAKE_Y_POS,         // Shake along +Y axis (pitch+)
+    ORIENT_SHAKE_Y_NEG,         // Shake along -Y axis (pitch-)
+    ORIENT_SHAKE_Z_POS,         // Shake along +Z axis (yaw+)
+    ORIENT_SHAKE_Z_NEG          // Shake along -Z axis (yaw-)
 };
 
 /**
