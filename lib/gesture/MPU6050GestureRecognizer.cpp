@@ -60,14 +60,16 @@ GestureRecognitionResult MPU6050GestureRecognizer::recognize(SampleBuffer* buffe
     // Rileva il giroscopio e l'orientamento dalla prima passata
     detectOrientationFromData(buffer);
 
-    // Variabili per tracciare movimento su ogni asse
-    float accelXMin = 0.0f, accelXMax = 0.0f;
-    float accelYMin = 0.0f, accelYMax = 0.0f;
-    float accelZMin = 0.0f, accelZMax = 0.0f;
+    // Inizializza min/max dal primo campione invece che da zero
+    // Questo previene che lo zero influenzi i range di movimento
+    Sample& firstSample = buffer->samples[0];
+    float accelXMin = firstSample.x, accelXMax = firstSample.x;
+    float accelYMin = firstSample.y, accelYMax = firstSample.y;
+    float accelZMin = firstSample.z, accelZMax = firstSample.z;
 
-    float gyroXMin = 0.0f, gyroXMax = 0.0f;
-    float gyroYMin = 0.0f, gyroYMax = 0.0f;
-    float gyroZMin = 0.0f, gyroZMax = 0.0f;
+    float gyroXMin = firstSample.gyroX, gyroXMax = firstSample.gyroX;
+    float gyroYMin = firstSample.gyroY, gyroYMax = firstSample.gyroY;
+    float gyroZMin = firstSample.gyroZ, gyroZMax = firstSample.gyroZ;
 
     float maxGyroMag = 0.0f;
     float maxAccelChange = 0.0f;
@@ -128,40 +130,62 @@ GestureRecognitionResult MPU6050GestureRecognizer::recognize(SampleBuffer* buffe
                              " Z=" + String(gyroZRange, 2) +
                              " maxMag=" + String(maxGyroMag, 2));
 
-    // SWIPE: trova l'asse con maggiore movimento (escludendo l'asse di gravità)
-    // PRIORITÀ ALTA - controlliamo prima gli swipe!
-    // Se giroscopio disponibile, usa la rotazione per determinare direzione
+    // Strategia: trova l'asse con maggior movimento (escludendo gravità)
+    // Poi controlla se è oscillazione (SHAKE) o movimento unidirezionale (SWIPE)
+
     float swipeThreshold = SWIPE_ACCEL_THRESHOLD;
 
-    // Identifica l'asse con il movimento più significativo
+    // Trova l'asse con movimento più significativo
     float maxMovement = 0.0f;
-    int swipeAxis = -1; // -1=none, 0=X, 1=Y, 2=Z
-    float swipeDirection = 0.0f; // positivo o negativo
+    int gestureAxis = -1; // -1=none, 0=X, 1=Y, 2=Z
 
-    // Considera solo assi che NON sono l'asse di gravità principale
     if (!_gravityAxisX && accelXRange > maxMovement && accelXRange > swipeThreshold) {
         maxMovement = accelXRange;
-        swipeAxis = 0;
-        swipeDirection = (accelXMax + accelXMin) / 2.0f; // media come direzione
+        gestureAxis = 0;
     }
     if (!_gravityAxisY && accelYRange > maxMovement && accelYRange > swipeThreshold) {
         maxMovement = accelYRange;
-        swipeAxis = 1;
-        swipeDirection = (accelYMax + accelYMin) / 2.0f;
+        gestureAxis = 1;
     }
     if (!_gravityAxisZ && accelZRange > maxMovement && accelZRange > swipeThreshold) {
         maxMovement = accelZRange;
-        swipeAxis = 2;
-        swipeDirection = (accelZMax + accelZMin) / 2.0f;
+        gestureAxis = 2;
     }
 
-    // Se abbiamo un movimento significativo, determinalo come swipe
-    if (swipeAxis >= 0) {
+    if (gestureAxis >= 0) {
+        // Abbiamo movimento significativo su un asse
+        // Determina se è SHAKE (bidirezionale) o SWIPE (unidirezionale)
+
+        float axisMin = (gestureAxis == 0) ? accelXMin : (gestureAxis == 1) ? accelYMin : accelZMin;
+        float axisMax = (gestureAxis == 0) ? accelXMax : (gestureAxis == 1) ? accelYMax : accelZMax;
+
+        // SHAKE: movimento in ENTRAMBE le direzioni (min negativo E max positivo)
+        // Soglie più alte per evitare falsi positivi: min < -0.7g E max > 0.7g
+        // Inoltre richiede un range minimo di 1.8g per essere considerato shake
+        bool isBidirectional = (axisMin < -0.7f && axisMax > 0.7f && maxMovement > 1.8f);
+
+        if (isBidirectional) {
+            // È uno SHAKE!
+            result.gestureID = 203;
+            result.gestureName = "G_SHAKE";
+            result.confidence = constrain(maxMovement / 3.0f, 0.5f, 1.0f);
+
+            Logger::getInstance().log("MPU6050: SHAKE detected on axis=" + String(gestureAxis) +
+                                     " range=" + String(maxMovement, 2) +
+                                     " min=" + String(axisMin, 2) +
+                                     " max=" + String(axisMax, 2) +
+                                     " (conf: " + String(result.confidence, 2) + ")");
+            return result;
+        }
+
+        // SWIPE: movimento principalmente unidirezionale
+        float swipeDirection = (axisMax + axisMin) / 2.0f;
+
         // Usa il giroscopio per affinare la direzione se disponibile
         if (_hasGyro) {
             float gyroDirection = 0.0f;
-            if (swipeAxis == 0) gyroDirection = gyroYRange > gyroZRange ? (gyroYMax + gyroYMin) : (gyroZMax + gyroZMin);
-            else if (swipeAxis == 1) gyroDirection = gyroXRange > gyroZRange ? (gyroXMax + gyroXMin) : (gyroZMax + gyroZMin);
+            if (gestureAxis == 0) gyroDirection = gyroYRange > gyroZRange ? (gyroYMax + gyroYMin) : (gyroZMax + gyroZMin);
+            else if (gestureAxis == 1) gyroDirection = gyroXRange > gyroZRange ? (gyroXMax + gyroXMin) : (gyroZMax + gyroZMin);
             else gyroDirection = gyroXRange > gyroYRange ? (gyroXMax + gyroXMin) : (gyroYMax + gyroYMin);
 
             // Il giroscopio determina se è left o right
@@ -182,26 +206,9 @@ GestureRecognitionResult MPU6050GestureRecognizer::recognize(SampleBuffer* buffe
         result.confidence = constrain(maxMovement / (swipeThreshold * 2.0f), 0.5f, 1.0f);
 
         Logger::getInstance().log("MPU6050: " + result.gestureName + " detected on axis=" +
-                                 String(swipeAxis) + " dir=" + String(swipeDirection, 2) +
+                                 String(gestureAxis) + " dir=" + String(swipeDirection, 2) +
+                                 " min=" + String(axisMin, 2) + " max=" + String(axisMax, 2) +
                                  " (conf: " + String(result.confidence, 2) + ")");
-        return result;
-    }
-
-    // SHAKE: movimento MOLTO rapido o rotazione MOLTO veloce su qualsiasi asse
-    // Controlliamo DOPO gli swipe, con soglie ALTE
-    bool hasVeryStrongAccel = maxAccelChange > SHAKE_ACCEL_THRESHOLD;
-    bool hasVeryStrongGyro = maxGyroMag > SHAKE_GYRO_THRESHOLD;
-
-    if (hasVeryStrongAccel || hasVeryStrongGyro) {
-        result.gestureID = 203;
-        result.gestureName = "G_SHAKE";
-        float confidence = hasVeryStrongAccel ?
-            (maxAccelChange / (SHAKE_ACCEL_THRESHOLD * 2.0f)) :
-            (maxGyroMag / (SHAKE_GYRO_THRESHOLD * 2.0f));
-        result.confidence = constrain(confidence, 0.5f, 1.0f);
-
-        Logger::getInstance().log("MPU6050: SHAKE detected (conf: " +
-                                 String(result.confidence, 2) + ")");
         return result;
     }
 
