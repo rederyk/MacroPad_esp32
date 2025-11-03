@@ -46,6 +46,7 @@ struct LedConfig
     byte pinBlue;
     bool anodeCommon;
     bool active;
+    uint8_t brightness = 255;
 };
 
 struct IRSensorConfig

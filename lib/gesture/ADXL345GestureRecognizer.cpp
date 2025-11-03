@@ -57,10 +57,10 @@ GestureRecognitionResult ADXL345GestureRecognizer::recognize(SampleBuffer *buffe
     config.sensorTag = "ADXL345";
     config.sensorMode = SENSOR_MODE_ADXL345;
     config.useGyro = false;
-    config.swipeAccelThreshold = 0.6f;
-    config.shakeBidirectionalMin = 0.7f;
-    config.shakeBidirectionalMax = 0.7f;
-    config.shakeRangeThreshold = 1.8f;
+    config.swipeAccelThreshold = 0.55f;
+    config.shakeBidirectionalMin = 0.6f;
+    config.shakeBidirectionalMax = 0.6f;
+    config.shakeRangeThreshold = 1.6f;
 
     GestureRecognitionResult result = detectSimpleGesture(buffer, config);
     if (result.gestureID >= 0 && result.confidence < _confidenceThreshold)

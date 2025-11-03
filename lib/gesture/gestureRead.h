@@ -97,8 +97,10 @@ public:
     MotionSensor* getMotionSensor() { return _sensor.get(); }
 
 private:
+    void drainSensorBuffer(uint32_t timeoutMs, uint32_t waitMs, uint8_t stableReads);
     void getMappedGyro(float &x, float &y, float &z);
     bool waitForGyroReady(uint32_t timeoutMs);
+    bool waitForFreshAccelerometer(uint32_t timeoutMs);
 
     std::unique_ptr<MotionSensor> _sensor;
     AccelerometerConfig _config;

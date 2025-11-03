@@ -17,6 +17,9 @@ namespace
     constexpr float kDefaultSwipeThreshold = 0.6f;
     constexpr float kDefaultShakeMinPeak = 0.7f;
     constexpr float kDefaultShakeRange = 1.8f;
+    constexpr float kOrientationDetectionFloor = 0.35f;
+    constexpr float kMinValidSampleMagnitude = 0.05f;
+    constexpr uint16_t kOrientationSampleWindow = 6;
 
     struct AxisStats
     {
@@ -51,20 +54,77 @@ namespace
         }
     };
 
-    OrientationInfo detectOrientation(const Sample &firstSample)
+    bool isSampleValid(const Sample &sample)
+    {
+        return std::isfinite(sample.x) &&
+               std::isfinite(sample.y) &&
+               std::isfinite(sample.z);
+    }
+
+    float accelMagnitude(const Sample &sample)
+    {
+        return sqrtf(sample.x * sample.x + sample.y * sample.y + sample.z * sample.z);
+    }
+
+    OrientationInfo detectOrientation(const SampleBuffer *buffer)
     {
         OrientationInfo info;
-        float absValues[3] = {
-            fabsf(firstSample.x),
-            fabsf(firstSample.y),
-            fabsf(firstSample.z)};
 
-        const float maxValue = std::max({absValues[0], absValues[1], absValues[2]});
-        if (maxValue > 0.5f)
+        if (!buffer || !buffer->samples || buffer->sampleCount == 0)
         {
-            const int axis = (maxValue == absValues[0]) ? 0 : (maxValue == absValues[1] ? 1 : 2);
+            return info;
+        }
+
+        float totals[3] = {0.0f, 0.0f, 0.0f};
+        uint16_t considered = 0;
+        const uint16_t limit = std::min<uint16_t>(buffer->sampleCount, kOrientationSampleWindow);
+
+        for (uint16_t i = 0; i < limit; ++i)
+        {
+            const Sample &sample = buffer->samples[i];
+            if (!isSampleValid(sample))
+            {
+                continue;
+            }
+
+            if (accelMagnitude(sample) < kMinValidSampleMagnitude)
+            {
+                continue;
+            }
+
+            totals[0] += fabsf(sample.x);
+            totals[1] += fabsf(sample.y);
+            totals[2] += fabsf(sample.z);
+            considered++;
+        }
+
+        if (considered == 0)
+        {
+            return info;
+        }
+
+        const float avgX = totals[0] / considered;
+        const float avgY = totals[1] / considered;
+        const float avgZ = totals[2] / considered;
+
+        int axis = 0;
+        float best = avgX;
+        if (avgY > best)
+        {
+            best = avgY;
+            axis = 1;
+        }
+        if (avgZ > best)
+        {
+            best = avgZ;
+            axis = 2;
+        }
+
+        if (best > kOrientationDetectionFloor)
+        {
             info.gravity[axis] = true;
         }
+
         return info;
     }
 
@@ -100,18 +160,26 @@ GestureRecognitionResult detectSimpleGesture(SampleBuffer *buffer, const SimpleG
         return result;
     }
 
-    const Sample &first = buffer->samples[0];
-    const bool gyroActive = config.useGyro && first.gyroValid;
-    const OrientationInfo orientation = detectOrientation(first);
+    bool gyroActive = config.useGyro;
+    if (gyroActive)
+    {
+        gyroActive = false;
+        for (uint16_t i = 0; i < buffer->sampleCount; ++i)
+        {
+            if (buffer->samples[i].gyroValid)
+            {
+                gyroActive = true;
+                break;
+            }
+        }
+    }
 
-    AxisStats accelStats[3] = {
-        AxisStats(first.x),
-        AxisStats(first.y),
-        AxisStats(first.z)};
-    AxisStats gyroStats[3] = {
-        AxisStats(first.gyroX),
-        AxisStats(first.gyroY),
-        AxisStats(first.gyroZ)};
+    const OrientationInfo orientation = detectOrientation(buffer);
+
+    AxisStats accelStats[3];
+    AxisStats gyroStats[3];
+    bool accelSeeded = false;
+    bool gyroSeeded = false;
 
     float maxAccelMagnitude = 0.0f;
     float maxGyroMagnitude = 0.0f;
@@ -120,11 +188,31 @@ GestureRecognitionResult detectSimpleGesture(SampleBuffer *buffer, const SimpleG
     {
         const Sample &sample = buffer->samples[i];
 
-        accelStats[0].update(sample.x);
-        accelStats[1].update(sample.y);
-        accelStats[2].update(sample.z);
+        if (!isSampleValid(sample))
+        {
+            continue;
+        }
 
-        const float accelMag = sqrtf(sample.x * sample.x + sample.y * sample.y + sample.z * sample.z);
+        const float accelMag = accelMagnitude(sample);
+        if (accelMag < kMinValidSampleMagnitude)
+        {
+            continue;
+        }
+
+        if (!accelSeeded)
+        {
+            accelStats[0] = AxisStats(sample.x);
+            accelStats[1] = AxisStats(sample.y);
+            accelStats[2] = AxisStats(sample.z);
+            accelSeeded = true;
+        }
+        else
+        {
+            accelStats[0].update(sample.x);
+            accelStats[1].update(sample.y);
+            accelStats[2].update(sample.z);
+        }
+
         if (accelMag > maxAccelMagnitude)
         {
             maxAccelMagnitude = accelMag;
@@ -132,9 +220,19 @@ GestureRecognitionResult detectSimpleGesture(SampleBuffer *buffer, const SimpleG
 
         if (gyroActive && sample.gyroValid)
         {
-            gyroStats[0].update(sample.gyroX);
-            gyroStats[1].update(sample.gyroY);
-            gyroStats[2].update(sample.gyroZ);
+            if (!gyroSeeded)
+            {
+                gyroStats[0] = AxisStats(sample.gyroX);
+                gyroStats[1] = AxisStats(sample.gyroY);
+                gyroStats[2] = AxisStats(sample.gyroZ);
+                gyroSeeded = true;
+            }
+            else
+            {
+                gyroStats[0].update(sample.gyroX);
+                gyroStats[1].update(sample.gyroY);
+                gyroStats[2].update(sample.gyroZ);
+            }
 
             const float gyroMag = sqrtf(sample.gyroX * sample.gyroX +
                                         sample.gyroY * sample.gyroY +
@@ -144,6 +242,17 @@ GestureRecognitionResult detectSimpleGesture(SampleBuffer *buffer, const SimpleG
                 maxGyroMagnitude = gyroMag;
             }
         }
+    }
+
+    if (!accelSeeded)
+    {
+        Logger::getInstance().log(String(config.sensorTag) + ": no valid accelerometer data in buffer");
+        return result;
+    }
+
+    if (gyroActive && !gyroSeeded)
+    {
+        gyroActive = false;
     }
 
     Logger::getInstance().log(String(config.sensorTag) +
@@ -163,10 +272,27 @@ GestureRecognitionResult detectSimpleGesture(SampleBuffer *buffer, const SimpleG
                                   " maxMag=" + String(maxGyroMagnitude, 2));
     }
 
-    const float swipeThreshold = (config.swipeAccelThreshold > 0.0f) ? config.swipeAccelThreshold : kDefaultSwipeThreshold;
+    const float swipeThresholdBase = (config.swipeAccelThreshold > 0.0f) ? config.swipeAccelThreshold : kDefaultSwipeThreshold;
+    float effectiveSwipeThreshold = swipeThresholdBase;
+
+    if (gyroActive)
+    {
+        effectiveSwipeThreshold *= (maxGyroMagnitude > 2.5f) ? 0.7f : 0.85f;
+    }
+
+    if (buffer->sampleCount >= 12 || maxAccelMagnitude > 1.5f)
+    {
+        effectiveSwipeThreshold *= 0.85f;
+    }
+
+    effectiveSwipeThreshold = std::max(0.35f, std::min(effectiveSwipeThreshold, swipeThresholdBase));
+
     const float shakeMinPositive = (config.shakeBidirectionalMax > 0.0f) ? config.shakeBidirectionalMax : kDefaultShakeMinPeak;
     const float shakeMinNegative = (config.shakeBidirectionalMin > 0.0f) ? config.shakeBidirectionalMin : kDefaultShakeMinPeak;
     const float shakeRange = (config.shakeRangeThreshold > 0.0f) ? config.shakeRangeThreshold : kDefaultShakeRange;
+    const float shakeMinPositiveAdjusted = shakeMinPositive * 0.9f;
+    const float shakeMinNegativeAdjusted = shakeMinNegative * 0.9f;
+    const float shakeRangeAdjusted = shakeRange * 0.9f;
 
     float maxMovement = 0.0f;
     int movementAxis = -1;
@@ -179,10 +305,28 @@ GestureRecognitionResult detectSimpleGesture(SampleBuffer *buffer, const SimpleG
         }
 
         const float range = accelStats[axis].range();
-        if (range > maxMovement && range > swipeThreshold)
+        if (range > maxMovement && range > effectiveSwipeThreshold)
         {
             maxMovement = range;
             movementAxis = axis;
+        }
+    }
+
+    if (movementAxis < 0 && gyroActive && maxGyroMagnitude > 2.0f)
+    {
+        for (int axis = 0; axis < 3; axis++)
+        {
+            if (orientation.gravity[axis])
+            {
+                continue;
+            }
+
+            const float range = accelStats[axis].range();
+            if (range > maxMovement && range > (effectiveSwipeThreshold * 0.75f))
+            {
+                maxMovement = range;
+                movementAxis = axis;
+            }
         }
     }
 
@@ -196,15 +340,15 @@ GestureRecognitionResult detectSimpleGesture(SampleBuffer *buffer, const SimpleG
     const float axisMax = accelStats[movementAxis].max;
     const float axisRange = accelStats[movementAxis].range();
 
-    const bool isShake = (axisMin < -shakeMinNegative) &&
-                         (axisMax > shakeMinPositive) &&
-                         (axisRange > shakeRange);
+    const bool isShake = (axisMin < -shakeMinNegativeAdjusted) &&
+                         (axisMax > shakeMinPositiveAdjusted) &&
+                         (axisRange > shakeRangeAdjusted);
 
     if (isShake)
     {
         result.gestureID = 203;
         result.gestureName = "G_SHAKE";
-        result.confidence = clampMinMax(axisRange / 3.0f, 0.5f, 1.0f);
+        result.confidence = clampMinMax(axisRange / (shakeRangeAdjusted + 0.01f), 0.5f, 1.0f);
 
         Logger::getInstance().log(String(config.sensorTag) + ": SHAKE detected on axis=" +
                                   String(axisName(movementAxis)) +
@@ -248,7 +392,8 @@ GestureRecognitionResult detectSimpleGesture(SampleBuffer *buffer, const SimpleG
     const bool isRight = swipeDirection > 0.0f;
     result.gestureID = isRight ? 201 : 202;
     result.gestureName = isRight ? "G_SWIPE_RIGHT" : "G_SWIPE_LEFT";
-    result.confidence = clampMinMax(axisRange / (swipeThreshold * 2.0f), 0.5f, 1.0f);
+    const float confidenceDenominator = std::max(effectiveSwipeThreshold * 2.0f, 0.1f);
+    result.confidence = clampMinMax(axisRange / confidenceDenominator, 0.5f, 1.0f);
 
     Logger::getInstance().log(String(config.sensorTag) + ": " + result.gestureName +
                               " detected on axis=" + String(axisName(movementAxis)) +

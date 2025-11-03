@@ -13,7 +13,44 @@ constexpr uint32_t kGyroReadyPollDelayMs = 5;
 constexpr float kGyroReadyMinAccelSum = 0.05f;
 constexpr float kGyroReadyNoiseFloor = 1e-4f;
 constexpr uint8_t kGyroReadyZeroTolerance = 5;
-constexpr uint32_t kMinSamplingTimeMs = 100; // Minimum sampling time in ms (10 samples at 100Hz)
+constexpr uint8_t kMinSamplingWindowSamples = 10;       // Aim to collect at least 10 samples per gesture
+constexpr uint32_t kMinSamplingWindowFloorMs = 50;      // Never wait less than 50ms
+constexpr float kSensorFlushStabilityEpsilon = 0.01f;   // Threshold to treat readings as stable
+constexpr uint32_t kSensorFlushTimeoutCeilingMs = 300;  // Upper bound for flush wait
+constexpr uint8_t kSensorFlushStableReadsMin = 3;
+constexpr uint8_t kSensorFlushStableReadsMax = 6;
+constexpr float kMinValidAccelMagnitude = 0.05f;
+constexpr float kStaleSampleEpsilon = 0.0025f;
+
+namespace
+{
+    struct FlushTiming
+    {
+        uint32_t timeoutMs;
+        uint32_t waitMs;
+        uint8_t stableReads;
+    };
+
+    FlushTiming computeFlushTiming(uint16_t sampleHz)
+    {
+        const uint32_t intervalMs = std::max<uint32_t>(1, MotionSensor::sampleIntervalMs(sampleHz));
+        const uint32_t waitMs = std::max<uint32_t>(1, intervalMs / 2);
+        const uint32_t timeoutMs = std::min<uint32_t>(
+            kSensorFlushTimeoutCeilingMs,
+            std::max<uint32_t>(intervalMs * 3, waitMs * 4));
+        const uint32_t stableTarget = std::max<uint32_t>(
+            kSensorFlushStableReadsMin,
+            std::min<uint32_t>(kSensorFlushStableReadsMax, timeoutMs / intervalMs));
+
+        return {timeoutMs, waitMs, static_cast<uint8_t>(stableTarget)};
+    }
+
+    uint32_t computeMinimumSamplingDurationMs(uint16_t sampleHz)
+    {
+        const uint32_t intervalMs = std::max<uint32_t>(1, MotionSensor::sampleIntervalMs(sampleHz));
+        return std::max<uint32_t>(kMinSamplingWindowFloorMs, intervalMs * kMinSamplingWindowSamples);
+    }
+} // namespace
 
 GestureRead::GestureRead(TwoWire *wire)
     : _sensor(new MotionSensor(wire)),
@@ -151,14 +188,112 @@ void GestureRead::clearMemory()
         memset(_sampleBuffer.samples, 0, _maxSamples * sizeof(Sample));
         _sampleBuffer.sampleCount = 0;
         _bufferFull = false;
+        lastSampleTime = 0;
     }
 }
 
 void GestureRead::flushSensorBuffer()
 {
-    // This function is now handled by startSampling()
-    // Kept for API compatibility but does nothing
-    // The flush is now done at the start of sampling to ensure fresh data
+    if (!_sensor || !_sensor->isReady())
+    {
+        return;
+    }
+
+    if (isSampling())
+    {
+        // Avoid touching the hardware FIFO while a capture is in progress
+        return;
+    }
+
+    // Temporarily wake the sensor so we can drain any residual samples that
+    // may still be buffered by the device after the previous capture.
+    if (!wakeup())
+    {
+        Logger::getInstance().log("GestureRead: failed to wake sensor for flush");
+        return;
+    }
+
+    if (!disableLowPowerMode())
+    {
+        Logger::getInstance().log("GestureRead: failed to disable low power mode for flush");
+        standby();
+        return;
+    }
+
+    const FlushTiming timing = computeFlushTiming(_sampleHZ);
+    drainSensorBuffer(timing.timeoutMs, timing.waitMs, timing.stableReads);
+
+    // Ensure the software buffer starts clean as well
+    clearMemory();
+
+    if (!standby())
+    {
+        Logger::getInstance().log("GestureRead: failed to return sensor to standby after flush");
+    }
+}
+
+void GestureRead::drainSensorBuffer(uint32_t timeoutMs, uint32_t waitMs, uint8_t stableReads)
+{
+    if (!_sensor || !_sensor->isReady())
+    {
+        return;
+    }
+
+    const uint32_t deadline = millis() + timeoutMs;
+    TickType_t waitTicks = pdMS_TO_TICKS(waitMs);
+    if (waitTicks == 0)
+    {
+        waitTicks = 1;
+    }
+
+    float prevX = 0.0f;
+    float prevY = 0.0f;
+    float prevZ = 0.0f;
+    bool havePrev = false;
+    uint8_t stableCount = 0;
+
+    while (millis() < deadline)
+    {
+        if (!_sensor->update())
+        {
+            vTaskDelay(waitTicks);
+            continue;
+        }
+
+        const float x = getMappedX();
+        const float y = getMappedY();
+        const float z = getMappedZ();
+
+        if (havePrev)
+        {
+            const bool stable =
+                fabsf(x - prevX) < kSensorFlushStabilityEpsilon &&
+                fabsf(y - prevY) < kSensorFlushStabilityEpsilon &&
+                fabsf(z - prevZ) < kSensorFlushStabilityEpsilon;
+
+            if (stable)
+            {
+                if (++stableCount >= stableReads)
+                {
+                    break;
+                }
+            }
+            else
+            {
+                stableCount = 0;
+            }
+        }
+        else
+        {
+            havePrev = true;
+        }
+
+        prevX = x;
+        prevY = y;
+        prevZ = z;
+
+        vTaskDelay(waitTicks);
+    }
 }
 
 bool GestureRead::calibrate(uint16_t calibrationSamples)
@@ -320,7 +455,15 @@ bool GestureRead::calibrate(uint16_t calibrationSamples)
 
 bool GestureRead::startSampling()
 {
-    if (_isSampling || !_sensor || !_sensor->isReady())
+    {
+        std::lock_guard<std::mutex> lock(_bufferMutex);
+        if (_isSampling)
+        {
+            return false;
+        }
+    }
+
+    if (!_sensor || !_sensor->isReady())
     {
         return false;
     }
@@ -335,21 +478,36 @@ bool GestureRead::startSampling()
         return false;
     }
 
-    // Flush stale data from sensor's FIFO buffer
-    // Wait for at least one fresh sample to be ready
-    // This prevents capturing old data from previous gesture
-    const uint8_t maxFlushAttempts = 10;
-    for (uint8_t i = 0; i < maxFlushAttempts; i++)
+    // Drain any stale samples that may still be buffered by the hardware
+    const FlushTiming timing = computeFlushTiming(_sampleHZ);
+    drainSensorBuffer(timing.timeoutMs, timing.waitMs, timing.stableReads);
+
+    bool sensorReady = false;
+    if (_expectGyro)
     {
-        _sensor->update(); // Read and discard
-        vTaskDelay(pdMS_TO_TICKS(5)); // Wait for new data (at 100Hz, ~10ms per sample)
+        sensorReady = waitForGyroReady(kGyroReadyTimeoutMs);
+    }
+    else
+    {
+        sensorReady = waitForFreshAccelerometer(kGyroReadyTimeoutMs);
     }
 
-    // Do one final read to prime the data registers with fresh values
+    if (!sensorReady)
+    {
+        Logger::getInstance().log("GestureRead: proceeding without confirmed fresh sample (warmup timeout)");
+    }
+
+    // Prime driver with the most recent frame so the first stored sample is current
     _sensor->update();
 
     clearMemory();
-    _isSampling = true;
+
+    {
+        std::lock_guard<std::mutex> lock(_bufferMutex);
+        _isSampling = true;
+        _bufferFull = false;
+    }
+
     samplingStartTime = millis(); // Record when sampling started
     return true;
 }
@@ -370,42 +528,46 @@ void GestureRead::ensureMinimumSamplingTime()
         return;
     }
 
-    // Minimum sampling time to ensure we capture a meaningful gesture
-    // Even if user releases button early, wait until minimum duration has elapsed
     const unsigned long elapsed = millis() - samplingStartTime;
+    const uint32_t minSamplingDuration = computeMinimumSamplingDurationMs(_sampleHZ);
 
-    if (elapsed < kMinSamplingTimeMs)
+    if (elapsed < minSamplingDuration)
     {
-        // Too early - wait for minimum time to pass
-        const uint32_t remainingTime = kMinSamplingTimeMs - elapsed;
-        Logger::getInstance().log("Waiting " + String(remainingTime) + "ms more for minimum sampling time...");
+        const uint32_t remainingTime = minSamplingDuration - elapsed;
+        Logger::getInstance().log("Waiting " + String(remainingTime) + "ms more for minimum sampling window (" +
+                                  String(minSamplingDuration) + "ms target)...");
 
-        // Continue sampling during the wait to collect more samples
         const unsigned long waitEnd = millis() + remainingTime;
 
         // Release lock before delay to allow updateSampling() to continue
         lock.unlock();
 
-        // Keep the sensor active and continue sampling until minimum time
-        while (millis() < waitEnd)
+        const uint32_t pollMs = std::max<uint32_t>(1, MotionSensor::sampleIntervalMs(_sampleHZ));
+        TickType_t pollTicks = pdMS_TO_TICKS(pollMs);
+        if (pollTicks == 0)
         {
-            vTaskDelay(pdMS_TO_TICKS(5)); // Short delays to allow updateSampling() to run
+            pollTicks = 1;
         }
 
-        // Lock will be released automatically when function exits
+        while (millis() < waitEnd)
+        {
+            vTaskDelay(pollTicks);
+        }
     }
 }
 
 bool GestureRead::stopSampling()
 {
+    std::unique_lock<std::mutex> lock(_bufferMutex);
     if (!_isSampling)
     {
         return false;
     }
 
-    _isSampling = false;
-
     const bool bufferWasFull = _sampleBuffer.sampleCount >= _maxSamples;
+    _isSampling = false;
+    lock.unlock();
+
     if (bufferWasFull)
     {
         Logger::getInstance().log("Stopped sampling - buffer full (" + String(_maxSamples) + " samples collected)");
@@ -636,6 +798,40 @@ bool GestureRead::waitForGyroReady(uint32_t timeoutMs)
     return false;
 }
 
+bool GestureRead::waitForFreshAccelerometer(uint32_t timeoutMs)
+{
+    if (!_sensor || !_sensor->isReady())
+    {
+        return false;
+    }
+
+    const unsigned long start = millis();
+
+    while (millis() - start < timeoutMs)
+    {
+        if (_sensor->update())
+        {
+            const float rawX = getMappedX();
+            const float rawY = getMappedY();
+            const float rawZ = getMappedZ();
+
+            if (std::isfinite(rawX) && std::isfinite(rawY) && std::isfinite(rawZ))
+            {
+                const float accelSum = fabsf(rawX) + fabsf(rawY) + fabsf(rawZ);
+                if (accelSum > kMinValidAccelMagnitude)
+                {
+                    return true;
+                }
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(kGyroReadyPollDelayMs));
+    }
+
+    Logger::getInstance().log("GestureRead: accelerometer failed to produce fresh data within " + String(timeoutMs) + " ms");
+    return false;
+}
+
 void GestureRead::updateSampling()
 {
     if (!_sensor || !_sensor->isReady())
@@ -643,8 +839,11 @@ void GestureRead::updateSampling()
         return;
     }
 
-    std::lock_guard<std::mutex> lock(_bufferMutex);
+    bool requestStop = false;
+    bool ledSetIdle = false;
+    bool ledSetFull = false;
 
+    std::unique_lock<std::mutex> lock(_bufferMutex);
     const unsigned long currentTime = millis();
     const unsigned long interval = MotionSensor::sampleIntervalMs(_sampleHZ);
 
@@ -661,10 +860,25 @@ void GestureRead::updateSampling()
         // Try to update sensor - this may fail if no new data is ready yet
         if (_sensor->update())
         {
-            Sample &sample = _sampleBuffer.samples[count];
             const float mappedX = getMappedX();
             const float mappedY = getMappedY();
             const float mappedZ = getMappedZ();
+
+            if (!std::isfinite(mappedX) || !std::isfinite(mappedY) || !std::isfinite(mappedZ))
+            {
+                return;
+            }
+
+            const float accelSum = fabsf(mappedX) + fabsf(mappedY) + fabsf(mappedZ);
+            if (accelSum < kMinValidAccelMagnitude)
+            {
+                // Skip clearly stale readings (all zeros)
+                return;
+            }
+
+            const float calibratedX = mappedX - _calibrationOffset.x;
+            const float calibratedY = mappedY - _calibrationOffset.y;
+            const float calibratedZ = mappedZ - _calibrationOffset.z;
 
             float mappedGyroX = 0.0f;
             float mappedGyroY = 0.0f;
@@ -675,10 +889,35 @@ void GestureRead::updateSampling()
                 getMappedGyro(mappedGyroX, mappedGyroY, mappedGyroZ);
             }
 
+            if (count > 0)
+            {
+                const Sample &prev = _sampleBuffer.samples[count - 1];
+                const bool accelDuplicate =
+                    fabsf(prev.x - calibratedX) < kStaleSampleEpsilon &&
+                    fabsf(prev.y - calibratedY) < kStaleSampleEpsilon &&
+                    fabsf(prev.z - calibratedZ) < kStaleSampleEpsilon;
+
+                bool gyroDuplicate = true;
+                if (gyroAvailable && prev.gyroValid)
+                {
+                    gyroDuplicate =
+                        fabsf(prev.gyroX - mappedGyroX) < kStaleSampleEpsilon &&
+                        fabsf(prev.gyroY - mappedGyroY) < kStaleSampleEpsilon &&
+                        fabsf(prev.gyroZ - mappedGyroZ) < kStaleSampleEpsilon;
+                }
+
+                if (accelDuplicate && gyroDuplicate)
+                {
+                    return;
+                }
+            }
+
+            Sample &sample = _sampleBuffer.samples[count];
+
             // Apply calibration offset (set during manual calibration)
-            sample.x = mappedX - _calibrationOffset.x;
-            sample.y = mappedY - _calibrationOffset.y;
-            sample.z = mappedZ - _calibrationOffset.z;
+            sample.x = calibratedX;
+            sample.y = calibratedY;
+            sample.z = calibratedZ;
 
             sample.gyroValid = gyroAvailable;
             if (sample.gyroValid)
@@ -751,12 +990,26 @@ void GestureRead::updateSampling()
     else if (sampling && count >= _maxSamples)
     {
         _bufferFull = true;
-        Led::getInstance().setColor(true);
-        stopSampling();
+        ledSetFull = true;
+        requestStop = true;
     }
     else
     {
+        if (!sampling)
+        {
+            ledSetIdle = true;
+        }
+    }
+
+    lock.unlock();
+
+    if (ledSetFull || ledSetIdle)
+    {
         Led::getInstance().setColor(true);
+    }
+
+    if (requestStop)
+    {
         stopSampling();
     }
 }

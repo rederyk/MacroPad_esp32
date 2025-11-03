@@ -53,6 +53,7 @@ public:
     const LedConfig &getLedConfig() const;
     const IRSensorConfig &getIrSensorConfig() const;
     const IRLedConfig &getIrLedConfig() const;
+    bool setLedBrightness(uint8_t brightness);
 
 private:
     WifiConfig wifiConfig;

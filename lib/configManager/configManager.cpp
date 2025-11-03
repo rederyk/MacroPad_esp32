@@ -190,20 +190,32 @@ bool ConfigurationManager::loadConfig()
     }
 
     // Load encoder configuration if it exists
-    JsonVariant ledConfig = doc["led"];
-    if (!ledConfig.isNull() && ledConfig.is<JsonObject>())
+    JsonVariant ledConfigJson = doc["led"];
+    if (!ledConfigJson.isNull() && ledConfigJson.is<JsonObject>())
     {
-        if (ledConfig.containsKey("pinRed"))
-            this->ledConfig.pinRed = ledConfig["pinRed"];
-        if (ledConfig.containsKey("pinGreen"))
-            this->ledConfig.pinGreen = ledConfig["pinGreen"];
-        this->ledConfig.pinRed = ledConfig["pinRed"];
-        if (ledConfig.containsKey("pinBlue"))
-            this->ledConfig.pinBlue = ledConfig["pinBlue"];
-        if (ledConfig.containsKey("anodeCommon"))
-            this->ledConfig.anodeCommon = ledConfig["anodeCommon"];
-        if (ledConfig.containsKey("active"))
-            this->ledConfig.active = ledConfig["active"];
+        if (ledConfigJson.containsKey("pinRed"))
+            this->ledConfig.pinRed = ledConfigJson["pinRed"];
+        if (ledConfigJson.containsKey("pinGreen"))
+            this->ledConfig.pinGreen = ledConfigJson["pinGreen"];
+        if (ledConfigJson.containsKey("pinBlue"))
+            this->ledConfig.pinBlue = ledConfigJson["pinBlue"];
+        if (ledConfigJson.containsKey("anodeCommon"))
+            this->ledConfig.anodeCommon = ledConfigJson["anodeCommon"];
+        if (ledConfigJson.containsKey("active"))
+            this->ledConfig.active = ledConfigJson["active"];
+        if (ledConfigJson.containsKey("brightness"))
+        {
+            int rawBrightness = ledConfigJson["brightness"];
+            this->ledConfig.brightness = static_cast<uint8_t>(constrain(rawBrightness, 0, 255));
+        }
+        else
+        {
+            this->ledConfig.brightness = 255;
+        }
+    }
+    else
+    {
+        this->ledConfig.brightness = 255;
     }
 
     // Load IR Sensor configuration if it exists
@@ -325,6 +337,58 @@ const WifiConfig &ConfigurationManager::getWifiConfig() const
 const LedConfig &ConfigurationManager::getLedConfig() const
 {
     return ledConfig;
+}
+
+bool ConfigurationManager::setLedBrightness(uint8_t brightness)
+{
+    ledConfig.brightness = brightness;
+
+    if (!LittleFS.begin(true))
+    {
+        Logger::getInstance().log("ConfigurationManager: failed to mount LittleFS for brightness update");
+        return false;
+    }
+
+    File configFile = LittleFS.open("/config.json", "r");
+    if (!configFile)
+    {
+        Logger::getInstance().log("ConfigurationManager: failed to open config.json for reading (brightness update)");
+        LittleFS.end();
+        return false;
+    }
+
+    StaticJsonDocument<4096> doc;
+    DeserializationError error = deserializeJson(doc, configFile);
+    configFile.close();
+    if (error)
+    {
+        Logger::getInstance().log("ConfigurationManager: failed to parse config.json (brightness update): " + String(error.c_str()));
+        LittleFS.end();
+        return false;
+    }
+
+    JsonObject ledObj = doc["led"].isNull() ? doc.createNestedObject("led") : doc["led"].as<JsonObject>();
+    ledObj["brightness"] = brightness;
+
+    File outFile = LittleFS.open("/config.json", "w");
+    if (!outFile)
+    {
+        Logger::getInstance().log("ConfigurationManager: failed to open config.json for writing (brightness update)");
+        LittleFS.end();
+        return false;
+    }
+
+    if (serializeJsonPretty(doc, outFile) == 0)
+    {
+        Logger::getInstance().log("ConfigurationManager: failed to write brightness to config.json");
+        outFile.close();
+        LittleFS.end();
+        return false;
+    }
+
+    outFile.close();
+    LittleFS.end();
+    return true;
 }
 
 const IRSensorConfig &ConfigurationManager::getIrSensorConfig() const

@@ -31,6 +31,7 @@
 #include <ArduinoJson.h>
 #include "rotaryEncoder.h"
 #include "Led.h"
+#include "configManager.h"
 #include "InputHub.h"
 
 extern InputHub inputHub;
@@ -1347,77 +1348,25 @@ void SpecialAction::showLedInfo()
 
 void SpecialAction::saveBrightnessToFile()
 {
-    if (!LittleFS.begin(true))
+    const uint8_t persisted = static_cast<uint8_t>(constrain(currentBrightness, 0, 255));
+    if (!configManager.setLedBrightness(persisted))
     {
-        Logger::getInstance().log("Failed to mount LittleFS for brightness save");
-        return;
+        Logger::getInstance().log("Failed to persist LED brightness to config.json");
     }
-
-    File file = LittleFS.open("/led_brightness.json", "w");
-    if (!file)
-    {
-        Logger::getInstance().log("Failed to open brightness file for writing");
-        return;
-    }
-
-    DynamicJsonDocument doc(128);
-    doc["brightness"] = currentBrightness;
-
-    if (serializeJson(doc, file) == 0)
-    {
-        Logger::getInstance().log("Failed to write brightness to file");
-    }
-
-    file.close();
 }
 
 void SpecialAction::loadBrightness()
 {
-    if (!LittleFS.begin(true))
-    {
-        Logger::getInstance().log("Failed to mount LittleFS for brightness load");
-        currentBrightness = 255; // Default
-        return;
-    }
-
-    if (!LittleFS.exists("/led_brightness.json"))
-    {
-        Logger::getInstance().log("Brightness file not found, using default 255");
-        currentBrightness = 255;
-        saveBrightnessToFile(); // Create file with default
-        return;
-    }
-
-    File file = LittleFS.open("/led_brightness.json", "r");
-    if (!file)
-    {
-        Logger::getInstance().log("Failed to open brightness file for reading");
-        currentBrightness = 255;
-        return;
-    }
-
-    DynamicJsonDocument doc(128);
-    DeserializationError error = deserializeJson(doc, file);
-    file.close();
-
-    if (error)
-    {
-        Logger::getInstance().log("Failed to parse brightness file: " + String(error.c_str()));
-        currentBrightness = 255;
-        return;
-    }
-
-    currentBrightness = doc["brightness"] | 255; // Default to 255 if not found
-    currentBrightness = constrain(currentBrightness, 0, 255);
-
-    Logger::getInstance().log("Loaded brightness: " + String(currentBrightness));
+    const LedConfig &ledConfig = configManager.getLedConfig();
+    const int configured = static_cast<int>(ledConfig.brightness);
+    currentBrightness = constrain(configured, 0, 255);
+    Logger::getInstance().log("Loaded brightness from config: " + String(currentBrightness));
 }
 
 void SpecialAction::setBrightness(int brightness)
 {
-    int oldBrightness = currentBrightness;
+    const int oldBrightness = currentBrightness;
     currentBrightness = constrain(brightness, 0, 255);
-    saveBrightnessToFile();
 
     // Refresh current LED color with new brightness (only if brightness changed)
     if (currentBrightness != oldBrightness)
@@ -1430,6 +1379,8 @@ void SpecialAction::setBrightness(int brightness)
 
         // Applica il nuovo colore con il nuovo brightness
         Led::getInstance().setColor(newRed, newGreen, newBlue, false);
+
+        saveBrightnessToFile();
     }
 
     Logger::getInstance().log("Brightness set to " + String(currentBrightness) + "/255 (applies to system notifications only)");
@@ -1437,10 +1388,10 @@ void SpecialAction::setBrightness(int brightness)
 
 void SpecialAction::adjustBrightness(int delta)
 {
-    int newBrightness = currentBrightness + delta;
-    setBrightness(newBrightness);
+    const int previous = currentBrightness;
+    setBrightness(currentBrightness + delta);
 
-    Logger::getInstance().log("Brightness adjusted from " + String(currentBrightness - delta) +
+    Logger::getInstance().log("Brightness adjusted from " + String(previous) +
                               " to " + String(currentBrightness) + "/255");
 }
 
