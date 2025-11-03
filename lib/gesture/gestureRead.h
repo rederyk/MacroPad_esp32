@@ -27,6 +27,8 @@
 #include <memory>
 #include <mutex>
 #include <vector>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 struct Offset
 {
@@ -91,12 +93,15 @@ public:
     float getMappedY();
     float getMappedZ();
 
-    void updateSampling(); // Call this regularly from main loop
+    void updateSampling(); // Driven by internal sampling task; exposed for testing if needed
 
     // Get underlying motion sensor (for axis calibration)
     MotionSensor* getMotionSensor() { return _sensor.get(); }
 
 private:
+    static void samplingTaskTrampoline(void *param);
+    bool ensureSamplingTask();
+    void samplingTaskLoop();
     void drainSensorBuffer(uint32_t timeoutMs, uint32_t waitMs, uint8_t stableReads);
     void getMappedGyro(float &x, float &y, float &z);
     bool waitForGyroReady(uint32_t timeoutMs);
@@ -121,6 +126,8 @@ private:
     SampleBuffer _sampleBuffer;
     uint16_t _maxSamples;
     uint16_t _sampleHZ;
+    TaskHandle_t _samplingTaskHandle;
+    volatile bool _samplingTaskShouldRun;
 };
 
 extern GestureRead gestureSensor; // Dichiarazione extern per l'istanza globale

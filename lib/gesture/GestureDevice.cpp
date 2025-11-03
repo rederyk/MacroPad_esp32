@@ -35,8 +35,6 @@ bool GestureDevice::processInput()
         return false;
     }
 
-    sensor.updateSampling();
-
     if (state == State::Capturing && !sensor.isSampling())
     {
         state = State::PendingRecognition;

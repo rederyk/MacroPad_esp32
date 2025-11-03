@@ -20,7 +20,6 @@ constexpr uint32_t kSensorFlushTimeoutCeilingMs = 300;  // Upper bound for flush
 constexpr uint8_t kSensorFlushStableReadsMin = 3;
 constexpr uint8_t kSensorFlushStableReadsMax = 6;
 constexpr float kMinValidAccelMagnitude = 0.05f;
-constexpr float kStaleSampleEpsilon = 0.0025f;
 
 namespace
 {
@@ -52,6 +51,73 @@ namespace
     }
 } // namespace
 
+void GestureRead::samplingTaskTrampoline(void *param)
+{
+    auto *self = static_cast<GestureRead *>(param);
+    if (self)
+    {
+        self->samplingTaskLoop();
+    }
+    vTaskDelete(nullptr);
+}
+
+bool GestureRead::ensureSamplingTask()
+{
+    if (_samplingTaskHandle != nullptr)
+    {
+        _samplingTaskShouldRun = true;
+        return true;
+    }
+
+    _samplingTaskShouldRun = true;
+
+    constexpr uint32_t stackDepth = 4096;
+    constexpr UBaseType_t priority = tskIDLE_PRIORITY + 2;
+    BaseType_t result = xTaskCreatePinnedToCore(
+        GestureRead::samplingTaskTrampoline,
+        "gestureSampler",
+        stackDepth,
+        this,
+        priority,
+        &_samplingTaskHandle,
+        CONFIG_ARDUINO_RUNNING_CORE);
+
+    if (result != pdPASS)
+    {
+        _samplingTaskHandle = nullptr;
+        _samplingTaskShouldRun = false;
+        Logger::getInstance().log("GestureRead: failed to create sampling task");
+        return false;
+    }
+
+    return true;
+}
+
+void GestureRead::samplingTaskLoop()
+{
+    TickType_t lastWakeTime = xTaskGetTickCount();
+
+    while (_samplingTaskShouldRun)
+    {
+        uint32_t intervalMs = MotionSensor::sampleIntervalMs(_sampleHZ);
+        if (intervalMs == 0)
+        {
+            intervalMs = 1;
+        }
+
+        TickType_t delayTicks = pdMS_TO_TICKS(intervalMs);
+        if (delayTicks == 0)
+        {
+            delayTicks = 1;
+        }
+
+        vTaskDelayUntil(&lastWakeTime, delayTicks);
+        updateSampling();
+    }
+
+    _samplingTaskHandle = nullptr;
+}
+
 GestureRead::GestureRead(TwoWire *wire)
     : _sensor(new MotionSensor(wire)),
       _configLoaded(false),
@@ -78,6 +144,8 @@ GestureRead::GestureRead(TwoWire *wire)
     _sampleBuffer.sampleCount = 0;
     _sampleBuffer.maxSamples = _maxSamples;
     _sampleBuffer.sampleHZ = _sampleHZ;
+    _samplingTaskHandle = nullptr;
+    _samplingTaskShouldRun = false;
 }
 
 GestureRead::~GestureRead()
@@ -85,6 +153,15 @@ GestureRead::~GestureRead()
     if (_isSampling)
     {
         stopSampling();
+    }
+
+    if (_samplingTaskHandle != nullptr)
+    {
+        _samplingTaskShouldRun = false;
+        while (_samplingTaskHandle != nullptr)
+        {
+            vTaskDelay(pdMS_TO_TICKS(1));
+        }
     }
 
     if (_sampleBuffer.samples)
@@ -176,7 +253,12 @@ bool GestureRead::begin(const AccelerometerConfig &config)
         _motionWakeEnabled = false;
     }
 
-    return standby();
+    if (!standby())
+    {
+        return false;
+    }
+
+    return ensureSamplingTask();
 }
 
 void GestureRead::clearMemory()
@@ -465,6 +547,12 @@ bool GestureRead::startSampling()
 
     if (!_sensor || !_sensor->isReady())
     {
+        return false;
+    }
+
+    if (!ensureSamplingTask())
+    {
+        Logger::getInstance().log("GestureRead: sampling task unavailable");
         return false;
     }
 
@@ -887,29 +975,6 @@ void GestureRead::updateSampling()
             if (gyroAvailable)
             {
                 getMappedGyro(mappedGyroX, mappedGyroY, mappedGyroZ);
-            }
-
-            if (count > 0)
-            {
-                const Sample &prev = _sampleBuffer.samples[count - 1];
-                const bool accelDuplicate =
-                    fabsf(prev.x - calibratedX) < kStaleSampleEpsilon &&
-                    fabsf(prev.y - calibratedY) < kStaleSampleEpsilon &&
-                    fabsf(prev.z - calibratedZ) < kStaleSampleEpsilon;
-
-                bool gyroDuplicate = true;
-                if (gyroAvailable && prev.gyroValid)
-                {
-                    gyroDuplicate =
-                        fabsf(prev.gyroX - mappedGyroX) < kStaleSampleEpsilon &&
-                        fabsf(prev.gyroY - mappedGyroY) < kStaleSampleEpsilon &&
-                        fabsf(prev.gyroZ - mappedGyroZ) < kStaleSampleEpsilon;
-                }
-
-                if (accelDuplicate && gyroDuplicate)
-                {
-                    return;
-                }
             }
 
             Sample &sample = _sampleBuffer.samples[count];
