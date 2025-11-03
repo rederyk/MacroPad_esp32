@@ -53,19 +53,56 @@ bool GestureAnalyze::initRecognizer(const String &sensorType, const String &gest
         }
     }
 
-    if (mode == "mpu6050" || mode == "shape" || mode == "orientation")
+    const bool legacyShapeMode = (mode == "shape" || mode == "orientation");
+    const bool genericSwipeMode = (mode == "swipe" || mode == "simple");
+
+    bool useMPU = (mode == "mpu6050" || legacyShapeMode);
+    bool useADXL = (mode == "adxl345");
+
+    if (genericSwipeMode)
+    {
+        if (normalizedSensor == "adxl345")
+        {
+            useADXL = true;
+        }
+        else if (normalizedSensor == "mpu6050")
+        {
+            useMPU = true;
+        }
+        else
+        {
+            Logger::getInstance().log("[GestureAnalyze] Generic gesture mode requires known sensor type");
+            return false;
+        }
+    }
+
+    if (useMPU)
     {
         _recognizer.reset(new MPU6050GestureRecognizer());
-        Logger::getInstance().log("[GestureAnalyze] Using MPU6050 recognizer (shape+orientation)");
+        if (legacyShapeMode || genericSwipeMode)
+        {
+            Logger::getInstance().log("[GestureAnalyze] Mode \"" + mode + "\" mapped to swipe/shake (MPU6050 accel+gyro)");
+        }
+        else
+        {
+            Logger::getInstance().log("[GestureAnalyze] Using swipe/shake recognizer for MPU6050 (accel+gyro)");
+        }
     }
-    else if (mode == "adxl345")
+    else if (useADXL)
     {
         _recognizer.reset(new ADXL345GestureRecognizer());
-        Logger::getInstance().log("[GestureAnalyze] Using ADXL345 recognizer (shape-only)");
+        if (genericSwipeMode)
+        {
+            Logger::getInstance().log("[GestureAnalyze] Mode \"" + mode + "\" mapped to swipe/shake (ADXL345 accel only)");
+        }
+        else
+        {
+            Logger::getInstance().log("[GestureAnalyze] Using swipe/shake recognizer for ADXL345 (accelerometer only)");
+        }
     }
     else
     {
-        Logger::getInstance().log("[GestureAnalyze] Gesture mode not supported without training: " + mode);
+        Logger::getInstance().log("[GestureAnalyze] Gesture mode not supported: " + mode);
         _recognizer.reset();
         return false;
     }

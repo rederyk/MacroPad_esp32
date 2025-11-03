@@ -19,15 +19,15 @@
  */
 
 #include "ADXL345GestureRecognizer.h"
+
 #include "Logger.h"
+#include "SimpleGestureDetector.h"
+
+static constexpr uint16_t kMinSamples = 3;
 
 ADXL345GestureRecognizer::ADXL345GestureRecognizer()
-    : _shapeRecognizer(),
-      _confidenceThreshold(0.5f)
+    : _confidenceThreshold(0.5f)
 {
-    // ADXL345 exposes only accelerometer data, so rely on linear motion analysis.
-    _shapeRecognizer.setMinMotionStdDev(0.18f); // Lower threshold for less sensitive sensor
-    _shapeRecognizer.setUseMadgwick(false);     // No gyro available
 }
 
 ADXL345GestureRecognizer::~ADXL345GestureRecognizer() = default;
@@ -40,28 +40,35 @@ bool ADXL345GestureRecognizer::init(const String &sensorType)
         return false;
     }
 
-    Logger::getInstance().log("ADXL345GestureRecognizer: Initialized for predefined shape recognition (no training required)");
+    Logger::getInstance().log("ADXL345GestureRecognizer: using swipe/shake detection (accelerometer only)");
     return true;
 }
 
 GestureRecognitionResult ADXL345GestureRecognizer::recognize(SampleBuffer *buffer)
 {
-    GestureRecognitionResult result = _shapeRecognizer.recognize(buffer, SENSOR_MODE_ADXL345);
-
-    if (result.gestureID < 0)
+    if (!buffer || buffer->sampleCount < kMinSamples)
     {
-        Logger::getInstance().log("ADXL345GestureRecognizer: No shape gesture recognised");
-        return result;
+        Logger::getInstance().log("ADXL345GestureRecognizer: insufficient samples (" +
+                                  String(buffer ? buffer->sampleCount : 0) + ")");
+        return GestureRecognitionResult();
     }
 
-    if (result.confidence < _confidenceThreshold)
+    SimpleGestureConfig config;
+    config.sensorTag = "ADXL345";
+    config.sensorMode = SENSOR_MODE_ADXL345;
+    config.useGyro = false;
+    config.swipeAccelThreshold = 0.6f;
+    config.shakeBidirectionalMin = 0.7f;
+    config.shakeBidirectionalMax = 0.7f;
+    config.shakeRangeThreshold = 1.8f;
+
+    GestureRecognitionResult result = detectSimpleGesture(buffer, config);
+    if (result.gestureID >= 0 && result.confidence < _confidenceThreshold)
     {
-        Logger::getInstance().log("ADXL345GestureRecognizer: Discarded low confidence gesture (" +
+        Logger::getInstance().log("ADXL345GestureRecognizer: gesture discarded (confidence " +
                                   String(result.confidence, 2) + ")");
         return GestureRecognitionResult();
     }
 
-    Logger::getInstance().log(String("ADXL345 Shape: ") + result.gestureName +
-                              " (conf: " + String(result.confidence, 2) + ")");
     return result;
 }

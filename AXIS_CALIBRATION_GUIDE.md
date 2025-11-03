@@ -126,7 +126,9 @@ O se ancora sbagliato:
 Se vuoi vedere i valori raw in tempo reale, aggiungi questo nel codice:
 
 ```cpp
-// In gestureOrientationFeatures.cpp, nella funzione extract():
+// (Legacy) In gestureOrientationFeatures.cpp, nella funzione extract():
+// Il file è stato rimosso con la semplificazione Swipe+Shake,
+// ma il pattern di log resta valido per eventuali estensioni future.
 Logger::getInstance().log("Raw angles: R=" + String(rollHistory[i] * 180/M_PI) +
                          " P=" + String(pitchHistory[i] * 180/M_PI) +
                          " Y=" + String(yawHistory[i] * 180/M_PI));

@@ -34,29 +34,12 @@ public:
     // IGestureRecognizer interface
     bool init(const String& sensorType) override;
     GestureRecognitionResult recognize(SampleBuffer* buffer) override;
-    String getModeName() const override { return "MPU6050 Simple (Swipe+Shake)"; }
+    String getModeName() const override { return "Swipe+Shake (Accel+Gyro)"; }
     void setConfidenceThreshold(float threshold) override { _confidenceThreshold = threshold; }
     float getConfidenceThreshold() const override { return _confidenceThreshold; }
 
 private:
     float _confidenceThreshold;
-
-    // Stato dell'orientamento dispositivo
-    bool _hasGyro;
-    bool _gravityAxisX;
-    bool _gravityAxisY;
-    bool _gravityAxisZ;
-
-    // Helper per rilevare orientamento dai dati
-    void detectOrientationFromData(SampleBuffer* buffer);
-
-    // Stub methods (kept for compatibility)
-    GestureRecognitionResult recognizeShape(SampleBuffer* buffer);
-    GestureRecognitionResult recognizeOrientation(SampleBuffer* buffer);
-    float calculateGyroActivity(SampleBuffer* buffer) const;
-    bool hasOrientationChange(SampleBuffer* buffer) const;
-    int orientationTypeToID(int orientation) const;
-    String orientationTypeToName(int orientation) const;
 };
 
 #endif // MPU6050_GESTURE_RECOGNIZER_H

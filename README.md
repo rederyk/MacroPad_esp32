@@ -563,7 +563,7 @@ Per modificare i colori:
 
 ### Limiti
 - **Max Combinazioni per file:** ~100-150 (limite JSON in RAM)
-- **Gesture supportate:** 8 shape (ADXL/MPU) + 7 orientation (solo MPU6050)
+- **Gesture supportate:** Swipe sinistra/destra + Shake (MPU6050 usa anche il gyro)
 - **Campioni gesture:** ~3s buffer circolare (configurabile)
 - **Max Lunghezza Comando Concatenato:** ~500 caratteri
 - **WiFi:** Solo 2.4 GHz (limitazione ESP32)
@@ -586,7 +586,7 @@ MacroPad_esp32/
 │   ├── gesture/                    # Sistema riconoscimento gesti
 │   │   ├── gestureRead.cpp
 │   │   ├── gestureAnalyze.cpp
-│   │   ├── PredefinedShapeRecognizer.cpp
+│   │   ├── SimpleGestureDetector.cpp
 │   │   ├── MotionSensor.cpp
 │   │   └── ...
 │   ├── inputDevice/                # Astrazione input

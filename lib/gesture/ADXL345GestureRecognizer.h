@@ -20,12 +20,10 @@
 #define ADXL345_GESTURE_RECOGNIZER_H
 
 #include "IGestureRecognizer.h"
-#include "PredefinedShapeRecognizer.h"
 
 /**
  * ADXL345-specific gesture recognition
- * Uses predefined shape recognition without requiring user training.
- * Orientation gestures are not available due to lack of gyro data.
+ * Detects only swipe left/right and shake gestures using accelerometer data.
  */
 class ADXL345GestureRecognizer : public IGestureRecognizer {
 public:
@@ -35,12 +33,11 @@ public:
     // IGestureRecognizer interface
     bool init(const String& sensorType) override;
     GestureRecognitionResult recognize(SampleBuffer* buffer) override;
-    String getModeName() const override { return "ADXL345 (Shape)"; }
+    String getModeName() const override { return "Swipe+Shake (Accel only)"; }
     void setConfidenceThreshold(float threshold) override { _confidenceThreshold = threshold; }
     float getConfidenceThreshold() const override { return _confidenceThreshold; }
 
 private:
-    PredefinedShapeRecognizer _shapeRecognizer;
     float _confidenceThreshold;
 };
 
