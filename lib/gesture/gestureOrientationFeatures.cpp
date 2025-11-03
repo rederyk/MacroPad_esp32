@@ -63,8 +63,9 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
         _madgwick.setSampleFrequency(static_cast<float>(buffer->sampleHZ));
     }
 
-    // Reset filter
-    _madgwick.reset();
+    // DO NOT RESET - Madgwick should track orientation continuously
+    // This allows proper world-frame transformation even if device is held tilted
+    // _madgwick.reset();
 
     const uint16_t totalSamples = buffer->sampleCount;
     const uint16_t sampleCount = std::min<uint16_t>(totalSamples, MAX_HISTORY_SAMPLES);
@@ -77,9 +78,19 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
     std::unique_ptr<float[]> gyroXHistory(new (std::nothrow) float[sampleCount]);
     std::unique_ptr<float[]> gyroYHistory(new (std::nothrow) float[sampleCount]);
     std::unique_ptr<float[]> gyroZHistory(new (std::nothrow) float[sampleCount]);
+    // Use calibrated accelerometer for shake detection (orientation-independent)
+    std::unique_ptr<float[]> accelXHistory(new (std::nothrow) float[sampleCount]);
+    std::unique_ptr<float[]> accelYHistory(new (std::nothrow) float[sampleCount]);
+    std::unique_ptr<float[]> accelZHistory(new (std::nothrow) float[sampleCount]);
+    // World-frame acceleration (gravity removed, rotation-corrected)
+    std::unique_ptr<float[]> worldAccelXHistory(new (std::nothrow) float[sampleCount]);
+    std::unique_ptr<float[]> worldAccelYHistory(new (std::nothrow) float[sampleCount]);
+    std::unique_ptr<float[]> worldAccelZHistory(new (std::nothrow) float[sampleCount]);
 
     if (!rollHistory || !pitchHistory || !yawHistory || !gyroMagnitudes ||
-        !gyroXHistory || !gyroYHistory || !gyroZHistory) {
+        !gyroXHistory || !gyroYHistory || !gyroZHistory ||
+        !accelXHistory || !accelYHistory || !accelZHistory ||
+        !worldAccelXHistory || !worldAccelYHistory || !worldAccelZHistory) {
         Logger::getInstance().log("[OrientationFeatures] Failed to allocate history arrays (OOM)");
         return false;
     }
@@ -91,11 +102,20 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
     for (uint16_t i = 0; i < sampleCount; i++) {
         const Sample& s = buffer->samples[startIndex + i];
 
+        // Store calibrated accelerometer data (sensor frame, gravity removed)
+        accelXHistory[i] = s.x;
+        accelYHistory[i] = s.y;
+        accelZHistory[i] = s.z;
+
         // Only update if gyro data is valid
         if (s.gyroValid) {
             _madgwick.update(s.gyroX, s.gyroY, s.gyroZ, s.x, s.y, s.z);
 
-            // Get current orientation
+            // Get current orientation quaternion
+            float q0, q1, q2, q3;
+            _madgwick.getQuaternion(q0, q1, q2, q3);
+
+            // Get Euler angles for logging/analysis
             float roll, pitch, yaw;
             _madgwick.getEulerAngles(roll, pitch, yaw);
 
@@ -104,13 +124,33 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
             pitchHistory[i] = pitch;
             yawHistory[i] = yaw;
 
-            // Store raw gyro data (for motion-based gesture detection)
+            // Store raw gyro data (for reference only)
             gyroXHistory[i] = s.gyroX;
             gyroYHistory[i] = s.gyroY;
             gyroZHistory[i] = s.gyroZ;
 
             // Calculate gyro magnitude
             gyroMagnitudes[i] = sqrtf(s.gyroX * s.gyroX + s.gyroY * s.gyroY + s.gyroZ * s.gyroZ);
+
+            // Transform calibrated acceleration to world frame using quaternion rotation
+            // This removes the effect of device orientation, making shake detection intuitive
+            // Formula: v_world = q * v_sensor * q_conjugate
+            // Simplified: rotateVectorByQuaternion(s.x, s.y, s.z, q0, q1, q2, q3)
+
+            // Quaternion rotation: v' = q * v * q^-1
+            // For unit quaternion: q^-1 = conjugate(q) = [q0, -q1, -q2, -q3]
+            float ax = s.x, ay = s.y, az = s.z;
+
+            // First: multiply quaternion q with vector [0, ax, ay, az]
+            float t0 = -q1 * ax - q2 * ay - q3 * az;
+            float t1 =  q0 * ax + q2 * az - q3 * ay;
+            float t2 =  q0 * ay + q3 * ax - q1 * az;
+            float t3 =  q0 * az + q1 * ay - q2 * ax;
+
+            // Then: multiply result with conjugate [q0, -q1, -q2, -q3]
+            worldAccelXHistory[i] = t1 * q0 - t0 * q1 + t2 * q3 - t3 * q2;
+            worldAccelYHistory[i] = t2 * q0 - t0 * q2 + t3 * q1 - t1 * q3;
+            worldAccelZHistory[i] = t3 * q0 - t0 * q3 + t1 * q2 - t2 * q1;
 
             // Save initial orientation
             if (i == 0) {
@@ -126,6 +166,9 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
             gyroXHistory[i] = 0;
             gyroYHistory[i] = 0;
             gyroZHistory[i] = 0;
+            worldAccelXHistory[i] = 0;
+            worldAccelYHistory[i] = 0;
+            worldAccelZHistory[i] = 0;
         }
     }
 
@@ -152,6 +195,24 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
     float maxGyroXPos = 0, maxGyroXNeg = 0;
     float maxGyroYPos = 0, maxGyroYNeg = 0;
     float maxGyroZPos = 0, maxGyroZNeg = 0;
+
+    // Calibrated accelerometer statistics (sensor frame)
+    float sumAccelX = 0, sumAccelXSq = 0, maxAccelX = 0;
+    float sumAccelY = 0, sumAccelYSq = 0, maxAccelY = 0;
+    float sumAccelZ = 0, sumAccelZSq = 0, maxAccelZ = 0;
+    float sumSignedAccelX = 0, sumSignedAccelY = 0, sumSignedAccelZ = 0;
+    float maxAccelXPos = 0, maxAccelXNeg = 0;
+    float maxAccelYPos = 0, maxAccelYNeg = 0;
+    float maxAccelZPos = 0, maxAccelZNeg = 0;
+
+    // World-frame acceleration statistics (INTUITIVE shake detection)
+    float sumWorldAccelX = 0, sumWorldAccelXSq = 0, maxWorldAccelX = 0;
+    float sumWorldAccelY = 0, sumWorldAccelYSq = 0, maxWorldAccelY = 0;
+    float sumWorldAccelZ = 0, sumWorldAccelZSq = 0, maxWorldAccelZ = 0;
+    float sumSignedWorldAccelX = 0, sumSignedWorldAccelY = 0, sumSignedWorldAccelZ = 0;
+    float maxWorldAccelXPos = 0, maxWorldAccelXNeg = 0;
+    float maxWorldAccelYPos = 0, maxWorldAccelYNeg = 0;
+    float maxWorldAccelZPos = 0, maxWorldAccelZNeg = 0;
 
     for (uint16_t i = 0; i < sampleCount; i++) {
         sumRoll += rollHistory[i];
@@ -199,6 +260,66 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
         sumSignedGyroZ += rawGyroZ;
         if (rawGyroZ > maxGyroZPos) maxGyroZPos = rawGyroZ;
         if (-rawGyroZ > maxGyroZNeg) maxGyroZNeg = -rawGyroZ;
+
+        // Calibrated accelerometer axis statistics (user reference frame)
+        float rawAccelX = accelXHistory[i];
+        float rawAccelY = accelYHistory[i];
+        float rawAccelZ = accelZHistory[i];
+
+        float absAccelX = fabsf(rawAccelX);
+        float absAccelY = fabsf(rawAccelY);
+        float absAccelZ = fabsf(rawAccelZ);
+
+        sumAccelX += absAccelX;
+        sumAccelXSq += absAccelX * absAccelX;
+        if (absAccelX > maxAccelX) maxAccelX = absAccelX;
+        sumSignedAccelX += rawAccelX;
+        if (rawAccelX > maxAccelXPos) maxAccelXPos = rawAccelX;
+        if (-rawAccelX > maxAccelXNeg) maxAccelXNeg = -rawAccelX;
+
+        sumAccelY += absAccelY;
+        sumAccelYSq += absAccelY * absAccelY;
+        if (absAccelY > maxAccelY) maxAccelY = absAccelY;
+        sumSignedAccelY += rawAccelY;
+        if (rawAccelY > maxAccelYPos) maxAccelYPos = rawAccelY;
+        if (-rawAccelY > maxAccelYNeg) maxAccelYNeg = -rawAccelY;
+
+        sumAccelZ += absAccelZ;
+        sumAccelZSq += absAccelZ * absAccelZ;
+        if (absAccelZ > maxAccelZ) maxAccelZ = absAccelZ;
+        sumSignedAccelZ += rawAccelZ;
+        if (rawAccelZ > maxAccelZPos) maxAccelZPos = rawAccelZ;
+        if (-rawAccelZ > maxAccelZNeg) maxAccelZNeg = -rawAccelZ;
+
+        // World-frame acceleration statistics (orientation-independent shake)
+        float rawWorldAccelX = worldAccelXHistory[i];
+        float rawWorldAccelY = worldAccelYHistory[i];
+        float rawWorldAccelZ = worldAccelZHistory[i];
+
+        float absWorldAccelX = fabsf(rawWorldAccelX);
+        float absWorldAccelY = fabsf(rawWorldAccelY);
+        float absWorldAccelZ = fabsf(rawWorldAccelZ);
+
+        sumWorldAccelX += absWorldAccelX;
+        sumWorldAccelXSq += absWorldAccelX * absWorldAccelX;
+        if (absWorldAccelX > maxWorldAccelX) maxWorldAccelX = absWorldAccelX;
+        sumSignedWorldAccelX += rawWorldAccelX;
+        if (rawWorldAccelX > maxWorldAccelXPos) maxWorldAccelXPos = rawWorldAccelX;
+        if (-rawWorldAccelX > maxWorldAccelXNeg) maxWorldAccelXNeg = -rawWorldAccelX;
+
+        sumWorldAccelY += absWorldAccelY;
+        sumWorldAccelYSq += absWorldAccelY * absWorldAccelY;
+        if (absWorldAccelY > maxWorldAccelY) maxWorldAccelY = absWorldAccelY;
+        sumSignedWorldAccelY += rawWorldAccelY;
+        if (rawWorldAccelY > maxWorldAccelYPos) maxWorldAccelYPos = rawWorldAccelY;
+        if (-rawWorldAccelY > maxWorldAccelYNeg) maxWorldAccelYNeg = -rawWorldAccelY;
+
+        sumWorldAccelZ += absWorldAccelZ;
+        sumWorldAccelZSq += absWorldAccelZ * absWorldAccelZ;
+        if (absWorldAccelZ > maxWorldAccelZ) maxWorldAccelZ = absWorldAccelZ;
+        sumSignedWorldAccelZ += rawWorldAccelZ;
+        if (rawWorldAccelZ > maxWorldAccelZPos) maxWorldAccelZPos = rawWorldAccelZ;
+        if (-rawWorldAccelZ > maxWorldAccelZNeg) maxWorldAccelZNeg = -rawWorldAccelZ;
     }
 
     uint16_t n = sampleCount;
@@ -245,6 +366,56 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
     features.gyroYStd = sqrtf(fmaxf(gyroYVar, 0.0f));
     features.gyroZStd = sqrtf(fmaxf(gyroZVar, 0.0f));
 
+    // Calibrated accelerometer features (user reference frame)
+    features.accelXMean = sumAccelX / n;
+    features.accelYMean = sumAccelY / n;
+    features.accelZMean = sumAccelZ / n;
+    features.accelXMax = maxAccelX;
+    features.accelYMax = maxAccelY;
+    features.accelZMax = maxAccelZ;
+    features.accelXSignedMean = sumSignedAccelX / n;
+    features.accelYSignedMean = sumSignedAccelY / n;
+    features.accelZSignedMean = sumSignedAccelZ / n;
+    features.accelXPosPeak = maxAccelXPos;
+    features.accelXNegPeak = maxAccelXNeg;
+    features.accelYPosPeak = maxAccelYPos;
+    features.accelYNegPeak = maxAccelYNeg;
+    features.accelZPosPeak = maxAccelZPos;
+    features.accelZNegPeak = maxAccelZNeg;
+
+    float accelXVar = (sumAccelXSq / n) - (features.accelXMean * features.accelXMean);
+    float accelYVar = (sumAccelYSq / n) - (features.accelYMean * features.accelYMean);
+    float accelZVar = (sumAccelZSq / n) - (features.accelZMean * features.accelZMean);
+
+    features.accelXStd = sqrtf(fmaxf(accelXVar, 0.0f));
+    features.accelYStd = sqrtf(fmaxf(accelYVar, 0.0f));
+    features.accelZStd = sqrtf(fmaxf(accelZVar, 0.0f));
+
+    // World-frame accelerometer features (orientation-independent)
+    features.worldAccelXMean = sumWorldAccelX / n;
+    features.worldAccelYMean = sumWorldAccelY / n;
+    features.worldAccelZMean = sumWorldAccelZ / n;
+    features.worldAccelXMax = maxWorldAccelX;
+    features.worldAccelYMax = maxWorldAccelY;
+    features.worldAccelZMax = maxWorldAccelZ;
+    features.worldAccelXSignedMean = sumSignedWorldAccelX / n;
+    features.worldAccelYSignedMean = sumSignedWorldAccelY / n;
+    features.worldAccelZSignedMean = sumSignedWorldAccelZ / n;
+    features.worldAccelXPosPeak = maxWorldAccelXPos;
+    features.worldAccelXNegPeak = maxWorldAccelXNeg;
+    features.worldAccelYPosPeak = maxWorldAccelYPos;
+    features.worldAccelYNegPeak = maxWorldAccelYNeg;
+    features.worldAccelZPosPeak = maxWorldAccelZPos;
+    features.worldAccelZNegPeak = maxWorldAccelZNeg;
+
+    float worldAccelXVar = (sumWorldAccelXSq / n) - (features.worldAccelXMean * features.worldAccelXMean);
+    float worldAccelYVar = (sumWorldAccelYSq / n) - (features.worldAccelYMean * features.worldAccelYMean);
+    float worldAccelZVar = (sumWorldAccelZSq / n) - (features.worldAccelZMean * features.worldAccelZMean);
+
+    features.worldAccelXStd = sqrtf(fmaxf(worldAccelXVar, 0.0f));
+    features.worldAccelYStd = sqrtf(fmaxf(worldAccelYVar, 0.0f));
+    features.worldAccelZStd = sqrtf(fmaxf(worldAccelZVar, 0.0f));
+
     // Calculate total rotation (sum of absolute angle changes)
     features.totalRotation = 0;
     for (uint16_t i = 1; i < sampleCount; i++) {
@@ -258,29 +429,45 @@ bool OrientationFeatureExtractor::extract(SampleBuffer* buffer, OrientationFeatu
                              "° dPitch=" + String(features.deltaPitch * 180 / M_PI, 1) +
                              "° dYaw=" + String(features.deltaYaw * 180 / M_PI, 1) + "°");
 
-    // Log first raw sample for axis mapping diagnostic
+    // Log first calibrated accelerometer sample for diagnostic
     if (buffer && buffer->sampleCount > 0) {
         const Sample& firstSample = buffer->samples[0];
-        Logger::getInstance().log("[GYRO_RAW] First sample: gyroX=" + String(firstSample.gyroX, 3) +
-                                 " gyroY=" + String(firstSample.gyroY, 3) +
-                                 " gyroZ=" + String(firstSample.gyroZ, 3));
+        Logger::getInstance().log("[ACCEL_CALIBRATED] First sample: accelX=" + String(firstSample.x, 3) +
+                                 " accelY=" + String(firstSample.y, 3) +
+                                 " accelZ=" + String(firstSample.z, 3));
     }
 
-    Logger::getInstance().log("[OrientationFeatures] Gyro: X(max=" + String(features.gyroXMax, 2) +
-                             " mean=" + String(features.gyroXMean, 2) +
-                             " pos=" + String(features.gyroXPosPeak, 2) +
-                             " neg=" + String(features.gyroXNegPeak, 2) +
-                             " signed=" + String(features.gyroXSignedMean, 2) + ") " +
-                             "Y(max=" + String(features.gyroYMax, 2) +
-                             " mean=" + String(features.gyroYMean, 2) +
-                             " pos=" + String(features.gyroYPosPeak, 2) +
-                             " neg=" + String(features.gyroYNegPeak, 2) +
-                             " signed=" + String(features.gyroYSignedMean, 2) + ") " +
-                             "Z(max=" + String(features.gyroZMax, 2) +
-                             " mean=" + String(features.gyroZMean, 2) +
-                             " pos=" + String(features.gyroZPosPeak, 2) +
-                             " neg=" + String(features.gyroZNegPeak, 2) +
-                             " signed=" + String(features.gyroZSignedMean, 2) + ")");
+    Logger::getInstance().log("[OrientationFeatures] Accel (sensor frame): X(max=" + String(features.accelXMax, 2) +
+                             " mean=" + String(features.accelXMean, 2) +
+                             " pos=" + String(features.accelXPosPeak, 2) +
+                             " neg=" + String(features.accelXNegPeak, 2) +
+                             " signed=" + String(features.accelXSignedMean, 2) + ") " +
+                             "Y(max=" + String(features.accelYMax, 2) +
+                             " mean=" + String(features.accelYMean, 2) +
+                             " pos=" + String(features.accelYPosPeak, 2) +
+                             " neg=" + String(features.accelYNegPeak, 2) +
+                             " signed=" + String(features.accelYSignedMean, 2) + ") " +
+                             "Z(max=" + String(features.accelZMax, 2) +
+                             " mean=" + String(features.accelZMean, 2) +
+                             " pos=" + String(features.accelZPosPeak, 2) +
+                             " neg=" + String(features.accelZNegPeak, 2) +
+                             " signed=" + String(features.accelZSignedMean, 2) + ")");
+
+    Logger::getInstance().log("[OrientationFeatures] Accel (world frame - INTUITIVE): X(max=" + String(features.worldAccelXMax, 2) +
+                             " mean=" + String(features.worldAccelXMean, 2) +
+                             " pos=" + String(features.worldAccelXPosPeak, 2) +
+                             " neg=" + String(features.worldAccelXNegPeak, 2) +
+                             " signed=" + String(features.worldAccelXSignedMean, 2) + ") " +
+                             "Y(max=" + String(features.worldAccelYMax, 2) +
+                             " mean=" + String(features.worldAccelYMean, 2) +
+                             " pos=" + String(features.worldAccelYPosPeak, 2) +
+                             " neg=" + String(features.worldAccelYNegPeak, 2) +
+                             " signed=" + String(features.worldAccelYSignedMean, 2) + ") " +
+                             "Z(max=" + String(features.worldAccelZMax, 2) +
+                             " mean=" + String(features.worldAccelZMean, 2) +
+                             " pos=" + String(features.worldAccelZPosPeak, 2) +
+                             " neg=" + String(features.worldAccelZNegPeak, 2) +
+                             " signed=" + String(features.worldAccelZSignedMean, 2) + ")");
 
     return true;
 }
@@ -325,33 +512,35 @@ OrientationType OrientationFeatureExtractor::classify(const OrientationFeatures&
         return ORIENT_FACE_DOWN;
     }
 
-    // Check for shake using RAW gyroscope data
-    // Shake = rapid rotation around one axis independent of device orientation
+    // Check for shake using WORLD-FRAME ACCELEROMETER data
+    // World-frame = orientation-independent, INTUITIVE for user
+    // No matter how device is tilted, moving it LEFT will always trigger SHAKE_X_NEG (for example)
+    // Shake = rapid linear motion along one axis in world coordinates
     // Use peak values to detect quick movements
-    float shakeThresholdPeak = _shakeThreshold * 1.5f;  // Higher threshold for peak detection
-    float shakeThresholdMean = _shakeThreshold * 0.5f;  // Lower threshold for sustained motion
+    const float accelShakeThresholdPeak = 0.25f;  // Lowered from 0.3g to 0.25g for better sensitivity
+    const float accelShakeThresholdMean = 0.12f;  // Lowered from 0.15g to 0.12g
 
-    // Check each axis independently using raw gyro data
-    bool xShake = (features.gyroXMax > shakeThresholdPeak) ||
-                  (features.gyroXMean > shakeThresholdMean && features.gyroXStd > _shakeThreshold * 0.3f);
-    bool yShake = (features.gyroYMax > shakeThresholdPeak) ||
-                  (features.gyroYMean > shakeThresholdMean && features.gyroYStd > _shakeThreshold * 0.3f);
-    bool zShake = (features.gyroZMax > shakeThresholdPeak) ||
-                  (features.gyroZMean > shakeThresholdMean && features.gyroZStd > _shakeThreshold * 0.3f);
+    // Check each axis independently using WORLD-FRAME accelerometer (rotation-corrected)
+    bool xShake = (features.worldAccelXMax > accelShakeThresholdPeak) ||
+                  (features.worldAccelXMean > accelShakeThresholdMean && features.worldAccelXStd > 0.08f);
+    bool yShake = (features.worldAccelYMax > accelShakeThresholdPeak) ||
+                  (features.worldAccelYMean > accelShakeThresholdMean && features.worldAccelYStd > 0.08f);
+    bool zShake = (features.worldAccelZMax > accelShakeThresholdPeak) ||
+                  (features.worldAccelZMean > accelShakeThresholdMean && features.worldAccelZStd > 0.08f);
 
     if (xShake || yShake || zShake) {
         // Determine which axis has the strongest shake
         // Use combination of peak and mean for robustness
-        float xStrength = features.gyroXMax * 0.6f + features.gyroXMean * 0.4f;
-        float yStrength = features.gyroYMax * 0.6f + features.gyroYMean * 0.4f;
-        float zStrength = features.gyroZMax * 0.6f + features.gyroZMean * 0.4f;
+        float xStrength = features.worldAccelXMax * 0.7f + features.worldAccelXMean * 0.3f;
+        float yStrength = features.worldAccelYMax * 0.7f + features.worldAccelYMean * 0.3f;
+        float zStrength = features.worldAccelZMax * 0.7f + features.worldAccelZMean * 0.3f;
 
         float maxStrength = fmaxf(xStrength, fmaxf(yStrength, zStrength));
 
         auto chooseDirection = [&](OrientationType posType, OrientationType negType,
                                    float posPeak, float negPeak, float signedMean) -> OrientationType {
-            const float dominanceFactor = 1.15f;  // Reduced from 1.25 to 1.15 for symmetric gestures
-            const float meanBias = _shakeThreshold * 0.15f;  // Reduced from 0.2 to 0.15 for better direction detection
+            const float dominanceFactor = 1.15f;  // Reduced from 1.2 to 1.15 (15% instead of 20%)
+            const float meanBias = 0.04f;  // Reduced from 0.05 to 0.04
 
             if (posPeak <= 0.0f && negPeak <= 0.0f) {
                 return ORIENT_UNKNOWN;
@@ -368,28 +557,29 @@ OrientationType OrientationFeatureExtractor::classify(const OrientationFeatures&
             return (posPeak >= negPeak) ? posType : negType;
         };
 
-        // Require dominant axis to be stronger (15% more) - reduced from 20% for better detection
-        if (xStrength >= maxStrength * 0.8f && xStrength > yStrength * 1.15f && xStrength > zStrength * 1.15f) {
-            _confidence = 0.75f + fminf(xStrength / (shakeThresholdPeak * 2.0f), 0.15f);
+        // Require dominant axis to be clearly stronger (reduced from 1.25 to 1.15 for better detection)
+        const float axisDominanceThreshold = 1.15f;
+        if (xStrength >= maxStrength * 0.75f && xStrength > yStrength * axisDominanceThreshold && xStrength > zStrength * axisDominanceThreshold) {
+            _confidence = 0.80f + fminf(xStrength / (accelShakeThresholdPeak * 2.0f), 0.10f);
             OrientationType dir = chooseDirection(ORIENT_SHAKE_X_POS, ORIENT_SHAKE_X_NEG,
-                                                  features.gyroXPosPeak, features.gyroXNegPeak,
-                                                  features.gyroXSignedMean);
+                                                  features.worldAccelXPosPeak, features.worldAccelXNegPeak,
+                                                  features.worldAccelXSignedMean);
             if (dir != ORIENT_UNKNOWN) {
                 return dir;
             }
-        } else if (yStrength >= maxStrength * 0.8f && yStrength > xStrength * 1.15f && yStrength > zStrength * 1.15f) {
-            _confidence = 0.75f + fminf(yStrength / (shakeThresholdPeak * 2.0f), 0.15f);
+        } else if (yStrength >= maxStrength * 0.75f && yStrength > xStrength * axisDominanceThreshold && yStrength > zStrength * axisDominanceThreshold) {
+            _confidence = 0.80f + fminf(yStrength / (accelShakeThresholdPeak * 2.0f), 0.10f);
             OrientationType dir = chooseDirection(ORIENT_SHAKE_Y_POS, ORIENT_SHAKE_Y_NEG,
-                                                  features.gyroYPosPeak, features.gyroYNegPeak,
-                                                  features.gyroYSignedMean);
+                                                  features.worldAccelYPosPeak, features.worldAccelYNegPeak,
+                                                  features.worldAccelYSignedMean);
             if (dir != ORIENT_UNKNOWN) {
                 return dir;
             }
-        } else if (zStrength >= maxStrength * 0.8f && zStrength > xStrength * 1.15f && zStrength > yStrength * 1.15f) {
-            _confidence = 0.75f + fminf(zStrength / (shakeThresholdPeak * 2.0f), 0.15f);
+        } else if (zStrength >= maxStrength * 0.75f && zStrength > xStrength * axisDominanceThreshold && zStrength > yStrength * axisDominanceThreshold) {
+            _confidence = 0.80f + fminf(zStrength / (accelShakeThresholdPeak * 2.0f), 0.10f);
             OrientationType dir = chooseDirection(ORIENT_SHAKE_Z_POS, ORIENT_SHAKE_Z_NEG,
-                                                  features.gyroZPosPeak, features.gyroZNegPeak,
-                                                  features.gyroZSignedMean);
+                                                  features.worldAccelZPosPeak, features.worldAccelZNegPeak,
+                                                  features.worldAccelZSignedMean);
             if (dir != ORIENT_UNKNOWN) {
                 return dir;
             }

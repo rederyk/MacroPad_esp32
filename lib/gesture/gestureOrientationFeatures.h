@@ -59,6 +59,24 @@ struct OrientationFeatures {
     float gyroYPosPeak, gyroYNegPeak;
     float gyroZPosPeak, gyroZNegPeak;
 
+    // Calibrated accelerometer features (sensor frame)
+    float accelXMean, accelXMax, accelXStd;  // X-axis shake magnitude (sensor frame)
+    float accelYMean, accelYMax, accelYStd;  // Y-axis shake magnitude (sensor frame)
+    float accelZMean, accelZMax, accelZStd;  // Z-axis shake magnitude (sensor frame)
+    float accelXSignedMean, accelYSignedMean, accelZSignedMean;
+    float accelXPosPeak, accelXNegPeak;
+    float accelYPosPeak, accelYNegPeak;
+    float accelZPosPeak, accelZNegPeak;
+
+    // World-frame acceleration features (INTUITIVE shake detection - orientation independent)
+    float worldAccelXMean, worldAccelXMax, worldAccelXStd;  // X-axis shake magnitude (world frame)
+    float worldAccelYMean, worldAccelYMax, worldAccelYStd;  // Y-axis shake magnitude (world frame)
+    float worldAccelZMean, worldAccelZMax, worldAccelZStd;  // Z-axis shake magnitude (world frame)
+    float worldAccelXSignedMean, worldAccelYSignedMean, worldAccelZSignedMean;
+    float worldAccelXPosPeak, worldAccelXNegPeak;
+    float worldAccelYPosPeak, worldAccelYNegPeak;
+    float worldAccelZPosPeak, worldAccelZNegPeak;
+
     // Final orientation
     float finalRoll;          // Ending roll
     float finalPitch;         // Ending pitch
@@ -78,6 +96,20 @@ struct OrientationFeatures {
         gyroXPosPeak = gyroXNegPeak = 0;
         gyroYPosPeak = gyroYNegPeak = 0;
         gyroZPosPeak = gyroZNegPeak = 0;
+        accelXMean = accelXMax = accelXStd = 0;
+        accelYMean = accelYMax = accelYStd = 0;
+        accelZMean = accelZMax = accelZStd = 0;
+        accelXSignedMean = accelYSignedMean = accelZSignedMean = 0;
+        accelXPosPeak = accelXNegPeak = 0;
+        accelYPosPeak = accelYNegPeak = 0;
+        accelZPosPeak = accelZNegPeak = 0;
+        worldAccelXMean = worldAccelXMax = worldAccelXStd = 0;
+        worldAccelYMean = worldAccelYMax = worldAccelYStd = 0;
+        worldAccelZMean = worldAccelZMax = worldAccelZStd = 0;
+        worldAccelXSignedMean = worldAccelYSignedMean = worldAccelZSignedMean = 0;
+        worldAccelXPosPeak = worldAccelXNegPeak = 0;
+        worldAccelYPosPeak = worldAccelYNegPeak = 0;
+        worldAccelZPosPeak = worldAccelZNegPeak = 0;
         finalRoll = finalPitch = finalYaw = 0;
     }
 };
