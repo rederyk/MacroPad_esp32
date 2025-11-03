@@ -84,9 +84,9 @@
     "address": 104,
     "motionWakeEnabled": true,
     "motionWakeThreshold": 5,
-    "motionWakeDuration": 1,
-    "motionWakeHighPass": 1,
-    "motionWakeCycleRate": 0,
+    "motionWakeDuration": 2,
+    "motionWakeHighPass": 2,
+    "motionWakeCycleRate": 1,
     "gestureMode": "auto"
   }
 }

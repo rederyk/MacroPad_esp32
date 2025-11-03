@@ -834,9 +834,29 @@ namespace
             Logger::getInstance().log("[MPU6050Clone] setRange(" + String(g, 1) + "g) -> configValue=0x" +
                                      String(configValue, HEX) + ", scale=" + String(scale, 2));
 
-            if (!writeRegister(_wire, _address, MPU6050_REG_ACCEL_CONFIG, configValue))
+            // Some MPU6050 clones ignore register writes while the device is in sleep mode.
+            // Temporarily wake the chip before touching ACCEL_CONFIG and restore its power state afterwards.
+            uint8_t originalPwrMgmt1 = 0;
+            bool powerStateKnown = readRegister(_wire, _address, MPU6050_REG_PWR_MGMT_1, originalPwrMgmt1);
+            bool restorePowerState = powerStateKnown && (originalPwrMgmt1 & 0x40);
+
+            if (restorePowerState)
+            {
+                if (!writeRegister(_wire, _address, MPU6050_REG_PWR_MGMT_1, static_cast<uint8_t>(originalPwrMgmt1 & ~0x40)))
+                {
+                    Logger::getInstance().log("[MPU6050Clone] ERROR: Failed to wake device before updating ACCEL_CONFIG.");
+                    return false;
+                }
+                vTaskDelay(pdMS_TO_TICKS(2));
+            }
+
+            if (!modifyRegister(_wire, _address, MPU6050_REG_ACCEL_CONFIG, 0x18, configValue))
             {
                 Logger::getInstance().log("[MPU6050Clone] ERROR: Failed to write ACCEL_CONFIG register!");
+                if (restorePowerState)
+                {
+                    writeRegister(_wire, _address, MPU6050_REG_PWR_MGMT_1, originalPwrMgmt1);
+                }
                 return false;
             }
 
@@ -846,7 +866,7 @@ namespace
             {
                 Logger::getInstance().log("[MPU6050Clone] ACCEL_CONFIG readback: 0x" + String(readback, HEX) +
                                          " (expected: 0x" + String(configValue, HEX) + ")");
-                if (readback != configValue)
+                if ((readback & 0x18) != configValue)
                 {
                     Logger::getInstance().log("[MPU6050Clone] WARNING: Readback mismatch! Register may not be set correctly.");
                 }
@@ -854,6 +874,18 @@ namespace
             else
             {
                 Logger::getInstance().log("[MPU6050Clone] WARNING: Failed to read back ACCEL_CONFIG register!");
+            }
+
+            if (restorePowerState)
+            {
+                if (!writeRegister(_wire, _address, MPU6050_REG_PWR_MGMT_1, originalPwrMgmt1))
+                {
+                    Logger::getInstance().log("[MPU6050Clone] WARNING: Failed to restore original power state after ACCEL_CONFIG update.");
+                }
+                else
+                {
+                    vTaskDelay(pdMS_TO_TICKS(2));
+                }
             }
 
             _scale = scale;
