@@ -87,6 +87,9 @@ bool ConfigurationManager::loadConfig()
     gyroMouseConfig.sensitivities.push_back({"Slow", 0.6f, 1.5f});
     gyroMouseConfig.sensitivities.push_back({"Medium", 1.0f, 1.2f});
     gyroMouseConfig.sensitivities.push_back({"Fast", 1.4f, 1.0f});
+    gyroMouseConfig.absoluteRecenter = false;
+    gyroMouseConfig.absoluteRangeX = 0;
+    gyroMouseConfig.absoluteRangeY = 0;
 
     // Load wifi configuration if it exists
     JsonVariant wifiConfigJson = doc["wifi"];
@@ -430,6 +433,24 @@ bool ConfigurationManager::loadConfig()
         {
             this->gyroMouseConfig.defaultSensitivity = 0;
         }
+
+        if (gyroObj.containsKey("absoluteRecenter"))
+        {
+            this->gyroMouseConfig.absoluteRecenter = gyroObj["absoluteRecenter"];
+        }
+
+        if (gyroObj.containsKey("absoluteRangeX"))
+        {
+            this->gyroMouseConfig.absoluteRangeX = gyroObj["absoluteRangeX"].as<int32_t>();
+        }
+
+        if (gyroObj.containsKey("absoluteRangeY"))
+        {
+            this->gyroMouseConfig.absoluteRangeY = gyroObj["absoluteRangeY"].as<int32_t>();
+        }
+
+        this->gyroMouseConfig.absoluteRangeX = constrain(this->gyroMouseConfig.absoluteRangeX, 0, 20000);
+        this->gyroMouseConfig.absoluteRangeY = constrain(this->gyroMouseConfig.absoluteRangeY, 0, 20000);
 
         this->gyroMouseConfig.smoothing = constrain(this->gyroMouseConfig.smoothing, 0.0f, 1.0f);
     }

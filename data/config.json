@@ -102,11 +102,14 @@
     "tiltDeadzoneDegrees": 1.8,
     "recenterRate": 0.25,
     "recenterThresholdDegrees": 2.5,
+    "absoluteRecenter": true,
+    "absoluteRangeX": 1920,
+    "absoluteRangeY": 1080,
     "sensitivities": [
-      { "name": "Gyro Slow", "mode": "gyro", "scale": 0.6, "gyroScale": 0.6, "deadzone": 1.6 },
-      { "name": "Gyro Fast", "mode": "gyro", "scale": 1.2, "gyroScale": 1.2, "deadzone": 1.0 },
-      { "name": "Tilt Nav", "mode": "tilt", "scale": 28.0, "tiltScale": 32.0, "tiltDeadzone": 2.0, "deadzone": 0.0 },
-      { "name": "Hybrid AirMouse", "mode": "hybrid", "scale": 1.0, "gyroScale": 1.0, "deadzone": 1.1, "tiltScale": 26.0, "tiltDeadzone": 1.5, "hybridBlend": 0.4 }
+      { "name": "Gyro Slow", "mode": "gyro", "scale": 0.6, "gyroScale": 0.6, "deadzone": 0.6 },
+      { "name": "Gyro Fast", "mode": "gyro", "scale": 1.2, "gyroScale": 1.2, "deadzone": 0.0 },
+      { "name": "Tilt Nav", "mode": "tilt", "scale": 8.0, "tiltScale": 2.0, "tiltDeadzone": 0.2, "deadzone": 0.0 },
+      { "name": "Hybrid AirMouse", "mode": "hybrid", "scale": 1.0, "gyroScale": 1.0, "deadzone": 1.1, "tiltScale": 6.0, "tiltDeadzone": 0.5, "hybridBlend": 0.4 }
     ]
   }
 }

@@ -79,6 +79,8 @@ private:
     void applyNeutralOrientationRotation(float& x, float& y, float& z) const;
     float applyDeadzone(float value, float threshold);
     int8_t clampMouseValue(float value);
+    void performAbsoluteCentering();
+    void dispatchRelativeMove(int deltaX, int deltaY);
 };
 
 #endif // GYROMOUSE_H

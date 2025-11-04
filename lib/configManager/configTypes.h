@@ -108,6 +108,9 @@ struct GyroMouseConfig
     float tiltDeadzoneDegrees;
     float recenterRate;
     float recenterThresholdDegrees;
+    bool absoluteRecenter;
+    int32_t absoluteRangeX;
+    int32_t absoluteRangeY;
     std::vector<SensitivitySettings> sensitivities;
 };
 

@@ -280,6 +280,9 @@ void GyroMouse::calculateMouseMovement(const SensorFrame& frame, float deltaTime
 
         applyNeutralOrientationRotation(gyroX, gyroY, gyroZ);
 
+        gyroX *= kRadToDeg;
+        gyroY *= kRadToDeg;
+
         gyroX = applyDeadzone(gyroX, sens.deadzone);
         gyroY = applyDeadzone(gyroY, sens.deadzone);
         outX = gyroX * rateScale * deltaTime * kRateScaleFactor;
@@ -436,6 +439,8 @@ void GyroMouse::recenterNeutral() {
         return;
     }
 
+    performAbsoluteCentering();
+
     if (!neutralCaptured) {
         Logger::getInstance().log("GyroMouse: capturing initial neutral orientation");
     }
@@ -445,6 +450,7 @@ void GyroMouse::recenterNeutral() {
     neutralCaptured = true;
     smoothedMouseX = 0.0f;
     smoothedMouseY = 0.0f;
+    lastUpdateTime = millis();
 
     Logger::getInstance().log("GyroMouse: Neutral orientation recentered");
 }
@@ -483,6 +489,65 @@ int8_t GyroMouse::clampMouseValue(float value) {
     if (value > 127.0f) return 127;
     if (value < -127.0f) return -127;
     return static_cast<int8_t>(value);
+}
+
+void GyroMouse::performAbsoluteCentering() {
+    if (!config.absoluteRecenter) {
+        return;
+    }
+
+    if (!bleController.isBleEnabled()) {
+        return;
+    }
+
+    const int32_t rangeX = config.absoluteRangeX;
+    const int32_t rangeY = config.absoluteRangeY;
+
+    if (rangeX <= 0 && rangeY <= 0) {
+        return;
+    }
+
+    dispatchRelativeMove(-rangeX, -rangeY);
+
+    const int32_t halfX = (rangeX >= 0) ? ((rangeX + 1) / 2) : 0;
+    const int32_t halfY = (rangeY >= 0) ? ((rangeY + 1) / 2) : 0;
+    dispatchRelativeMove(halfX, halfY);
+
+    Logger::getInstance().log("GyroMouse: Absolute pointer recentered");
+}
+
+void GyroMouse::dispatchRelativeMove(int deltaX, int deltaY) {
+    const int maxStep = 127;
+
+    while (deltaX != 0 || deltaY != 0) {
+        int stepX = 0;
+        if (deltaX > 0) {
+            stepX = deltaX > maxStep ? maxStep : deltaX;
+        } else if (deltaX < 0) {
+            stepX = deltaX < -maxStep ? -maxStep : deltaX;
+        }
+
+        int stepY = 0;
+        if (deltaY > 0) {
+            stepY = deltaY > maxStep ? maxStep : deltaY;
+        } else if (deltaY < 0) {
+            stepY = deltaY < -maxStep ? -maxStep : deltaY;
+        }
+
+        if (stepX == 0 && stepY == 0) {
+            break;
+        }
+
+        bleController.moveMouse(static_cast<signed char>(stepX),
+                                static_cast<signed char>(stepY),
+                                0,
+                                0);
+
+        deltaX -= stepX;
+        deltaY -= stepY;
+
+        delay(2);
+    }
 }
 
 void GyroMouse::cycleSensitivity() {
