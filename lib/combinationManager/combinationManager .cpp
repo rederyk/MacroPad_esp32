@@ -32,15 +32,38 @@ bool CombinationManager::loadJsonFile(const char* filepath, JsonObject& target)
         return false;
     }
 
+    // Check file size before loading
+    size_t fileSize = file.size();
+    Logger::getInstance().log("Loading " + String(filepath) + " (size: " + String(fileSize) + " bytes)");
+
+    if (fileSize > COMBO_FILE_WARNING_SIZE)
+    {
+        Logger::getInstance().log("WARNING: File is large, may cause memory issues (limit: " +
+                                String(COMBO_FILE_WARNING_SIZE) + " bytes)");
+    }
+
     // Usa un buffer dinamico per il caricamento temporaneo
-    // I file combo_X.json sono massimo 1.5KB, ma ArduinoJson ha overhead
-    DynamicJsonDocument tempDoc(2560);  // Aumentato per overhead JSON
+    // Size is configurable via COMBO_TEMP_DOC_SIZE
+    DynamicJsonDocument tempDoc(COMBO_TEMP_DOC_SIZE);
     DeserializationError error = deserializeJson(tempDoc, file);
     file.close();
 
     if (error)
     {
-        Logger::getInstance().log("Failed to parse " + String(filepath) + ": " + String(error.c_str()));
+        String errorMsg = "Failed to parse " + String(filepath) + ": " + String(error.c_str());
+
+        // Specific error messages for common issues
+        if (error == DeserializationError::NoMemory)
+        {
+            errorMsg += " - File too large! Max buffer: " + String(COMBO_TEMP_DOC_SIZE) +
+                       " bytes (file is " + String(fileSize) + " bytes)";
+        }
+        else if (error == DeserializationError::InvalidInput)
+        {
+            errorMsg += " - Invalid JSON format, check syntax";
+        }
+
+        Logger::getInstance().log(errorMsg);
         return false;
     }
 
@@ -50,6 +73,7 @@ bool CombinationManager::loadJsonFile(const char* filepath, JsonObject& target)
         target[kv.key()] = kv.value();
     }
 
+    Logger::getInstance().log("Successfully loaded " + String(filepath));
     return true;
 }
 
@@ -121,6 +145,10 @@ bool CombinationManager::loadCombinationsInternal(int setNumber, const char* pre
         Logger::getInstance().log("Failed to mount LittleFS");
         return false;
     }
+
+    // Log memory configuration
+    Logger::getInstance().log("Combo memory config - Buffer: " + String(COMBO_MAIN_DOC_SIZE) +
+                            " bytes, Temp: " + String(COMBO_TEMP_DOC_SIZE) + " bytes");
 
     // Clear previous data
     doc.clear();

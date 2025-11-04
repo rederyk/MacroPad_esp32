@@ -267,6 +267,27 @@ Il dispositivo si riavvierà in modalità Bluetooth. Cerca "Macropad_esp32" nell
 
 - **[TODO.md](TODO.md)** - Roadmap e miglioramenti pianificati
 
+### Configurazione Avanzata Memoria
+
+Se i tuoi file combo sono molto grandi e ricevi errori di memoria insufficiente, puoi aumentare i buffer JSON. Nel file `platformio.ini`, aggiungi sotto `build_flags`:
+
+```ini
+build_flags =
+    -D COMBO_TEMP_DOC_SIZE=4096      # Buffer per singolo file (default: 2560)
+    -D COMBO_MAIN_DOC_SIZE=6144      # Buffer totale combo (default: 3072)
+    -D COMBO_FILE_WARNING_SIZE=3500  # Soglia warning (default: 2048)
+```
+
+**Limiti consigliati per dispositivo:**
+- **ESP32** (4MB RAM): fino a 8192 bytes
+- **ESP32-S3** (8MB RAM): fino a 16384 bytes
+- **ESP8266** (80KB RAM): mantieni 2048-3072 bytes
+
+**Note:**
+- Ogni aumento usa più RAM statica
+- File combo troppo grandi rallentano il caricamento
+- Il log mostrerà sempre i limiti correnti all'avvio
+
 ### Web Interface
 
 Accedi alla web interface per:

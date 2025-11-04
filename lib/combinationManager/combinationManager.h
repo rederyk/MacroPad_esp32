@@ -25,6 +25,22 @@
 #include <vector>
 #include <array>
 
+// Memory configuration for JSON documents
+// These values can be adjusted based on device capabilities
+// ESP32: Can use larger values (3072-8192)
+// ESP8266: Should use smaller values (2048-3072)
+#ifndef COMBO_TEMP_DOC_SIZE
+    #define COMBO_TEMP_DOC_SIZE 2560    // Temporary buffer for loading single files (~2.5KB)
+#endif
+
+#ifndef COMBO_MAIN_DOC_SIZE
+    #define COMBO_MAIN_DOC_SIZE 3072    // Main buffer for all combined combos (~3KB)
+#endif
+
+#ifndef COMBO_FILE_WARNING_SIZE
+    #define COMBO_FILE_WARNING_SIZE 2048 // Warn if single file exceeds this size (~2KB)
+#endif
+
 // Struct to hold combo settings
 struct ComboSettings {
     int ledR = -1;  // -1 means not set
@@ -49,7 +65,7 @@ struct ComboSettings {
 
 class CombinationManager {
 private:
-    StaticJsonDocument<3072> doc;  // Reduced from 8192 to 3072 bytes (saves ~5KB RAM)
+    StaticJsonDocument<COMBO_MAIN_DOC_SIZE> doc;  // Configurable buffer size for all combos
     JsonObject combinations;
     int currentSetNumber;  // Track current loaded set
     String currentPrefix;  // Track current file prefix ("combo" or "my_combo")

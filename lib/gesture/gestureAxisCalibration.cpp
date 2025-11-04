@@ -12,10 +12,6 @@
 #include <ArduinoJson.h>
 #include <cmath>
 
-AxisCalibration::AxisCalibration()
-{
-}
-
 AxisCalibrationResult AxisCalibration::calibrate(MotionSensor* sensor, uint32_t samplingTimeMs)
 {
     AxisCalibrationResult result;
@@ -208,32 +204,6 @@ void AxisCalibration::determineAxisMapping(float rawX, float rawY, float rawZ,
     Logger::getInstance().log("[AxisCalibration] Determined: axisMap=\"" + axisMap +
                              "\", axisDir=\"" + axisDir + "\"");
 }
-
-float AxisCalibration::calculateConfidence(float x, float y, float z)
-{
-    float magnitude = sqrt(x * x + y * y + z * z);
-    float error = fabs(magnitude - 1.0f);
-    return fmax(0.0f, 1.0f - error);
-}
-
-bool AxisCalibration::applyCalibration(MotionSensor* sensor, const AxisCalibrationResult& result)
-{
-    if (!result.success || !sensor) {
-        return false;
-    }
-
-    // Note: This requires modifying MotionSensor to expose a reconfigure method
-    // For now, we log the required changes
-    Logger::getInstance().log("[AxisCalibration] Apply these settings:");
-    Logger::getInstance().log("  axisMap: \"" + result.axisMap + "\"");
-    Logger::getInstance().log("  axisDir: \"" + result.axisDir + "\"");
-
-    // TODO: Actually reconfigure sensor
-    // sensor->setAxisMapping(result.axisMap, result.axisDir);
-
-    return true;
-}
-
 bool AxisCalibration::saveToConfig(const AxisCalibrationResult& result, const char* configPath)
 {
     if (!result.success) {

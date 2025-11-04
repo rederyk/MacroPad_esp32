@@ -50,7 +50,7 @@ struct AxisCalibrationResult {
  */
 class AxisCalibration {
 public:
-    AxisCalibration();
+    AxisCalibration() = default;
 
     /**
      * Perform automatic axis calibration
@@ -65,15 +65,6 @@ public:
     AxisCalibrationResult calibrate(MotionSensor* sensor, uint32_t samplingTimeMs = 2000);
 
     /**
-     * Apply calibration result to sensor configuration
-     *
-     * @param sensor Motion sensor to configure
-     * @param result Calibration result from calibrate()
-     * @return true if configuration applied successfully
-     */
-    bool applyCalibration(MotionSensor* sensor, const AxisCalibrationResult& result);
-
-    /**
      * Save calibration to config file
      *
      * @param result Calibration result
@@ -83,9 +74,6 @@ public:
     bool saveToConfig(const AxisCalibrationResult& result, const char* configPath = "/config.json");
 
 private:
-    static constexpr float GRAVITY = 9.80665f;  // Standard gravity (m/s²)
-    static constexpr float GRAVITY_TOLERANCE = 0.2f;  // ±0.2g tolerance
-
     /**
      * Collect samples from sensor
      */
@@ -102,11 +90,6 @@ private:
      */
     void determineAxisMapping(float rawX, float rawY, float rawZ,
                              String& axisMap, String& axisDir, float& confidence);
-
-    /**
-     * Calculate confidence score for calibration
-     */
-    float calculateConfidence(float x, float y, float z);
 };
 
 #endif // GESTURE_AXIS_CALIBRATION_H

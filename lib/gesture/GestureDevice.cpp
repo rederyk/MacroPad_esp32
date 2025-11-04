@@ -4,7 +4,6 @@
  */
 
 #include "GestureDevice.h"
-#include "gestureAxisCalibration.h"
 #include "Logger.h"
 
 GestureDevice::GestureDevice(GestureRead &sensorRef, GestureAnalyze &analyzerRef)
@@ -12,7 +11,6 @@ GestureDevice::GestureDevice(GestureRead &sensorRef, GestureAnalyze &analyzerRef
       analyzer(analyzerRef),
       state(State::Idle),
       sensorAvailable(false),
-      eventReady(false),
       lastGestureId(-1),
       lastGestureName(""),
       recognitionEnabled(true)
@@ -152,7 +150,6 @@ void GestureDevice::resetEvent()
     pendingEvent.value2 = 0;
     pendingEvent.state = false;
     pendingEvent.text = "";
-    eventReady = false;
 }
 
 bool GestureDevice::performRecognition()
@@ -198,7 +195,6 @@ bool GestureDevice::performRecognition()
     pendingEvent.value2 = buffer.sampleCount;
     pendingEvent.state = true;
     pendingEvent.text = result.gestureName;
-    eventReady = true;
 
     sensor.clearMemory();
 
@@ -206,5 +202,5 @@ bool GestureDevice::performRecognition()
     // This is done AFTER recognition to avoid adding latency to gesture start
     sensor.flushSensorBuffer();
 
-    return eventReady;
+    return true;
 }

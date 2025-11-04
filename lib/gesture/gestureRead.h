@@ -26,7 +26,6 @@
 #include "MotionSensor.h"
 #include <memory>
 #include <mutex>
-#include <vector>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 

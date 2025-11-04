@@ -1,12 +1,44 @@
 {
-  "BUTTON": ["EXECUTE_GESTURE"],
-  "1,CW": ["S_B:VOL_UP"],
-  "1,CCW": ["S_B:VOL_DOWN"],
-  "1+2,CW": ["S_B:MOUSE_MOVE_0_0_5_0"],
-  "1+2,CCW": ["S_B:MOUSE_MOVE_0_0_-5_0"],
-  "1+5+9": ["CALIBRATE_SENSOR"],
-  "1+2+3,BUTTON": ["TOGGLE_BLE_WIFI"],
-  "1+4+7,BUTTON": ["HOP_BLE_DEVICE"],
-  "7+8+9,BUTTON": ["RESET_ALL"],
-  "1+2+3+4+5+6+7+8+9": ["<DELAY_100><ENTER_SLEEP>"]
+  "BUTTON": [
+    "EXECUTE_GESTURE"
+  ],
+  "1,CW": [
+    "S_B:VOL_UP"
+  ],
+  "1,CCW": [
+    "S_B:VOL_DOWN"
+  ],
+  "1+2,CW": [
+    "S_B:MOUSE_MOVE_0_0_5_0"
+  ],
+  "1+2,CCW": [
+    "S_B:MOUSE_MOVE_0_0_-5_0"
+  ],
+  "1+5+9": [
+    "CALIBRATE_SENSOR"
+  ],
+  "1+2+3,BUTTON": [
+    "TOGGLE_BLE_WIFI"
+  ],
+  "1+4+7,BUTTON": [
+    "HOP_BLE_DEVICE"
+  ],
+  "7+8+9,BUTTON": [
+    "RESET_ALL"
+  ],
+  "G_SHAKE": [
+    "S_B:SPACE"
+  ],
+  "G_SWIPE_LEFT": [
+    "S_B:CTRL+SUPER,LEFT_ARROW"
+  ],
+  "G_SWIPE_RIGHT": [
+    "S_B:CTRL+SUPER,RIGHT_ARROW"
+  ],
+  "G_RANDOM": [
+    "S_B:CTRL+SUPER,RIGHT_ARROW"
+  ],
+  "1+2+3+4+5+6+7+8+9": [
+    "<DELAY_100><ENTER_SLEEP>"
+  ]
 }
