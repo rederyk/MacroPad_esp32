@@ -128,7 +128,9 @@ GestureRead::GestureRead(TwoWire *wire)
       lastSampleTime(0),
       samplingStartTime(0),
       _motionWakeEnabled(false),
-      _expectGyro(false)
+      _expectGyro(false),
+      _streamingMode(false),
+      _writeIndex(0)
 {
     _calibrationOffset = {0, 0, 0};
     _sampleHZ = MotionSensor::kDefaultSampleHz;
@@ -271,6 +273,7 @@ void GestureRead::clearMemory()
         _sampleBuffer.sampleCount = 0;
         _bufferFull = false;
         lastSampleTime = 0;
+        _writeIndex = 0;
     }
 }
 
@@ -819,6 +822,27 @@ void GestureRead::getMappedGyro(float &x, float &y, float &z)
     _sensor->getMappedGyro(x, y, z);
 }
 
+float GestureRead::getMappedGyroX()
+{
+    float x = 0.0f, y = 0.0f, z = 0.0f;
+    getMappedGyro(x, y, z);
+    return x;
+}
+
+float GestureRead::getMappedGyroY()
+{
+    float x = 0.0f, y = 0.0f, z = 0.0f;
+    getMappedGyro(x, y, z);
+    return y;
+}
+
+float GestureRead::getMappedGyroZ()
+{
+    float x = 0.0f, y = 0.0f, z = 0.0f;
+    getMappedGyro(x, y, z);
+    return z;
+}
+
 bool GestureRead::waitForGyroReady(uint32_t timeoutMs)
 {
     if (!_sensor || !_sensor->isReady())
@@ -943,7 +967,7 @@ void GestureRead::updateSampling()
     const bool sampling = _isSampling;
     const uint16_t count = _sampleBuffer.sampleCount;
 
-    if (sampling && count < _maxSamples)
+    if (sampling)
     {
         // Try to update sensor - this may fail if no new data is ready yet
         if (_sensor->update())
@@ -977,7 +1001,8 @@ void GestureRead::updateSampling()
                 getMappedGyro(mappedGyroX, mappedGyroY, mappedGyroZ);
             }
 
-            Sample &sample = _sampleBuffer.samples[count];
+            const uint16_t writeIndex = (count < _maxSamples) ? count : _writeIndex;
+            Sample &sample = _sampleBuffer.samples[writeIndex];
 
             // Apply calibration offset (set during manual calibration)
             sample.x = calibratedX;
@@ -1001,7 +1026,31 @@ void GestureRead::updateSampling()
             sample.temperatureValid = _sensor->hasTemperature();
             sample.temperature = sample.temperatureValid ? _sensor->readTemperatureC() : 0.0f;
 
-            _sampleBuffer.sampleCount = count + 1;
+            if (count < _maxSamples)
+            {
+                _sampleBuffer.sampleCount = count + 1;
+                if (_sampleBuffer.sampleCount == _maxSamples)
+                {
+                    _bufferFull = true;
+                    if (!_streamingMode)
+                    {
+                        ledSetFull = true;
+                        requestStop = true;
+                    }
+                }
+            }
+            else
+            {
+                _sampleBuffer.sampleCount = _maxSamples;
+                _bufferFull = true;
+                if (!_streamingMode)
+                {
+                    ledSetFull = true;
+                    requestStop = true;
+                }
+            }
+
+            _writeIndex = (writeIndex + 1) % _maxSamples;
             // Only update lastSampleTime when we successfully got new data
             lastSampleTime = currentTime;
 
@@ -1052,12 +1101,6 @@ void GestureRead::updateSampling()
             Led::getInstance().setColor(r, g, b, false);
         }
     }
-    else if (sampling && count >= _maxSamples)
-    {
-        _bufferFull = true;
-        ledSetFull = true;
-        requestStop = true;
-    }
     else
     {
         if (!sampling)
@@ -1076,5 +1119,14 @@ void GestureRead::updateSampling()
     if (requestStop)
     {
         stopSampling();
+    }
+}
+void GestureRead::setStreamingMode(bool enable)
+{
+    std::lock_guard<std::mutex> lock(_bufferMutex);
+    _streamingMode = enable;
+    if (enable)
+    {
+        _bufferFull = false;
     }
 }

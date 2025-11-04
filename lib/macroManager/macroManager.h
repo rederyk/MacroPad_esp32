@@ -87,7 +87,7 @@ private:
     bool newKeyPressed = false; // Flag to track when a new key is pressed
     bool encoderReleaseScheduled = false; // Flag per indicare il rilascio programmato dell'encoder
     unsigned long gestureExecutionTime = 0;
-    
+
     // Command chaining functionality
     std::vector<std::string> commandQueue;
     unsigned long nextCommandTime;
@@ -113,6 +113,12 @@ private:
     bool pendingComboSwitchFlag = false;
     std::string pendingComboPrefix;
     int pendingComboSetNumber = 0;
+
+    // Gyro mouse mode tracking
+    bool gyroModeActive = false;
+    bool hasSavedCombo = false;
+    std::string savedComboPrefix;
+    int savedComboSetNumber = 0;
 };
 
 #endif // MACRO_MANAGER_H

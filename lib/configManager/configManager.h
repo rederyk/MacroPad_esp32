@@ -41,6 +41,7 @@ private:
     IRLedConfig irLedConfig;
     AccelerometerConfig accelerometerConfig;
     SystemConfig systemConfig;
+    GyroMouseConfig gyroMouseConfig;
 
 public:
     ConfigurationManager();
@@ -48,6 +49,7 @@ public:
     const KeypadConfig &getKeypadConfig() const;
     const EncoderConfig &getEncoderConfig() const;
     const AccelerometerConfig &getAccelerometerConfig() const;
+    const GyroMouseConfig &getGyroMouseConfig() const;
     const WifiConfig &getWifiConfig() const;
     const SystemConfig &getSystemConfig() const;
     const LedConfig &getLedConfig() const;

@@ -13,7 +13,7 @@
 extern GestureRead gestureSensor;
 extern GestureAnalyze gestureAnalyzer;
 
-InputHub::InputHub() = default;
+InputHub::InputHub() : gestureCaptureEnabled(true) {}
 
 InputHub::~InputHub() = default;
 
@@ -38,6 +38,7 @@ bool InputHub::begin(ConfigurationManager &configManager)
         }
         gestureDevice->setSensorAvailable(true);
         gestureDevice->setup();
+        gestureDevice->setRecognitionEnabled(gestureCaptureEnabled);
         Logger::getInstance().log("Gesture device registered");
     }
     else
@@ -305,7 +306,7 @@ void InputHub::scanRotaryEncoder()
 
 void InputHub::scanGestures()
 {
-    if (!gestureDevice)
+    if (!gestureDevice || !gestureCaptureEnabled)
     {
         return;
     }
@@ -344,4 +345,35 @@ void InputHub::updateReactiveLightingColors(const ComboSettings &settings)
 void InputHub::saveReactiveLightingColors() const
 {
     reactiveLighting.saveColors();
+}
+
+void InputHub::setGestureCaptureEnabled(bool enable)
+{
+    if (gestureCaptureEnabled == enable)
+    {
+        return;
+    }
+
+    gestureCaptureEnabled = enable;
+
+    if (!gestureDevice)
+    {
+        return;
+    }
+
+    if (!enable)
+    {
+        gestureDevice->stopCapture();
+        gestureDevice->setRecognitionEnabled(false);
+        gestureDevice->clearLastGesture();
+    }
+    else
+    {
+        gestureDevice->setRecognitionEnabled(true);
+    }
+}
+
+bool InputHub::isGestureCaptureEnabled() const
+{
+    return gestureCaptureEnabled;
 }

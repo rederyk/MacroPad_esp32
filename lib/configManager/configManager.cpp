@@ -50,6 +50,7 @@ bool ConfigurationManager::loadConfig()
     filter["led"] = true;
     filter["irSensor"] = true;
     filter["irLed"] = true;
+    filter["gyromouse"] = true;
 
     // Increase buffer size and add error handling
     StaticJsonDocument<4096> doc;
@@ -75,6 +76,17 @@ bool ConfigurationManager::loadConfig()
     accelerometerConfig.motionWakeCycleRate = 1; // default to MPU6050_CYCLE_5_HZ
     wifiConfig = WifiConfig();
     ledConfig = LedConfig();
+    gyroMouseConfig = GyroMouseConfig();
+    gyroMouseConfig.enabled = false;
+    gyroMouseConfig.smoothing = 0.2f;
+    gyroMouseConfig.invertX = false;
+    gyroMouseConfig.invertY = false;
+    gyroMouseConfig.swapAxes = false;
+    gyroMouseConfig.defaultSensitivity = 1;
+    gyroMouseConfig.sensitivities.clear();
+    gyroMouseConfig.sensitivities.push_back({"Slow", 0.6f, 1.5f});
+    gyroMouseConfig.sensitivities.push_back({"Medium", 1.0f, 1.2f});
+    gyroMouseConfig.sensitivities.push_back({"Fast", 1.4f, 1.0f});
 
     // Load wifi configuration if it exists
     JsonVariant wifiConfigJson = doc["wifi"];
@@ -304,10 +316,65 @@ bool ConfigurationManager::loadConfig()
             this->accelerometerConfig.motionWakeHighPass = accelerometerConfig["motionWakeHighPass"];
         if (accelerometerConfig.containsKey("motionWakeCycleRate"))
             this->accelerometerConfig.motionWakeCycleRate = accelerometerConfig["motionWakeCycleRate"];
-        if (accelerometerConfig.containsKey("gestureMode"))
+    if (accelerometerConfig.containsKey("gestureMode"))
             this->accelerometerConfig.gestureMode = accelerometerConfig["gestureMode"].as<String>();
         else
             this->accelerometerConfig.gestureMode = "auto"; // Default to auto
+    }
+
+    JsonVariant gyromouseConfigVariant = doc["gyromouse"];
+    if (!gyromouseConfigVariant.isNull() && gyromouseConfigVariant.is<JsonObject>())
+    {
+        JsonObject gyroObj = gyromouseConfigVariant.as<JsonObject>();
+
+        if (gyroObj.containsKey("enabled"))
+            this->gyroMouseConfig.enabled = gyroObj["enabled"];
+        if (gyroObj.containsKey("smoothing"))
+            this->gyroMouseConfig.smoothing = gyroObj["smoothing"];
+        if (gyroObj.containsKey("invertX"))
+            this->gyroMouseConfig.invertX = gyroObj["invertX"];
+        if (gyroObj.containsKey("invertY"))
+            this->gyroMouseConfig.invertY = gyroObj["invertY"];
+        if (gyroObj.containsKey("swapAxes"))
+            this->gyroMouseConfig.swapAxes = gyroObj["swapAxes"];
+        if (gyroObj.containsKey("defaultSensitivity"))
+        {
+            int idx = gyroObj["defaultSensitivity"];
+            this->gyroMouseConfig.defaultSensitivity = idx < 0 ? 0 : static_cast<uint8_t>(idx);
+        }
+
+        if (gyroObj.containsKey("sensitivities") && gyroObj["sensitivities"].is<JsonArray>())
+        {
+            this->gyroMouseConfig.sensitivities.clear();
+            for (JsonVariant entry : gyroObj["sensitivities"].as<JsonArray>())
+            {
+                if (!entry.is<JsonObject>())
+                {
+                    continue;
+                }
+                JsonObject sensObj = entry.as<JsonObject>();
+
+                SensitivitySettings settings;
+                settings.name = sensObj.containsKey("name") && sensObj["name"].is<const char *>()
+                                    ? sensObj["name"].as<const char *>()
+                                    : "mode";
+                settings.scale = sensObj.containsKey("scale") ? sensObj["scale"].as<float>() : 1.0f;
+                settings.deadzone = sensObj.containsKey("deadzone") ? sensObj["deadzone"].as<float>() : 1.0f;
+                this->gyroMouseConfig.sensitivities.push_back(settings);
+            }
+
+            if (this->gyroMouseConfig.sensitivities.empty())
+            {
+                this->gyroMouseConfig.sensitivities.push_back({"Medium", 1.0f, 1.2f});
+            }
+        }
+
+        if (this->gyroMouseConfig.defaultSensitivity >= this->gyroMouseConfig.sensitivities.size())
+        {
+            this->gyroMouseConfig.defaultSensitivity = 0;
+        }
+
+        this->gyroMouseConfig.smoothing = constrain(this->gyroMouseConfig.smoothing, 0.0f, 1.0f);
     }
 
     configFile.close();
@@ -328,6 +395,11 @@ const EncoderConfig &ConfigurationManager::getEncoderConfig() const
 const AccelerometerConfig &ConfigurationManager::getAccelerometerConfig() const
 {
     return accelerometerConfig;
+}
+
+const GyroMouseConfig &ConfigurationManager::getGyroMouseConfig() const
+{
+    return gyroMouseConfig;
 }
 
 const WifiConfig &ConfigurationManager::getWifiConfig() const

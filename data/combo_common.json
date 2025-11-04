@@ -17,6 +17,9 @@
   "1+5+9": [
     "CALIBRATE_SENSOR"
   ],
+  "4+7": [
+    "GYROMOUSE_TOGGLE"
+  ],
   "1+2+3,BUTTON": [
     "TOGGLE_BLE_WIFI"
   ],

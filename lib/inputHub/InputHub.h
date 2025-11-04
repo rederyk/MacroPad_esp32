@@ -106,6 +106,9 @@ public:
     void updateReactiveLightingColors(const ComboSettings &settings);
     void saveReactiveLightingColors() const;
 
+    void setGestureCaptureEnabled(bool enable);
+    bool isGestureCaptureEnabled() const;
+
 private:
     static constexpr size_t MAX_QUEUE_SIZE = 32;
 
@@ -122,6 +125,7 @@ private:
     std::unique_ptr<IRStorage> irStorage;
     std::unique_ptr<GestureDevice> gestureDevice;
     ReactiveLightingController reactiveLighting;
+    bool gestureCaptureEnabled;
 };
 
 #endif // INPUT_HUB_H

@@ -91,18 +91,24 @@ public:
     float getMappedX();
     float getMappedY();
     float getMappedZ();
+    void getMappedGyro(float &x, float &y, float &z);
+    float getMappedGyroX();
+    float getMappedGyroY();
+    float getMappedGyroZ();
 
     void updateSampling(); // Driven by internal sampling task; exposed for testing if needed
 
     // Get underlying motion sensor (for axis calibration)
     MotionSensor* getMotionSensor() { return _sensor.get(); }
 
+    void setStreamingMode(bool enable);
+    bool isStreamingMode() const { return _streamingMode; }
+
 private:
     static void samplingTaskTrampoline(void *param);
     bool ensureSamplingTask();
     void samplingTaskLoop();
     void drainSensorBuffer(uint32_t timeoutMs, uint32_t waitMs, uint8_t stableReads);
-    void getMappedGyro(float &x, float &y, float &z);
     bool waitForGyroReady(uint32_t timeoutMs);
     bool waitForFreshAccelerometer(uint32_t timeoutMs);
 
@@ -121,6 +127,8 @@ private:
     unsigned long samplingStartTime;
     bool _motionWakeEnabled;
     bool _expectGyro;
+    bool _streamingMode;
+    uint16_t _writeIndex;
 
     SampleBuffer _sampleBuffer;
     uint16_t _maxSamples;

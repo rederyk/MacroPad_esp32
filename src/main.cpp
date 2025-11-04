@@ -35,6 +35,7 @@
 #include "specialAction.h"
 #include "powerManager.h"
 #include "InputHub.h"
+#include "GyroMouse.h"
 
 WIFIManager wifiManager; // Create an instance of WIFIManager
 
@@ -48,6 +49,7 @@ BLEController bleController("Macropad_esp32"); // prendere nome dal config in qu
 // modificare blecontroller.start??
 MacroManager macroManager(nullptr, nullptr);
 InputHub inputHub;
+GyroMouse gyroMouse;
 
 // Task function prototype
 void mainLoopTask(void *parameter);
@@ -187,6 +189,15 @@ void setup()
                                         gestureAnalyzer.getRecognizerModeName());
             } else {
                 Logger::getInstance().log("Warning: Failed to initialize gesture recognizer, using legacy mode");
+            }
+
+            if (gyroMouse.begin(&gestureSensor, configManager.getGyroMouseConfig()))
+            {
+                const GyroMouseConfig &gyroCfg = gyroMouse.getConfig();
+                Logger::getInstance().log("GyroMouse config loaded (enabled=" +
+                                           String(gyroCfg.enabled ? "true" : "false") +
+                                           ", sensitivities=" +
+                                           String(gyroCfg.sensitivities.size()) + ")");
             }
         }
     }
@@ -345,6 +356,7 @@ void mainLoopTask(void *parameter)
         // --- Operazioni potenzialmente più lunghe ---
         bleController.checkConnection();
         macroManager.update();          // Assicurati che non blocchi
+        gyroMouse.update();
 
         // Check for pending combo switch request (processed outside of action context to avoid stack issues)
         if (macroManager.hasPendingComboSwitch())

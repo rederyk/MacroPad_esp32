@@ -89,5 +89,18 @@
     "motionWakeHighPass": 2,
     "motionWakeCycleRate": 1,
     "gestureMode": "auto"
+  },
+  "gyromouse": {
+    "enabled": true,
+    "smoothing": 0.25,
+    "invertX": false,
+    "invertY": false,
+    "swapAxes": false,
+    "defaultSensitivity": 1,
+    "sensitivities": [
+      { "name": "Slow", "scale": 0.6, "deadzone": 1.5 },
+      { "name": "Medium", "scale": 1.0, "deadzone": 1.2 },
+      { "name": "Fast", "scale": 1.4, "deadzone": 1.0 }
+    ]
   }
 }

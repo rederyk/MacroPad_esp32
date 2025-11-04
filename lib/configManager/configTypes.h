@@ -83,6 +83,24 @@ struct AccelerometerConfig
     String gestureMode; // "auto", "mpu6050", "adxl345", "shape", "orientation"
 };
 
+struct SensitivitySettings
+{
+    String name;
+    float scale;
+    float deadzone;
+};
+
+struct GyroMouseConfig
+{
+    bool enabled;
+    float smoothing;
+    bool invertX;
+    bool invertY;
+    bool swapAxes;
+    uint8_t defaultSensitivity;
+    std::vector<SensitivitySettings> sensitivities;
+};
+
 struct WifiConfig
 {
     String ap_ssid;

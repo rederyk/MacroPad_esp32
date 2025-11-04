@@ -392,6 +392,36 @@ Il file `data/config.json` contiene tutta la configurazione hardware e sistema.
 }
 ```
 
+### Sezione `gyromouse`
+
+È stato introdotto un nuovo blocco di configurazione dedicato alla modalità mouse giroscopico:
+
+```json
+"gyromouse": {
+  "enabled": true,          // Abilita (true) o disabilita (false) la modalità gyromouse
+  "smoothing": 0.25,        // Fattore di smoothing esponenziale (0.0–1.0)
+  "invertX": false,         // Inverte l'asse X
+  "invertY": false,         // Inverte l'asse Y
+  "swapAxes": false,        // Scambia X/Y
+  "defaultSensitivity": 1,  // Indice della sensibilità di default
+  "sensitivities": [        // Elenco profili sensibilità disponibili
+    { "name": "Slow",   "scale": 0.6, "deadzone": 1.5 },
+    { "name": "Medium", "scale": 1.0, "deadzone": 1.2 },
+    { "name": "Fast",   "scale": 1.4, "deadzone": 1.0 }
+  ]
+}
+```
+
+> **Suggerimento:** lascia almeno un profilo nelle `sensitivities` oppure l'inizializzazione verrà ignorata.
+
+### Modalità GyroMouse
+
+- Premi `4+7` per attivare/disattivare la modalità (combinazione definita in `combo_common.json`).
+- All'attivazione vengono caricati i bindings dal file `gyromouse_combo_0.json` (tasti 1/2/3/4/6 per i pulsanti del mouse, encoder per lo scroll, tasto `5` per uscire, pulsante encoder per cambiare sensibilità).
+- Alla disattivazione il sistema ripristina automaticamente il set di combo precedente.
+- Per funzionare correttamente richiede **BLE attivo** e l'accelerometro inizializzato; se BLE è spento viene stampato un warning e la modalità non parte.
+- Puoi personalizzare sensibilità, deadzone e mapping modificando sia la sezione `gyromouse` in `config.json` sia il file `data/gyromouse_combo_0.json`.
+
 ### Parametri Critici da Verificare
 
 **1. Pin Hardware:**

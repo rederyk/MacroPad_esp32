@@ -27,10 +27,14 @@
 #include <BLEController.h>
 #include "Led.h"
 #include "InputHub.h"
+#include "GyroMouse.h"
+#include "combinationManager.h"
 
 extern WIFIManager wifiManager;
 extern BLEController bleController;
 extern InputHub inputHub;
+extern GyroMouse gyroMouse;
+extern CombinationManager comboManager;
 
 // Bitmask helper functions
 inline void setKeyState(uint16_t &mask, uint8_t key, bool state)
@@ -278,6 +282,81 @@ void MacroManager::pressAction(const std::string &action)
 
     {
         specialAction.enterSleep();
+    }
+    else if (action == "GYROMOUSE_START")
+    {
+        if (!gyroMouse.isRunning())
+        {
+            if (!gyroModeActive)
+            {
+                String currentPrefix = comboManager.getCurrentPrefix();
+                savedComboPrefix = std::string(currentPrefix.c_str());
+                savedComboSetNumber = comboManager.getCurrentSet();
+                hasSavedCombo = true;
+            }
+
+            gyroMouse.start();
+            gyroModeActive = gyroMouse.isRunning();
+
+            if (gyroModeActive)
+            {
+                pendingComboSwitchFlag = true;
+                pendingComboPrefix = "gyromouse_combo";
+                pendingComboSetNumber = 0;
+            }
+            else
+            {
+                Logger::getInstance().log("GyroMouse: failed to start (check configuration)");
+            }
+        }
+    }
+    else if (action == "GYROMOUSE_STOP")
+    {
+        if (gyroMouse.isRunning())
+        {
+            gyroMouse.stop();
+        }
+
+        if (gyroModeActive && hasSavedCombo)
+        {
+            pendingComboSwitchFlag = true;
+            pendingComboPrefix = savedComboPrefix;
+            pendingComboSetNumber = savedComboSetNumber;
+        }
+
+        gyroModeActive = false;
+    }
+    else if (action == "GYROMOUSE_TOGGLE")
+    {
+        if (gyroMouse.isRunning())
+        {
+            gyroMouse.stop();
+
+            if (gyroModeActive && hasSavedCombo)
+            {
+                pendingComboSwitchFlag = true;
+                pendingComboPrefix = savedComboPrefix;
+                pendingComboSetNumber = savedComboSetNumber;
+            }
+            gyroModeActive = false;
+        }
+        else
+        {
+            // Reuse start logic
+            pressAction("GYROMOUSE_START");
+        }
+    }
+    else if (action == "GYROMOUSE_CYCLE_SENSITIVITY")
+    {
+        if (gyroMouse.isRunning())
+        {
+            gyroMouse.cycleSensitivity();
+            Logger::getInstance().log("GyroMouse: Sensitivity -> " + gyroMouse.getSensitivityName());
+        }
+        else
+        {
+            Logger::getInstance().log("GyroMouse: Cycle request ignored (mode inactive)");
+        }
     }
     else if (action.rfind("DELAY_", 0) == 0)
     {
@@ -663,6 +742,13 @@ void MacroManager::releaseAction(const std::string &action)
     {
         inputHub.saveReactiveLightingColors();
     }
+    else if (action == "GYROMOUSE_START" ||
+             action == "GYROMOUSE_STOP" ||
+             action == "GYROMOUSE_TOGGLE" ||
+             action == "GYROMOUSE_CYCLE_SENSITIVITY")
+    {
+        // No release action required for GyroMouse commands
+    }
     else if (action.rfind("SWITCH_MY_COMBO_", 0) == 0)
     {
         // Extract combo number from "SWITCH_MY_COMBO_X"
@@ -675,6 +761,13 @@ void MacroManager::releaseAction(const std::string &action)
             pendingComboSwitchFlag = true;
             pendingComboPrefix = "my_combo";
             pendingComboSetNumber = comboNum;
+
+            if (gyroModeActive)
+            {
+                savedComboPrefix = pendingComboPrefix;
+                savedComboSetNumber = pendingComboSetNumber;
+                hasSavedCombo = true;
+            }
         }
         catch (const std::exception &e)
         {
@@ -693,6 +786,13 @@ void MacroManager::releaseAction(const std::string &action)
             pendingComboSwitchFlag = true;
             pendingComboPrefix = "combo";
             pendingComboSetNumber = comboNum;
+
+            if (gyroModeActive)
+            {
+                savedComboPrefix = pendingComboPrefix;
+                savedComboSetNumber = pendingComboSetNumber;
+                hasSavedCombo = true;
+            }
         }
         catch (const std::exception &e)
         {
