@@ -61,7 +61,7 @@
     "pinBlue": 27,
     "anode_common": false,
     "active": true,
-    "brightness": 255
+    "brightness": 15
   },
   "irLed": {
     "pin": 33,
