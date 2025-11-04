@@ -129,6 +129,7 @@ private:
     bool _expectGyro;
     bool _streamingMode;
     uint16_t _writeIndex;
+    uint32_t _totalSamples;
 
     SampleBuffer _sampleBuffer;
     uint16_t _maxSamples;

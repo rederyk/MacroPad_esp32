@@ -88,6 +88,11 @@ struct SensitivitySettings
     String name;
     float scale;
     float deadzone;
+    String mode;
+    float gyroScale;
+    float tiltScale;
+    float tiltDeadzone;
+    float hybridBlend;
 };
 
 struct GyroMouseConfig
@@ -98,6 +103,11 @@ struct GyroMouseConfig
     bool invertY;
     bool swapAxes;
     uint8_t defaultSensitivity;
+    float orientationAlpha;
+    float tiltLimitDegrees;
+    float tiltDeadzoneDegrees;
+    float recenterRate;
+    float recenterThresholdDegrees;
     std::vector<SensitivitySettings> sensitivities;
 };
 

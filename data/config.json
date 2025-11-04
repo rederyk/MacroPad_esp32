@@ -97,10 +97,16 @@
     "invertY": false,
     "swapAxes": false,
     "defaultSensitivity": 1,
+    "orientationAlpha": 0.94,
+    "tiltLimitDegrees": 65.0,
+    "tiltDeadzoneDegrees": 1.8,
+    "recenterRate": 0.25,
+    "recenterThresholdDegrees": 2.5,
     "sensitivities": [
-      { "name": "Slow", "scale": 0.6, "deadzone": 1.5 },
-      { "name": "Medium", "scale": 1.0, "deadzone": 1.2 },
-      { "name": "Fast", "scale": 1.4, "deadzone": 1.0 }
+      { "name": "Gyro Slow", "mode": "gyro", "scale": 0.6, "gyroScale": 0.6, "deadzone": 1.6 },
+      { "name": "Gyro Fast", "mode": "gyro", "scale": 1.2, "gyroScale": 1.2, "deadzone": 1.0 },
+      { "name": "Tilt Nav", "mode": "tilt", "scale": 28.0, "tiltScale": 32.0, "tiltDeadzone": 2.0, "deadzone": 0.0 },
+      { "name": "Hybrid AirMouse", "mode": "hybrid", "scale": 1.0, "gyroScale": 1.0, "deadzone": 1.1, "tiltScale": 26.0, "tiltDeadzone": 1.5, "hybridBlend": 0.4 }
     ]
   }
 }

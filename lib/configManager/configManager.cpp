@@ -360,6 +360,14 @@ bool ConfigurationManager::loadConfig()
                                     : "mode";
                 settings.scale = sensObj.containsKey("scale") ? sensObj["scale"].as<float>() : 1.0f;
                 settings.deadzone = sensObj.containsKey("deadzone") ? sensObj["deadzone"].as<float>() : 1.0f;
+                settings.mode = sensObj.containsKey("mode") && sensObj["mode"].is<const char *>()
+                                    ? sensObj["mode"].as<const char *>()
+                                    : "gyro";
+                settings.gyroScale = sensObj.containsKey("gyroScale") ? sensObj["gyroScale"].as<float>() : settings.scale;
+                settings.tiltScale = sensObj.containsKey("tiltScale") ? sensObj["tiltScale"].as<float>() : settings.scale * 20.0f;
+                settings.tiltDeadzone = sensObj.containsKey("tiltDeadzone") ? sensObj["tiltDeadzone"].as<float>() : settings.deadzone;
+                settings.hybridBlend = sensObj.containsKey("hybridBlend") ? sensObj["hybridBlend"].as<float>() : 0.35f;
+                settings.hybridBlend = constrain(settings.hybridBlend, 0.0f, 1.0f);
                 this->gyroMouseConfig.sensitivities.push_back(settings);
             }
 
@@ -368,6 +376,55 @@ bool ConfigurationManager::loadConfig()
                 this->gyroMouseConfig.sensitivities.push_back({"Medium", 1.0f, 1.2f});
             }
         }
+
+        if (gyroObj.containsKey("orientationAlpha"))
+        {
+            this->gyroMouseConfig.orientationAlpha = constrain(gyroObj["orientationAlpha"].as<float>(), 0.0f, 0.999f);
+        }
+        else if (this->gyroMouseConfig.orientationAlpha <= 0.0f)
+        {
+            this->gyroMouseConfig.orientationAlpha = 0.96f;
+        }
+
+        if (gyroObj.containsKey("tiltLimitDegrees"))
+        {
+            this->gyroMouseConfig.tiltLimitDegrees = gyroObj["tiltLimitDegrees"].as<float>();
+        }
+        else if (this->gyroMouseConfig.tiltLimitDegrees <= 0.0f)
+        {
+            this->gyroMouseConfig.tiltLimitDegrees = 55.0f;
+        }
+        this->gyroMouseConfig.tiltLimitDegrees = constrain(this->gyroMouseConfig.tiltLimitDegrees, 5.0f, 90.0f);
+
+        if (gyroObj.containsKey("tiltDeadzoneDegrees"))
+        {
+            this->gyroMouseConfig.tiltDeadzoneDegrees = gyroObj["tiltDeadzoneDegrees"].as<float>();
+        }
+        else if (this->gyroMouseConfig.tiltDeadzoneDegrees <= 0.0f)
+        {
+            this->gyroMouseConfig.tiltDeadzoneDegrees = 1.5f;
+        }
+        this->gyroMouseConfig.tiltDeadzoneDegrees = constrain(this->gyroMouseConfig.tiltDeadzoneDegrees, 0.0f, 15.0f);
+
+        if (gyroObj.containsKey("recenterRate"))
+        {
+            this->gyroMouseConfig.recenterRate = gyroObj["recenterRate"].as<float>();
+        }
+        else if (this->gyroMouseConfig.recenterRate < 0.0f)
+        {
+            this->gyroMouseConfig.recenterRate = 0.35f;
+        }
+        this->gyroMouseConfig.recenterRate = constrain(this->gyroMouseConfig.recenterRate, 0.0f, 1.0f);
+
+        if (gyroObj.containsKey("recenterThresholdDegrees"))
+        {
+            this->gyroMouseConfig.recenterThresholdDegrees = gyroObj["recenterThresholdDegrees"].as<float>();
+        }
+        else if (this->gyroMouseConfig.recenterThresholdDegrees <= 0.0f)
+        {
+            this->gyroMouseConfig.recenterThresholdDegrees = 2.0f;
+        }
+        this->gyroMouseConfig.recenterThresholdDegrees = constrain(this->gyroMouseConfig.recenterThresholdDegrees, 0.1f, 20.0f);
 
         if (this->gyroMouseConfig.defaultSensitivity >= this->gyroMouseConfig.sensitivities.size())
         {

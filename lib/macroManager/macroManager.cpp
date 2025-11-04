@@ -358,6 +358,17 @@ void MacroManager::pressAction(const std::string &action)
             Logger::getInstance().log("GyroMouse: Cycle request ignored (mode inactive)");
         }
     }
+    else if (action == "GYROMOUSE_RECENTER")
+    {
+        if (gyroMouse.isRunning())
+        {
+            gyroMouse.recenterNeutral();
+        }
+        else
+        {
+            Logger::getInstance().log("GyroMouse: Recenter request ignored (mode inactive)");
+        }
+    }
     else if (action.rfind("DELAY_", 0) == 0)
     {
         // Estrae il valore del delay in ms
@@ -745,7 +756,8 @@ void MacroManager::releaseAction(const std::string &action)
     else if (action == "GYROMOUSE_START" ||
              action == "GYROMOUSE_STOP" ||
              action == "GYROMOUSE_TOGGLE" ||
-             action == "GYROMOUSE_CYCLE_SENSITIVITY")
+             action == "GYROMOUSE_CYCLE_SENSITIVITY" ||
+             action == "GYROMOUSE_RECENTER")
     {
         // No release action required for GyroMouse commands
     }

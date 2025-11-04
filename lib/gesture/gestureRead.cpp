@@ -130,7 +130,8 @@ GestureRead::GestureRead(TwoWire *wire)
       _motionWakeEnabled(false),
       _expectGyro(false),
       _streamingMode(false),
-      _writeIndex(0)
+      _writeIndex(0),
+      _totalSamples(0)
 {
     _calibrationOffset = {0, 0, 0};
     _sampleHZ = MotionSensor::kDefaultSampleHz;
@@ -274,6 +275,7 @@ void GestureRead::clearMemory()
         _bufferFull = false;
         lastSampleTime = 0;
         _writeIndex = 0;
+        _totalSamples = 0;
     }
 }
 
@@ -1026,6 +1028,8 @@ void GestureRead::updateSampling()
             sample.temperatureValid = _sensor->hasTemperature();
             sample.temperature = sample.temperatureValid ? _sensor->readTemperatureC() : 0.0f;
 
+            const uint32_t sampleNumber = _totalSamples++;
+
             if (count < _maxSamples)
             {
                 _sampleBuffer.sampleCount = count + 1;
@@ -1054,15 +1058,42 @@ void GestureRead::updateSampling()
             // Only update lastSampleTime when we successfully got new data
             lastSampleTime = currentTime;
 
-            static uint16_t debugLogEmitted = 0;
-            if (count == 0)
+            static uint8_t initialDebugLogsRemaining = 0;
+            static unsigned long lastStreamingLogMs = 0;
+            static uint32_t lastStreamingLoggedSample = 0;
+
+            if (sampleNumber == 0)
             {
-                debugLogEmitted = 0;
+                initialDebugLogsRemaining = 5;
+                lastStreamingLogMs = 0;
+                lastStreamingLoggedSample = 0;
             }
 
-            if (debugLogEmitted < 5)
+            bool shouldEmitLog = false;
+
+            if (initialDebugLogsRemaining > 0)
             {
-                String logMsg = "gesture_sample idx=" + String(count) +
+                shouldEmitLog = true;
+                initialDebugLogsRemaining--;
+            }
+            else if (_streamingMode)
+            {
+                const unsigned long elapsedMs = (lastStreamingLogMs <= currentTime)
+                                                    ? (currentTime - lastStreamingLogMs)
+                                                    : 0;
+                const uint32_t samplesSinceLast = (sampleNumber >= lastStreamingLoggedSample)
+                                                      ? (sampleNumber - lastStreamingLoggedSample)
+                                                      : 0;
+
+                if (elapsedMs >= 500 || samplesSinceLast >= 50)
+                {
+                    shouldEmitLog = true;
+                }
+            }
+
+            if (shouldEmitLog)
+            {
+                String logMsg = "gesture_sample idx=" + String(sampleNumber) +
                                 " mapped=[" + String(mappedX, 4) + "," + String(mappedY, 4) + "," + String(mappedZ, 4) + "]" +
                                 " offset=[" + String(_calibrationOffset.x, 4) + "," + String(_calibrationOffset.y, 4) + "," + String(_calibrationOffset.z, 4) + "]" +
                                 " calibrated=[" + String(sample.x, 4) + "," + String(sample.y, 4) + "," + String(sample.z, 4) + "]";
@@ -1082,7 +1113,12 @@ void GestureRead::updateSampling()
                 }
 
                 Logger::getInstance().log(logMsg);
-                debugLogEmitted++;
+
+                if (_streamingMode)
+                {
+                    lastStreamingLogMs = currentTime;
+                    lastStreamingLoggedSample = sampleNumber;
+                }
             }
 
             float x = fabsf(sample.x);

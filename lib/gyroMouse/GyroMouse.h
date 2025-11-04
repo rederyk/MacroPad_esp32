@@ -23,6 +23,7 @@ public:
 
     // Gestione sensibilità
     void cycleSensitivity();
+    void recenterNeutral();
     uint8_t getCurrentSensitivity() const { return currentSensitivityIndex; }
     String getSensitivityName() const;
 
@@ -30,6 +31,24 @@ public:
     const GyroMouseConfig& getConfig() const { return config; }
 
 private:
+    enum class PointingMode : uint8_t
+    {
+        GyroRate,
+        TiltVelocity,
+        Hybrid
+    };
+
+    struct SensorFrame
+    {
+        float gyroX;
+        float gyroY;
+        float gyroZ;
+        float accelX;
+        float accelY;
+        float accelZ;
+        float accelMagnitude;
+    };
+
     // Riferimenti esterni
     GestureRead* gestureSensor;
 
@@ -39,15 +58,25 @@ private:
     GyroMouseConfig config;
     bool ownsSampling;
     bool gestureCaptureSuspended;
+    bool gyroAvailable;
 
     // Variabili movimento
     float smoothedMouseX;
     float smoothedMouseY;
     unsigned long lastUpdateTime;
+    float fusedPitchRad;
+    float fusedRollRad;
+    float neutralPitchRad;
+    float neutralRollRad;
+    bool neutralCaptured;
 
     // Helper
-    void calculateMouseMovement(float gyroX, float gyroY, float deltaTime,
+    void calculateMouseMovement(const SensorFrame& frame, float deltaTime,
                                int8_t& mouseX, int8_t& mouseY);
+    void updateOrientation(const SensorFrame& frame, float deltaTime);
+    void updateNeutralBaseline(float deltaTime, const SensorFrame& frame);
+    PointingMode resolvePointingMode(const SensitivitySettings& settings) const;
+    void applyNeutralOrientationRotation(float& x, float& y, float& z) const;
     float applyDeadzone(float value, float threshold);
     int8_t clampMouseValue(float value);
 };
