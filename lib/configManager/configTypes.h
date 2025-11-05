@@ -114,6 +114,7 @@ struct GyroMouseConfig
     bool absoluteRecenter;
     int32_t absoluteRangeX;
     int32_t absoluteRangeY;
+    float clickSlowdownFactor; // Slowdown factor when mouse button is pressed (0.0-1.0)
     std::vector<SensitivitySettings> sensitivities;
 };
 

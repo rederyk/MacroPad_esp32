@@ -477,8 +477,18 @@ bool ConfigurationManager::loadConfig()
             this->gyroMouseConfig.absoluteRangeY = gyroObj["absoluteRangeY"].as<int32_t>();
         }
 
+        if (gyroObj.containsKey("clickSlowdownFactor"))
+        {
+            this->gyroMouseConfig.clickSlowdownFactor = gyroObj["clickSlowdownFactor"].as<float>();
+        }
+        else
+        {
+            this->gyroMouseConfig.clickSlowdownFactor = 0.3f; // Default: slow down to 30% speed
+        }
+
         this->gyroMouseConfig.absoluteRangeX = constrain(this->gyroMouseConfig.absoluteRangeX, 0, 20000);
         this->gyroMouseConfig.absoluteRangeY = constrain(this->gyroMouseConfig.absoluteRangeY, 0, 20000);
+        this->gyroMouseConfig.clickSlowdownFactor = constrain(this->gyroMouseConfig.clickSlowdownFactor, 0.0f, 1.0f);
 
         this->gyroMouseConfig.smoothing = constrain(this->gyroMouseConfig.smoothing, 0.0f, 1.0f);
     }

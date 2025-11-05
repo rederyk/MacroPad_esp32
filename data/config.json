@@ -96,7 +96,7 @@
     "invertX": true,
     "invertY": true,
     "swapAxes": true,
-    "defaultSensitivity": 1,
+    "defaultSensitivity": 2,
     "orientationAlpha": 0.96,
     "tiltLimitDegrees": 55.0,
     "tiltDeadzoneDegrees": 1.0,
@@ -105,10 +105,11 @@
     "absoluteRecenter": true,
     "absoluteRangeX": 1920,
     "absoluteRangeY": 1080,
+    "clickSlowdownFactor": 0.3,
     "sensitivities": [
-      { "name": "Precision", "mode": "gyro", "scale": 0.5, "gyroScale": 0.5, "deadzone": 1.0 },
       { "name": "Normal", "mode": "gyro", "scale": 1.0, "gyroScale": 1.0, "deadzone": 0.5 },
-      { "name": "Fast", "mode": "gyro", "scale": 1.8, "gyroScale": 1.8, "deadzone": 0.3 }
+      { "name": "Fast", "mode": "gyro", "scale": 1.8, "gyroScale": 1.8, "deadzone": 0.3 },
+      { "name": "Precision", "mode": "gyro", "scale": 0.5, "gyroScale": 0.5, "deadzone": 1.0 }
     ]
   }
 }

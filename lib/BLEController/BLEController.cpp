@@ -46,7 +46,9 @@ BLEController::BLEController(String name)
     : bluetoothEnabled(false),
       connectionLost(false),
       statoPrecedente(false),
-      originalName(name)
+      originalName(name),
+      mouseButtonsPressed(0),
+      lastMouseButtonChangeTime(0)
 {
   Keyboard.deviceName = originalName.c_str();
 }
@@ -285,6 +287,11 @@ const uint8_t *getMediaKeyToken(const String &token)
 void BLEController::moveMouse(signed char x, signed char y, signed char wheel, signed char hWheel)
 {
   Mouse.move(x, y, wheel, hWheel);
+}
+
+unsigned long BLEController::getTimeSinceLastMouseButtonChange() const
+{
+  return millis() - lastMouseButtonChangeTime;
 }
 
 // Mappa i token “speciali” ai relativi codici
@@ -557,9 +564,16 @@ void BLEController::BLExecutor(String action, bool pressed)
           if (mouseButton != 0)
           {
             if (pressed)
+            {
               Mouse.press(mouseButton);
+              mouseButtonsPressed |= mouseButton;
+            }
             else
+            {
               Mouse.release(mouseButton);
+              mouseButtonsPressed &= ~mouseButton;
+            }
+            lastMouseButtonChangeTime = millis();
             Logger::getInstance().log("Mouse button: " + token + (pressed ? " pressed" : " released"));
           }
         }

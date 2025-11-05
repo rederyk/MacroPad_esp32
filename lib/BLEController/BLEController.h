@@ -39,6 +39,10 @@ private:
     uint8_t originalMAC[6];
     char pressed_Char = '\0'; // null character to represent "no character pressed"
 
+    // Mouse button state tracking
+    uint8_t mouseButtonsPressed;
+    unsigned long lastMouseButtonChangeTime;
+
     // Funzione privata per stampare il MAC in formato leggibile.
     void printMacAddress(const uint8_t *mac);
 
@@ -68,6 +72,11 @@ public:
     void incrementName(int increment);
     void BLExecutor(String action, bool pressed);
     void moveMouse(signed char x, signed char y, signed char wheel, signed char hWheel);
+
+    // Mouse button state queries
+    bool isAnyMouseButtonPressed() const { return mouseButtonsPressed != 0; }
+    uint8_t getMouseButtonsPressed() const { return mouseButtonsPressed; }
+    unsigned long getTimeSinceLastMouseButtonChange() const;
 
     // Esegue una serie di test per le funzionalità di tastiera e mouse.
     bool isBleEnabled();

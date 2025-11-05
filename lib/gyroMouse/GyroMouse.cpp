@@ -51,6 +51,8 @@ GyroMouse::GyroMouse()
       lastMotionTime(0),
       madgwickBeta(0.1f),  // Default beta for Madgwick filter
       madgwickSampleFreq(200.0f),  // Assume 200Hz default
+      clickSlowdownFactor(1.0f),
+      lastClickCheckTime(0),
       neutralCapturePending(false),
       neutralCaptureSamples(0),
       neutralPitchAccum(0.0f),
@@ -309,6 +311,9 @@ void GyroMouse::update() {
         return;
     }
 
+    // Update click slowdown factor
+    updateClickSlowdown();
+
     // Calcola movimento mouse usando il nuovo algoritmo basato su rotazione relativa
     int8_t mouseX = 0;
     int8_t mouseY = 0;
@@ -319,6 +324,12 @@ void GyroMouse::update() {
     } else {
         // Fallback to legacy algorithm if gyro not available
         calculateMouseMovement(frame, deltaTime, mouseX, mouseY);
+    }
+
+    // Apply click slowdown if any mouse button is pressed
+    if (clickSlowdownFactor < 1.0f) {
+        mouseX = static_cast<int8_t>(mouseX * clickSlowdownFactor);
+        mouseY = static_cast<int8_t>(mouseY * clickSlowdownFactor);
     }
 
     // Invia movimento se non nullo
@@ -1083,4 +1094,48 @@ void GyroMouse::updateMadgwickBeta() {
 
     // Keep beta in reasonable range
     madgwickBeta = constrain(madgwickBeta, 0.01f, 0.5f);
+}
+
+void GyroMouse::updateClickSlowdown() {
+    // Check mouse button state every 10ms to avoid overhead
+    unsigned long currentTime = millis();
+    if (currentTime - lastClickCheckTime < 10) {
+        return;
+    }
+    lastClickCheckTime = currentTime;
+
+    // Check if any mouse button is pressed
+    bool anyButtonPressed = bleController.isAnyMouseButtonPressed();
+
+    if (anyButtonPressed) {
+        // Get time since button was pressed
+        unsigned long timeSinceChange = bleController.getTimeSinceLastMouseButtonChange();
+
+        // Get configured base slowdown factor (default 0.3 = 30% speed)
+        float baseSlowdown = config.clickSlowdownFactor;
+
+        // Adaptive slowdown based on click duration
+        // Slowdown phases:
+        // 0-50ms: Maximum slowdown - critical click time
+        // 50-150ms: Base slowdown + 50% - drag start stabilization
+        // 150-300ms: Base slowdown + 25% - active drag
+        // 300ms+: Base slowdown + 50% recovery - sustained drag
+
+        if (timeSinceChange < 50) {
+            // Maximum precision during initial click
+            clickSlowdownFactor = baseSlowdown * 0.5f;
+        } else if (timeSinceChange < 150) {
+            // Slower during drag start
+            clickSlowdownFactor = baseSlowdown * 0.75f;
+        } else if (timeSinceChange < 300) {
+            // Use configured slowdown for active drag
+            clickSlowdownFactor = baseSlowdown;
+        } else {
+            // Gradually recover speed for sustained drag
+            clickSlowdownFactor = fminf(baseSlowdown * 1.5f, 0.9f);
+        }
+    } else {
+        // No button pressed - full speed
+        clickSlowdownFactor = 1.0f;
+    }
 }
