@@ -167,18 +167,7 @@ void ReactiveLightingController::handleInput(uint8_t keyIndex, bool isEncoder, i
     }
     else
     {
-        ensureKeyColor(keyIndex);
-
-        const auto &color = state.keyColors[keyIndex];
-        applyColorWithBrightness(color[0], color[1], color[2]);
-
-        state.ledReactiveActive = true;
-        state.ledReactiveTime = millis() + LED_REACTIVE_DURATION;
-
-        if (activeKeysMask == 0)
-        {
-            state.editMode = false;
-        }
+        applyCombinedColor(activeKeysMask);
     }
 }
 
@@ -200,6 +189,45 @@ void ReactiveLightingController::update()
         state.ledReactiveActive = false;
         state.editMode = false;
     }
+}
+
+void ReactiveLightingController::applyCombinedColor(uint16_t activeKeysMask)
+{
+    if (activeKeysMask == 0)
+    {
+        // No keys pressed, restore saved color after a short delay
+        if (state.ledReactiveActive)
+        {
+            state.ledReactiveTime = millis() + 50; // 50ms delay before turning off
+        }
+        return;
+    }
+
+    int combinedR = 0;
+    int combinedG = 0;
+    int combinedB = 0;
+
+    for (uint8_t i = 0; i < 16; ++i)
+    {
+        if (activeKeysMask & (1 << i))
+        {
+            ensureKeyColor(i);
+            const auto& color = state.keyColors[i];
+            combinedR += color[0];
+            combinedG += color[1];
+            combinedB += color[2];
+        }
+    }
+
+    // Clamp the values to 255
+    combinedR = std::min(255, combinedR);
+    combinedG = std::min(255, combinedG);
+    combinedB = std::min(255, combinedB);
+
+    applyColorWithBrightness(combinedR, combinedG, combinedB);
+    state.ledReactiveActive = true;
+    // Set a long duration, as we'll manage the "off" state ourselves
+    state.ledReactiveTime = millis() + 10000;
 }
 
 void ReactiveLightingController::updateColors(const ComboSettings &settings)

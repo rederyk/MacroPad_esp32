@@ -26,6 +26,15 @@
 class SpecialAction
 {
 public:
+    enum class LedMode {
+        NONE,
+        IR_SCAN,
+        IR_SEND,
+        FLASHLIGHT
+    };
+
+    LedMode getCurrentLedMode() const { return currentLedMode; }
+
     /// System commands
     void resetDevice();
     void actionDelay(int totalDelayMs);
@@ -65,9 +74,13 @@ public:
     int getBrightness();                                                // Get current brightness
     void loadBrightness();                                              // Load brightness from file
     void showBrightnessInfo();                                          // Show current brightness in log
+    void toggleFlashlight();                                            // Toggle flashlight mode
     int brightnessAdjustmentStep = 10;                                  // Default step for brightness PLUS/MINUS (configurable)
 
 private:
+    LedMode currentLedMode = LedMode::NONE;
+    bool flashlightActive = false;
+    int flashlightSavedColor[3] = {0, 0, 0};
     int getKeypadInput(unsigned long timeout);
     int getInput(unsigned long timeout, bool allowGesture = false); // Keypad + optional gesture input
     String getInputWithEncoder(unsigned long timeout, bool allowGesture = false, bool allowEncoder = true, const String &exitCombo = ""); // Keypad + gesture + encoder (CW/CCW/BUTTON)

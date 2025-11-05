@@ -656,25 +656,7 @@ void MacroManager::pressAction(const std::string &action)
     // Flashlight Command - Toggle white LED full brightness
     else if (action == "FLASHLIGHT")
     {
-        if (!flashlightActive)
-        {
-            // Save current LED state
-            Led::getInstance().getColor(flashlightSavedColor[0], flashlightSavedColor[1], flashlightSavedColor[2]);
-            // Turn on white LED at full brightness
-            Led::getInstance().setColor(255, 255, 255, false);
-            flashlightActive = true;
-            Logger::getInstance().log("Flashlight ON - LED set to white (255,255,255)");
-        }
-        else
-        {
-            // Restore previous LED state
-            Led::getInstance().setColor(flashlightSavedColor[0], flashlightSavedColor[1], flashlightSavedColor[2], false);
-            flashlightActive = false;
-            Logger::getInstance().log("Flashlight OFF - LED restored to RGB(" +
-                                    String(flashlightSavedColor[0]) + "," +
-                                    String(flashlightSavedColor[1]) + "," +
-                                    String(flashlightSavedColor[2]) + ")");
-        }
+        specialAction.toggleFlashlight();
     }
 
     // Is useless now??

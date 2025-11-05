@@ -105,10 +105,6 @@ private:
     bool executeCombinationActions(const std::string &comboKey);
     void releaseGestureActions();
 
-    // Flashlight mode state
-    bool flashlightActive = false;
-    int flashlightSavedColor[3] = {0, 0, 0}; // Saved color before flashlight activation
-
     // Pending combo switch request
     bool pendingComboSwitchFlag = false;
     std::string pendingComboPrefix;

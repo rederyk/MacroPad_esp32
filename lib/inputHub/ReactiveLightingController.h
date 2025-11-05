@@ -42,6 +42,7 @@ private:
     void ensureKeyColor(size_t keyIndex);
     std::array<int, 3> generateDefaultKeyColor(size_t keyIndex, size_t totalKeys) const;
     void applyColorWithBrightness(int r, int g, int b) const;
+    void applyCombinedColor(uint16_t activeKeysMask);
     const char *getChannelName(uint8_t channel) const;
 };
 

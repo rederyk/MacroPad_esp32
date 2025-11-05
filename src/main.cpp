@@ -383,19 +383,22 @@ void mainLoopTask(void *parameter)
                     inputHub.updateReactiveLightingColors(comboSettings);
 
                     // Visual feedback and LED color management based on combo settings
-                    if (comboSettings.hasLedColor())
+                    if (specialAction.getCurrentLedMode() == SpecialAction::LedMode::NONE)
                     {
-                        // Mode has custom LED color - show brief flash then set as permanent
-                        // Use setSystemLedColor to apply brightness scaling and maintain brightness control
-                        specialAction.setSystemLedColor(comboSettings.ledR, comboSettings.ledG, comboSettings.ledB, false);
-                        vTaskDelay(pdMS_TO_TICKS(150));
-                        // Set the permanent LED color for this mode and save it
-                        specialAction.setSystemLedColor(comboSettings.ledR, comboSettings.ledG, comboSettings.ledB, true);
-                    }
-                    else
-                    {
-                        // Mode has no custom LED color - keep current LED color (no flash, no change)
-                        // This maintains consistency when switching between modes without LED settings
+                        if (comboSettings.hasLedColor())
+                        {
+                            // Mode has custom LED color - show brief flash then set as permanent
+                            // Use setSystemLedColor to apply brightness scaling and maintain brightness control
+                            specialAction.setSystemLedColor(comboSettings.ledR, comboSettings.ledG, comboSettings.ledB, false);
+                            vTaskDelay(pdMS_TO_TICKS(150));
+                            // Set the permanent LED color for this mode and save it
+                            specialAction.setSystemLedColor(comboSettings.ledR, comboSettings.ledG, comboSettings.ledB, true);
+                        }
+                        else
+                        {
+                            // Mode has no custom LED color - keep current LED color (no flash, no change)
+                            // This maintains consistency when switching between modes without LED settings
+                        }
                     }
                 }
                 else

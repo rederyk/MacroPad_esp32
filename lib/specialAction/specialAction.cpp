@@ -697,6 +697,7 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
         Logger::getInstance().log("Exiting IR Scan mode for DEV" + String(deviceId));
         scanningMode = false;
         currentDeviceId = -1;
+        currentLedMode = LedMode::NONE;
         // Pulisce buffer IR quando si esce
         irSensor->clearBuffer();
         // Restore LED color
@@ -715,6 +716,7 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
 
     // Enter scan mode and start immediate capture
     scanningMode = true;
+    currentLedMode = LedMode::IR_SCAN;
     currentDeviceId = deviceId;
     deviceName = "dev" + String(deviceId);
 
@@ -820,6 +822,7 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
         }
         scanningMode = false;
         currentDeviceId = -1;
+        currentLedMode = LedMode::NONE;
         // Pulisce buffer IR quando si esce
         irSensor->clearBuffer();
         // Restore LED color
@@ -860,6 +863,7 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
             Logger::getInstance().log("Timeout or invalid input - IR not saved");
             scanningMode = false;
             currentDeviceId = -1;
+            currentLedMode = LedMode::NONE;
             // Pulisce buffer IR quando si esce
             irSensor->clearBuffer();
             return;
@@ -871,6 +875,7 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
             Logger::getInstance().log("Exit combo pressed - cancelling IR save");
             scanningMode = false;
             currentDeviceId = -1;
+            currentLedMode = LedMode::NONE;
             // Pulisce buffer IR quando si esce
             irSensor->clearBuffer();
             return;
@@ -882,6 +887,7 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
             Logger::getInstance().log("Cannot save exit combo as IR command - choose different combo");
             scanningMode = false;
             currentDeviceId = -1;
+            currentLedMode = LedMode::NONE;
             // Pulisce buffer IR quando si esce
             irSensor->clearBuffer();
             return;
@@ -929,6 +935,7 @@ void SpecialAction::toggleScanIR(int deviceId, const String &exitCombo)
 
     scanningMode = false;
     currentDeviceId = -1;
+    currentLedMode = LedMode::NONE;
     // Pulisce buffer IR quando si esce
     irSensor->clearBuffer();
     // Restore LED color
@@ -969,6 +976,7 @@ void SpecialAction::toggleSendIR(int deviceId, const String &exitCombo)
         Logger::getInstance().log("Exiting IR Send mode for DEV" + String(deviceId));
         sendingMode = false;
         currentDeviceId = -1;
+        currentLedMode = LedMode::NONE;
         // Restore LED color
         Led::getInstance().setColor(savedRed, savedGreen, savedBlue, false);
         return;
@@ -985,6 +993,7 @@ void SpecialAction::toggleSendIR(int deviceId, const String &exitCombo)
 
     // Enter or switch sending mode
     sendingMode = true;
+    currentLedMode = LedMode::IR_SEND;
     currentDeviceId = deviceId;
     deviceName = "dev" + String(deviceId);
 
@@ -1019,6 +1028,7 @@ void SpecialAction::toggleSendIR(int deviceId, const String &exitCombo)
             Logger::getInstance().log("Exit combo pressed - exiting send mode");
             sendingMode = false;
             currentDeviceId = -1;
+            currentLedMode = LedMode::NONE;
             // Restore LED color
             Led::getInstance().setColor(savedRed, savedGreen, savedBlue, false);
             break;
@@ -1066,6 +1076,7 @@ void SpecialAction::toggleSendIR(int deviceId, const String &exitCombo)
     }
 
     // Restore LED color when exiting loop
+    currentLedMode = LedMode::NONE;
     Led::getInstance().setColor(savedRed, savedGreen, savedBlue, false);
 }
 
@@ -1359,6 +1370,12 @@ void SpecialAction::saveSystemLedColor()
 
 void SpecialAction::restoreSystemLedColor()
 {
+    if (currentLedMode != LedMode::NONE)
+    {
+        // A special mode is active, don't restore the system color
+        return;
+    }
+
     if (!systemColorSaved)
     {
         // No saved color - just reapply current original values with brightness
@@ -1439,4 +1456,29 @@ int SpecialAction::getBrightness()
 void SpecialAction::showBrightnessInfo()
 {
     Logger::getInstance().log("LED Brightness: " + String(currentBrightness) + "/255");
+}
+
+void SpecialAction::toggleFlashlight()
+{
+    if (!flashlightActive)
+    {
+        // Save current LED state
+        Led::getInstance().getColor(flashlightSavedColor[0], flashlightSavedColor[1], flashlightSavedColor[2]);
+        // Turn on white LED at full brightness
+        Led::getInstance().setColor(255, 255, 255, false);
+        flashlightActive = true;
+        currentLedMode = LedMode::FLASHLIGHT;
+        Logger::getInstance().log("Flashlight ON - LED set to white (255,255,255)");
+    }
+    else
+    {
+        // Restore previous LED state
+        Led::getInstance().setColor(flashlightSavedColor[0], flashlightSavedColor[1], flashlightSavedColor[2], false);
+        flashlightActive = false;
+        currentLedMode = LedMode::NONE;
+        Logger::getInstance().log("Flashlight OFF - LED restored to RGB(" +
+                                String(flashlightSavedColor[0]) + "," +
+                                String(flashlightSavedColor[1]) + "," +
+                                String(flashlightSavedColor[2]) + ")");
+    }
 }
