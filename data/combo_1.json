@@ -30,10 +30,10 @@
     "S_B:SUPER+TAB"
   ],
   "G_SWIPE_RIGHT": [
-    "S_B:CTRL+SUPER,LEFT_ARROW"
+    "S_B:CTRL+SUPER,RIGHT_ARROW"
   ],
   "G_SWIPE_LEFT": [
-    "S_B:CTRL+SUPER,RIGHT_ARROW"
+    "S_B:CTRL+SUPER,LEFT_ARROW"
   ],
 
   "1+5": [

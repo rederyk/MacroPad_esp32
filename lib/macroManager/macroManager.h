@@ -39,6 +39,8 @@ extern SpecialAction specialAction;
 class MacroManager
 {
 public:
+    MacroManager();
+    void init(const KeypadConfig *config, const WifiConfig *wifiConfig);
     MacroManager(const KeypadConfig *config, const WifiConfig *wifiConfig);
     void handleInputEvent(const InputEvent &event);
     void update();

@@ -45,32 +45,40 @@ CombinationManager comboManager;
 GestureRead gestureSensor; // Definizione effettiva (deve rimanere UNICA)
 GestureAnalyze gestureAnalyzer(gestureSensor);
 SpecialAction specialAction;
-BLEController bleController("Macropad_esp32"); // prendere nome dal config in qualche modo...uguale per wifi e bluethoot
+BLEController bleController;
 // modificare blecontroller.start??
-MacroManager macroManager(nullptr, nullptr);
+MacroManager macroManager;
 InputHub inputHub;
 GyroMouse gyroMouse;
 
 // Task function prototype
 void mainLoopTask(void *parameter);
 
-void setup()
-{
-
-    // Ottieni l'istanza del Logger
-    Logger &logger = Logger::getInstance();
-
-    logger.log("🔹 Logger avviato correttamente!");
-
+void initConfig() {
     // Load configuration first
     if (!configManager.loadConfig())
     {
-        logger.setSerialEnabled(true);
-        logger.log("Failed to load configuration from json! forced enable serial true");
+        Logger::getInstance().setSerialEnabled(true);
+        Logger::getInstance().log("Failed to load configuration from json! forced enable serial true");
         while (true)
             ;
     }
 
+    // Initialize BLE controller with name from config
+    bleController.init(configManager.getSystemConfig().BleName);
+}
+
+void initSerial() {
+    // Set serial enabled based on config
+    bool serialEnabled = configManager.getSystemConfig().serial_enabled;
+    if (serialEnabled)
+    {
+        Serial.begin(115200);
+    }
+    Logger::getInstance().setSerialEnabled(serialEnabled);
+}
+
+void initLed() {
     const LedConfig ledConfig = configManager.getLedConfig();
     if (ledConfig.active)
     {
@@ -82,38 +90,28 @@ void setup()
         specialAction.setSystemLedColor(255, 0, 255, true); // Magenta with loaded brightness (system notification)
         Logger::getInstance().log("LED acceso: " + Led::getInstance().getColorLog(), true);
     }
-    // Set serial enabled based on config
+}
 
-    bool serialEnabled = configManager.getSystemConfig().serial_enabled;
-    if (serialEnabled)
-    {
-        Serial.begin(115200);
-    }
-
-    logger.setSerialEnabled(serialEnabled);
-    // Inizializza il PowerManager con la configurazione
+void initPowerManager() {
     powerManager.begin(configManager.getSystemConfig(), configManager.getKeypadConfig(), configManager.getEncoderConfig());
+}
 
+void initMacroManagerAndCombos() {
     // Load combinations
     if (!comboManager.loadCombinations(configManager.getSystemConfig().BleMacAdd))
     {
-        logger.log("Failed to load combinations");
+        Logger::getInstance().log("Failed to load combinations");
     }
-    // Initialize macroManager with keypad config and wifi config
 
+    // Initialize macroManager with keypad config and wifi config
     Logger::getInstance().log("\nESP32 Keypad and Encoder Test");
-    macroManager = MacroManager(
+    macroManager.init(
         &configManager.getKeypadConfig(),
         &configManager.getWifiConfig());
 
     // Load combinations into macroManager
     {
         JsonObject combos = comboManager.getCombinations();
-        // some debug
-        //  String debugCombos;
-        //  serializeJson(combos, debugCombos);
-        //  Logger::getInstance().log("Combos: " + debugCombos);
-
         for (JsonPair combo : combos)
         {
             // Skip _settings entry as it's not a key combination
@@ -137,9 +135,9 @@ void setup()
     // Load interactive lighting colors from initial combo settings
     const ComboSettings& initialSettings = comboManager.getSettings();
     inputHub.updateReactiveLightingColors(initialSettings);
+}
 
-    // Initialize I2C with configured pins
-
+void initPeripherals() {
     const AccelerometerConfig &accelConfig = configManager.getAccelerometerConfig();
     if (accelConfig.active)
     {
@@ -189,7 +187,9 @@ void setup()
 
     // Initialise input subsystem (keypad, rotary encoder, IR peripherals)
     inputHub.begin(configManager);
+}
 
+void startMainLoopTask() {
     // Create main loop task with sufficient stack size
     xTaskCreateUniversal(
         mainLoopTask,   // Task function
@@ -200,11 +200,9 @@ void setup()
         2,     // Priority (same as gesture task)
         NULL,  // Task handle,
         CONFIG_ARDUINO_RUNNING_CORE);
+}
 
-    // Log free RAM/flash memory after hardware initialisation
-    Logger::getInstance().log("Free RAM memory: " + String(ESP.getFreeHeap()) + " bytes");
-    Logger::getInstance().log("Free sketch memory: " + String(ESP.getFreeSketchSpace()) + " bytes");
-
+void initConnectivity() {
     /// system Feature
     // Get system config
     const SystemConfig &systemConfig = configManager.getSystemConfig();
@@ -299,6 +297,29 @@ void setup()
 
         Logger::getInstance().log("Free heap before webserver start: " + String(ESP.getFreeHeap()) + " bytes");
     }
+}
+
+void setup()
+{
+
+    // Ottieni l'istanza del Logger
+    Logger &logger = Logger::getInstance();
+
+    logger.log("🔹 Logger avviato correttamente!");
+
+    initConfig();
+    initSerial();
+    initLed();
+    initPowerManager();
+    initMacroManagerAndCombos();
+    initPeripherals();
+    startMainLoopTask();
+
+    // Log free RAM/flash memory after hardware initialisation
+    Logger::getInstance().log("Free RAM memory: " + String(ESP.getFreeHeap()) + " bytes");
+    Logger::getInstance().log("Free sketch memory: " + String(ESP.getFreeSketchSpace()) + " bytes");
+
+    initConnectivity();
 
     Logger::getInstance().log("Hardware initialized with name ");
 

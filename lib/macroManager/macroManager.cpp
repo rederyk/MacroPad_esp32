@@ -54,6 +54,27 @@ inline bool getKeyState(uint16_t mask, uint8_t key)
     return (mask & (1 << key)) != 0;
 }
 
+MacroManager::MacroManager()
+    : activeKeysMask(0),
+      previousKeysMask(0),
+      lastCombinationTime(0),
+      pendingCombination(""),
+      keypadConfig(nullptr),
+      wifiConfig(nullptr),
+      newKeyPressed(false),
+      encoderReleaseScheduled(false),
+      useKeyPressOrder(false), // Di default usa il metodo originale
+      processingCommandQueue(false)
+{
+    lastActionTime = millis();
+}
+
+void MacroManager::init(const KeypadConfig *config, const WifiConfig *wifiConfig)
+{
+    this->keypadConfig = config;
+    this->wifiConfig = wifiConfig;
+}
+
 MacroManager::MacroManager(const KeypadConfig *config, const WifiConfig *wifiConfig)
     : activeKeysMask(0),
       previousKeysMask(0),

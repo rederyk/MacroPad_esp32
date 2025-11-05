@@ -42,7 +42,24 @@ void BLEController::printMacAddress(const uint8_t *mac)
   Logger::getInstance().log("New MAC address: " + macStr);
 }
 
-BLEController::BLEController(String name)
+BLEController::BLEController()
+    : bluetoothEnabled(false),
+      connectionLost(false),
+      statoPrecedente(false),
+      originalName(""),
+      mouseButtonsPressed(0),
+      lastMouseButtonChangeTime(0)
+{
+  // Keyboard.deviceName is set in init
+}
+
+void BLEController::init(const String &name)
+{
+  originalName = name;
+  Keyboard.deviceName = originalName.c_str();
+}
+
+BLEController::BLEController(const String &name)
     : bluetoothEnabled(false),
       connectionLost(false),
       statoPrecedente(false),

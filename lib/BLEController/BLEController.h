@@ -47,8 +47,10 @@ private:
     void printMacAddress(const uint8_t *mac);
 
 public:
+    BLEController();
+    void init(const String &name);
     // Costruttore: imposta il nome originale e assegna il deviceName alla tastiera.
-    BLEController(String name = "My Custom Keyboard");
+    explicit BLEController(const String &name);
 
     // Salva il MAC originale all'avvio.
     void storeOriginalMAC();
