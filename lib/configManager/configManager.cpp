@@ -387,6 +387,8 @@ bool ConfigurationManager::loadConfig()
                 settings.tiltDeadzone = sensObj.containsKey("tiltDeadzone") ? sensObj["tiltDeadzone"].as<float>() : settings.deadzone;
                 settings.hybridBlend = sensObj.containsKey("hybridBlend") ? sensObj["hybridBlend"].as<float>() : 0.35f;
                 settings.hybridBlend = constrain(settings.hybridBlend, 0.0f, 1.0f);
+                settings.accelerationCurve = sensObj.containsKey("accelerationCurve") ? sensObj["accelerationCurve"].as<float>() : 1.0f;
+                settings.accelerationCurve = constrain(settings.accelerationCurve, 0.5f, 2.0f); // Limit to reasonable range
                 if (sensObj.containsKey("invertX"))
                 {
                     settings.invertXOverride = sensObj["invertX"].as<bool>() ? 1 : 0;

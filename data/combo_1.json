@@ -29,7 +29,7 @@
   "G_SHAKE": [
     "S_B:SUPER+TAB"
   ],
-  "G_SWIPE_RIGTH": [
+  "G_SWIPE_RIGHT": [
     "S_B:CTRL+SUPER,LEFT_ARROW"
   ],
   "G_SWIPE_LEFT": [

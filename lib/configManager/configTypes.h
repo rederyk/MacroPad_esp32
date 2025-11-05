@@ -93,6 +93,7 @@ struct SensitivitySettings
     float tiltScale;
     float tiltDeadzone;
     float hybridBlend;
+    float accelerationCurve = 1.0f; // Acceleration curve exponent: <1.0 = sub-linear (precision), 1.0 = linear, >1.0 = super-linear (speed)
     int8_t invertXOverride = -1; // -1 = inherit global, 0 = false, 1 = true
     int8_t invertYOverride = -1;
     int8_t swapAxesOverride = -1;

@@ -65,6 +65,7 @@ private:
     float applyDeadzone(float value, float threshold);
     float applyDynamicDeadzone(float value, float baseThreshold, float noiseFactor);
     float applySmoothCurve(float value, float deadzone, float maxValue);
+    float applyAccelerationCurve(float angularVelocity, float curveExponent);
     int8_t clampMouseValue(float pending, float& residual);
     void beginNeutralCapture();
     void accumulateNeutralCapture(float pitchAcc, float rollAcc, const SensorFrame& frame);
@@ -82,6 +83,9 @@ private:
     float gyroBiasAccumX;
     float gyroBiasAccumY;
     float gyroBiasAccumZ;
+    float gyroBiasSquaredAccumX;
+    float gyroBiasSquaredAccumY;
+    float gyroBiasSquaredAccumZ;
 };
 
 #endif // GYROMOUSE_H

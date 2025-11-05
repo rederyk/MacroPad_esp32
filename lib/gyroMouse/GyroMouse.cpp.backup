@@ -258,78 +258,48 @@ void GyroMouse::calculateMouseMovement(const SensorFrame& frame, float deltaTime
     const SensitivitySettings& sens = config.sensitivities[currentSensitivityIndex];
     const float rateScale = sens.gyroScale > 0.0f ? sens.gyroScale : sens.scale;
 
-    // APPROCCIO CORRETTO E LOGICO:
-    // 1. Il sensore fornisce già i valori del giroscopio con axisMap applicato
-    //    (getMappedGyroX/Y/Z già considera "axisMap": "xyz" e "axisDir": "--+")
-    //
-    // 2. Il SensorFusion traccia l'orientamento usando questi valori mappati
-    //
-    // 3. Calcoliamo la rotazione relativa rispetto alla posizione neutra
-    //    usando i quaternioni per evitare gimbal lock
-    //
-    // 4. Estraiamo la velocità angolare nel reference frame della posizione neutra
-    //    In questo modo, indipendentemente da come ruotiamo il dispositivo,
-    //    i movimenti sono sempre relativi alla posizione "home"
+    Quaternion relativeRotation = fusion.getRelativeOrientation();
 
-    // Get current and last orientation quaternions
-    Quaternion currentQuat = fusion.getCurrentOrientation();
-    static Quaternion lastQuat = currentQuat;
+    // Extract Euler angles from relative orientation
+    float pitch, roll, yaw;
+    relativeRotation.toEuler(pitch, roll, yaw);
 
-    // Calculate relative rotation from neutral position
-    Quaternion neutralQuat = fusion.getNeutralOrientation();
-    Quaternion relativeRotation = neutralQuat.conjugate().multiply(currentQuat);
-    Quaternion lastRelativeRotation = neutralQuat.conjugate().multiply(lastQuat);
+    // Get previous Euler angles (for rate calculation)
+    static float lastPitch = 0.0f;
+    static float lastRoll = 0.0f;
+    static float lastYaw = 0.0f;
 
-    // Calculate delta rotation between current and last frame
-    Quaternion deltaRotation = lastRelativeRotation.conjugate().multiply(relativeRotation);
+    // Calculate angular velocities from Euler angle changes (deg/s)
+    // This gives us screen-aligned motion even when device is rotated
+    float pitchRate = (pitch - lastPitch) * kRadToDeg / deltaTime;
+    float rollRate = (roll - lastRoll) * kRadToDeg / deltaTime;
+    float yawRate = (yaw - lastYaw) * kRadToDeg / deltaTime;
 
-    // Extract angular velocity from delta rotation
-    float deltaAngle = 2.0f * acosf(constrain(deltaRotation.w, -1.0f, 1.0f));
-
-    float rawMouseX = 0.0f;
-    float rawMouseY = 0.0f;
-
-    if (deltaAngle > 1e-6f && deltaTime > 1e-6f) {
-        float sinHalfAngle = sinf(deltaAngle * 0.5f);
-        if (fabsf(sinHalfAngle) > 1e-6f) {
-            // Extract rotation axis in neutral-relative coordinates
-            float invSinHalf = 1.0f / sinHalfAngle;
-            float axisX = deltaRotation.x * invSinHalf;
-            float axisY = deltaRotation.y * invSinHalf;
-            float axisZ = deltaRotation.z * invSinHalf;
-
-            // Angular velocity in neutral frame (rad/s)
-            float angularVelX = axisX * deltaAngle / deltaTime;
-            float angularVelY = axisY * deltaAngle / deltaTime;
-            float angularVelZ = axisZ * deltaAngle / deltaTime;
-
-            // Convert to degrees/s
-            angularVelX *= kRadToDeg;
-            angularVelY *= kRadToDeg;
-            angularVelZ *= kRadToDeg;
-
-            // Map angular velocities to screen movement:
-            // - Z-axis rotation (yaw) -> X movement (left/right)
-            // - X-axis rotation (pitch) -> Y movement (up/down)
-            // - Y-axis rotation (roll) -> ignored
-
-            float rateX = applyDynamicDeadzone(angularVelZ, sens.deadzone,
-                                               fusion.getFilterState().gyroNoiseEstimate * kRadToDeg);
-            float rateY = applyDynamicDeadzone(angularVelX, sens.deadzone,
-                                               fusion.getFilterState().gyroNoiseEstimate * kRadToDeg);
-
-            // Apply acceleration curve
-            rateX = applyAccelerationCurve(rateX, sens.accelerationCurve);
-            rateY = applyAccelerationCurve(rateY, sens.accelerationCurve);
-
-            // Convert rate to pixel movement
-            rawMouseX = rateX * rateScale * deltaTime * kRateScaleFactor;
-            rawMouseY = rateY * rateScale * deltaTime * kRateScaleFactor;
-        }
+    // Handle yaw wraparound (180° -> -180° discontinuity)
+    if (fabsf(yawRate) > 180.0f / deltaTime) {
+        yawRate = 0.0f; // Ignore wraparound spikes
     }
 
-    // Update last quaternion for next frame
-    lastQuat = currentQuat;
+    // Store for next frame
+    lastPitch = pitch;
+    lastRoll = roll;
+    lastYaw = yaw;
+
+    // Map to screen axes (intuitive control):
+    // - Yaw left/right -> cursor left/right
+    // - Pitch up/down -> cursor up/down
+    float rateX = applyDynamicDeadzone(yawRate, sens.deadzone,
+                                       fusion.getFilterState().gyroNoiseEstimate * kRadToDeg);
+    float rateY = applyDynamicDeadzone(-pitchRate, sens.deadzone,
+                                       fusion.getFilterState().gyroNoiseEstimate * kRadToDeg);
+
+    // Apply acceleration curve
+    rateX = applyAccelerationCurve(rateX, sens.accelerationCurve);
+    rateY = applyAccelerationCurve(rateY, sens.accelerationCurve);
+
+    // Convert rate to pixel movement
+    float rawMouseX = rateX * rateScale * deltaTime * kRateScaleFactor;
+    float rawMouseY = rateY * rateScale * deltaTime * kRateScaleFactor;
 
     bool invertX = config.invertX;
     bool invertY = config.invertY;

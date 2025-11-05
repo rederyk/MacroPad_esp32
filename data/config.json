@@ -103,24 +103,24 @@
   },
   "gyromouse": {
     "enabled": true,
-    "smoothing": 0.3,
+    "smoothing": 0.15,
     "invertX": true,
-    "invertY": true,
+    "invertY": false,
     "swapAxes": false,
-    "defaultSensitivity": 2,
-    "orientationAlpha": 0.96,
+    "defaultSensitivity": 1,
+    "orientationAlpha": 0.85,
     "tiltLimitDegrees": 75.0,
-    "tiltDeadzoneDegrees": 1.0,
-    "recenterRate": 0.3,
-    "recenterThresholdDegrees": 2.0,
+    "tiltDeadzoneDegrees": 0.2,
+    "recenterRate": 0.0,
+    "recenterThresholdDegrees": 0.0,
     "absoluteRecenter": true,
     "absoluteRangeX": 1920,
     "absoluteRangeY": 1080,
-    "clickSlowdownFactor": 0.3,
+    "clickSlowdownFactor": 0.4,
     "sensitivities": [
-      { "name": "Normal", "mode": "gyro", "scale": 1.0, "gyroScale": 1.0, "deadzone": 0.5 },
-      { "name": "Fast", "mode": "gyro", "scale": 1.8, "gyroScale": 1.8, "deadzone": 0.3 },
-      { "name": "Precision", "mode": "gyro", "scale": 0.5, "gyroScale": 0.5, "deadzone": 1.0 }
+      { "name": "Precision", "mode": "gyro", "scale": 0.4, "gyroScale": 0.4, "deadzone": 3.0, "accelerationCurve": 0.85 },
+      { "name": "Normal", "mode": "gyro", "scale": 0.8, "gyroScale": 0.8, "deadzone": 2.0, "accelerationCurve": 1.0 },
+      { "name": "Fast", "mode": "gyro", "scale": 1.5, "gyroScale": 1.5, "deadzone": 1.0, "accelerationCurve": 1.15 }
     ]
   }
 }
