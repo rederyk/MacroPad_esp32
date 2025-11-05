@@ -96,6 +96,10 @@ private:
     float velocityMagnitude;
     unsigned long lastMotionTime;
 
+    // Madgwick filter parameters
+    float madgwickBeta;  // Filter gain (inversely proportional to noise)
+    float madgwickSampleFreq; // Sample frequency in Hz
+
     // Helper
     void calculateMouseMovement(const SensorFrame& frame, float deltaTime,
                                int8_t& mouseX, int8_t& mouseY);
@@ -119,6 +123,11 @@ private:
                                                      int8_t& mouseX, int8_t& mouseY);
     void extractLocalAngularVelocity(float& localPitch, float& localYaw) const;
 
+    // Madgwick filter implementation
+    void madgwickUpdate(float gx, float gy, float gz, float ax, float ay, float az, float deltaTime);
+    void updateMadgwickBeta(); // Adaptive beta based on motion
+
+    // Member variables
     bool neutralCapturePending;
     uint16_t neutralCaptureSamples;
     float neutralPitchAccum;

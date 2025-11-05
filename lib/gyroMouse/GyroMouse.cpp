@@ -49,6 +49,8 @@ GyroMouse::GyroMouse()
       adaptiveSmoothingFactor(0.3f),
       velocityMagnitude(0.0f),
       lastMotionTime(0),
+      madgwickBeta(0.1f),  // Default beta for Madgwick filter
+      madgwickSampleFreq(200.0f),  // Assume 200Hz default
       neutralCapturePending(false),
       neutralCaptureSamples(0),
       neutralPitchAccum(0.0f),
@@ -844,50 +846,26 @@ void GyroMouse::updateQuaternionOrientation(const SensorFrame& frame, float delt
     // Store previous orientation
     lastOrientation = currentOrientation;
 
-    // Create rotation quaternion from gyroscope
-    Quaternion deltaQ = createQuaternionFromGyro(frame, deltaTime);
+    // Update adaptive beta parameter based on current motion
+    updateMadgwickBeta();
 
-    // Update current orientation: q_new = q_current * q_delta
-    currentOrientation = currentOrientation.multiply(deltaQ);
-    currentOrientation.normalize();
+    // Apply bias-corrected gyro values
+    float gx = frame.gyroX - gyroBiasX;
+    float gy = frame.gyroY - gyroBiasY;
+    float gz = frame.gyroZ - gyroBiasZ;
 
-    // Accel correction (complementary filter in quaternion space)
+    // Check if accelerometer data is reliable
     bool accelReliable = (frame.accelMagnitude > kAccelReliableMin) &&
                          (frame.accelMagnitude < kAccelReliableMax);
 
     if (accelReliable) {
-        float pitchAcc = atan2f(-frame.accelX, sqrtf(frame.accelY * frame.accelY + frame.accelZ * frame.accelZ));
-        float rollAcc = atan2f(frame.accelY, frame.accelZ);
-
-        // Create quaternion from accelerometer angles (simple conversion)
-        float cr = cosf(rollAcc * 0.5f);
-        float sr = sinf(rollAcc * 0.5f);
-        float cp = cosf(pitchAcc * 0.5f);
-        float sp = sinf(pitchAcc * 0.5f);
-
-        Quaternion accelQ(
-            cr * cp,
-            sr * cp,
-            cr * sp,
-            -sr * sp
-        );
-
-        // Spherical linear interpolation (SLERP) for smooth correction
-        float alpha = 1.0f - config.orientationAlpha;
-
-        // Adaptive alpha based on motion
-        if (velocityMagnitude < 0.1f) {
-            alpha *= 1.2f; // Trust accel more when stationary
-        } else if (velocityMagnitude > 0.8f) {
-            alpha *= 0.5f; // Trust gyro more during fast motion
-        }
-        alpha = constrain(alpha, 0.001f, 0.15f);
-
-        // Simple LERP + normalize (approximation of SLERP for small angles)
-        currentOrientation.w = currentOrientation.w * (1.0f - alpha) + accelQ.w * alpha;
-        currentOrientation.x = currentOrientation.x * (1.0f - alpha) + accelQ.x * alpha;
-        currentOrientation.y = currentOrientation.y * (1.0f - alpha) + accelQ.y * alpha;
-        currentOrientation.z = currentOrientation.z * (1.0f - alpha) + accelQ.z * alpha;
+        // Use Madgwick filter with accelerometer correction
+        madgwickUpdate(gx, gy, gz, frame.accelX, frame.accelY, frame.accelZ, deltaTime);
+    } else {
+        // Gyro-only update when accelerometer is unreliable
+        // (e.g., during acceleration or vibration)
+        Quaternion deltaQ = createQuaternionFromGyro(frame, deltaTime);
+        currentOrientation = currentOrientation.multiply(deltaQ);
         currentOrientation.normalize();
     }
 }
@@ -1001,4 +979,108 @@ void GyroMouse::calculateMouseMovementFromRelativeRotation(const SensorFrame& fr
 
     mouseX = applySmoothing(rawMouseX, smoothedMouseX, residualMouseX);
     mouseY = applySmoothing(rawMouseY, smoothedMouseY, residualMouseY);
+}
+
+// ============================================================================
+// Madgwick Filter Implementation
+// ============================================================================
+
+void GyroMouse::madgwickUpdate(float gx, float gy, float gz, float ax, float ay, float az, float deltaTime) {
+    // Madgwick AHRS algorithm
+    // Based on: https://x-io.co.uk/open-source-imu-and-ahrs-algorithms/
+
+    // Update sample frequency
+    if (deltaTime > 1e-6f) {
+        madgwickSampleFreq = 1.0f / deltaTime;
+    }
+
+    // Rate of change of quaternion from gyroscope
+    float qDot1 = 0.5f * (-currentOrientation.x * gx - currentOrientation.y * gy - currentOrientation.z * gz);
+    float qDot2 = 0.5f * (currentOrientation.w * gx + currentOrientation.y * gz - currentOrientation.z * gy);
+    float qDot3 = 0.5f * (currentOrientation.w * gy - currentOrientation.x * gz + currentOrientation.z * gx);
+    float qDot4 = 0.5f * (currentOrientation.w * gz + currentOrientation.x * gy - currentOrientation.y * gx);
+
+    // Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
+    if (!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f))) {
+        // Normalise accelerometer measurement
+        float recipNorm = 1.0f / sqrtf(ax * ax + ay * ay + az * az);
+        ax *= recipNorm;
+        ay *= recipNorm;
+        az *= recipNorm;
+
+        // Auxiliary variables to avoid repeated arithmetic
+        float _2q0 = 2.0f * currentOrientation.w;
+        float _2q1 = 2.0f * currentOrientation.x;
+        float _2q2 = 2.0f * currentOrientation.y;
+        float _2q3 = 2.0f * currentOrientation.z;
+        float _4q0 = 4.0f * currentOrientation.w;
+        float _4q1 = 4.0f * currentOrientation.x;
+        float _4q2 = 4.0f * currentOrientation.y;
+        float _8q1 = 8.0f * currentOrientation.x;
+        float _8q2 = 8.0f * currentOrientation.y;
+        float q0q0 = currentOrientation.w * currentOrientation.w;
+        float q1q1 = currentOrientation.x * currentOrientation.x;
+        float q2q2 = currentOrientation.y * currentOrientation.y;
+        float q3q3 = currentOrientation.z * currentOrientation.z;
+
+        // Gradient descent algorithm corrective step
+        float s0 = _4q0 * q2q2 + _2q2 * ax + _4q0 * q1q1 - _2q1 * ay;
+        float s1 = _4q1 * q3q3 - _2q3 * ax + 4.0f * q0q0 * currentOrientation.x - _2q0 * ay - _4q1 + _8q1 * q1q1 + _8q1 * q2q2 + _4q1 * az;
+        float s2 = 4.0f * q0q0 * currentOrientation.y + _2q0 * ax + _4q2 * q3q3 - _2q3 * ay - _4q2 + _8q2 * q1q1 + _8q2 * q2q2 + _4q2 * az;
+        float s3 = 4.0f * q1q1 * currentOrientation.z - _2q1 * ax + 4.0f * q2q2 * currentOrientation.z - _2q2 * ay;
+
+        // Normalise step magnitude
+        recipNorm = 1.0f / sqrtf(s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3);
+        s0 *= recipNorm;
+        s1 *= recipNorm;
+        s2 *= recipNorm;
+        s3 *= recipNorm;
+
+        // Apply feedback step
+        qDot1 -= madgwickBeta * s0;
+        qDot2 -= madgwickBeta * s1;
+        qDot3 -= madgwickBeta * s2;
+        qDot4 -= madgwickBeta * s3;
+    }
+
+    // Integrate rate of change of quaternion to yield quaternion
+    currentOrientation.w += qDot1 * deltaTime;
+    currentOrientation.x += qDot2 * deltaTime;
+    currentOrientation.y += qDot3 * deltaTime;
+    currentOrientation.z += qDot4 * deltaTime;
+
+    // Normalise quaternion
+    currentOrientation.normalize();
+}
+
+void GyroMouse::updateMadgwickBeta() {
+    // Adaptive beta based on motion
+    // Higher motion -> higher beta (more trust in gyro, faster response)
+    // Lower motion -> lower beta (more trust in accel, better drift correction)
+
+    float baseBeta = 0.1f;  // Default value for moderate motion
+
+    if (velocityMagnitude < 0.05f) {
+        // Very low motion - minimize drift
+        madgwickBeta = 0.033f;  // ~2 degree error convergence
+    } else if (velocityMagnitude < 0.2f) {
+        // Low motion - good balance
+        madgwickBeta = 0.066f;  // ~4 degree error convergence
+    } else if (velocityMagnitude < 0.5f) {
+        // Moderate motion
+        madgwickBeta = baseBeta;  // ~6 degree error convergence
+    } else if (velocityMagnitude < 1.0f) {
+        // High motion - trust gyro more
+        madgwickBeta = 0.15f;  // ~9 degree error convergence
+    } else {
+        // Very high motion - maximum gyro trust
+        madgwickBeta = 0.2f;  // ~12 degree error convergence
+    }
+
+    // Additional scaling based on noise estimate
+    float noiseFactor = constrain(gyroNoiseEstimate / 0.1f, 0.5f, 2.0f);
+    madgwickBeta *= noiseFactor;
+
+    // Keep beta in reasonable range
+    madgwickBeta = constrain(madgwickBeta, 0.01f, 0.5f);
 }
