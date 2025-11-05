@@ -1267,8 +1267,10 @@ void SpecialAction::setLedColor(int red, int green, int blue, bool save)
     green = constrain(green, 0, 255);
     blue = constrain(blue, 0, 255);
 
-    Led::getInstance().setColor(red, green, blue, save);
-    Logger::getInstance().log("LED set to RGB(" + String(red) + "," + String(green) + "," + String(blue) + ") [manual]");
+    if (Led::getInstance().setColor(red, green, blue, save))
+    {
+        Logger::getInstance().log("LED set to RGB(" + String(red) + "," + String(green) + "," + String(blue) + ") [manual]");
+    }
 }
 
 void SpecialAction::setSystemLedColor(int red, int green, int blue, bool save)
@@ -1289,9 +1291,11 @@ void SpecialAction::setSystemLedColor(int red, int green, int blue, bool save)
     int adjustedGreen = (int)(green * brightnessScale);
     int adjustedBlue = (int)(blue * brightnessScale);
 
-    Led::getInstance().setColor(adjustedRed, adjustedGreen, adjustedBlue, save);
-    Logger::getInstance().log("LED set to RGB(" + String(red) + "," + String(green) + "," + String(blue) +
-                              ") @ " + String(currentBrightness) + "/255 brightness [system]");
+    if (Led::getInstance().setColor(adjustedRed, adjustedGreen, adjustedBlue, save))
+    {
+        Logger::getInstance().log("LED set to RGB(" + String(red) + "," + String(green) + "," + String(blue) +
+                                  ") @ " + String(currentBrightness) + "/255 brightness [system]");
+    }
 }
 
 void SpecialAction::adjustLedColor(int redDelta, int greenDelta, int blueDelta)
@@ -1305,16 +1309,19 @@ void SpecialAction::adjustLedColor(int redDelta, int greenDelta, int blueDelta)
     int newGreen = constrain(currentGreen + greenDelta, 0, 255);
     int newBlue = constrain(currentBlue + blueDelta, 0, 255);
 
-    Led::getInstance().setColor(newRed, newGreen, newBlue, false);
-
-    Logger::getInstance().log("LED adjusted from RGB(" + String(currentRed) + "," + String(currentGreen) + "," + String(currentBlue) +
-                              ") to RGB(" + String(newRed) + "," + String(newGreen) + "," + String(newBlue) + ")");
+    if (Led::getInstance().setColor(newRed, newGreen, newBlue, false))
+    {
+        Logger::getInstance().log("LED adjusted from RGB(" + String(currentRed) + "," + String(currentGreen) + "," + String(currentBlue) +
+                                  ") to RGB(" + String(newRed) + "," + String(newGreen) + "," + String(newBlue) + ")");
+    }
 }
 
 void SpecialAction::turnOffLed()
 {
-    Led::getInstance().setColor(0, 0, 0, false);
-    Logger::getInstance().log("LED turned OFF");
+    if (Led::getInstance().setColor(0, 0, 0, false))
+    {
+        Logger::getInstance().log("LED turned OFF");
+    }
 }
 
 void SpecialAction::saveLedColor()
@@ -1328,11 +1335,40 @@ void SpecialAction::saveLedColor()
 
 void SpecialAction::restoreLedColor()
 {
-    Led::getInstance().setColor(true); // Restore saved color
+    if (Led::getInstance().setColor(true)) // Restore saved color
+    {
+        int red, green, blue;
+        Led::getInstance().getColor(red, green, blue);
+        Logger::getInstance().log("LED color restored: RGB(" + String(red) + "," + String(green) + "," + String(blue) + ")");
+    }
+    else
+    {
+        Logger::getInstance().log("No saved LED color available for restore");
+    }
+}
 
-    int red, green, blue;
-    Led::getInstance().getColor(red, green, blue);
-    Logger::getInstance().log("LED color restored: RGB(" + String(red) + "," + String(green) + "," + String(blue) + ")");
+void SpecialAction::saveSystemLedColor()
+{
+    // Save the ORIGINAL (unscaled) RGB values + brightness
+    savedSystemRed = originalRed;
+    savedSystemGreen = originalGreen;
+    savedSystemBlue = originalBlue;
+    systemColorSaved = true;
+    Logger::getInstance().log("System LED color saved: RGB(" + String(originalRed) + "," + String(originalGreen) + "," + String(originalBlue) + ") @ " + String(currentBrightness) + "/255");
+}
+
+void SpecialAction::restoreSystemLedColor()
+{
+    if (!systemColorSaved)
+    {
+        // No saved color - just reapply current original values with brightness
+        // This happens on first call before any save was made
+        setSystemLedColor(originalRed, originalGreen, originalBlue, true);
+        return;
+    }
+
+    // Restore by reapplying brightness to the saved original values
+    setSystemLedColor(savedSystemRed, savedSystemGreen, savedSystemBlue, true);
 }
 
 void SpecialAction::showLedInfo()

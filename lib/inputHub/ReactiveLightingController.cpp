@@ -7,12 +7,22 @@
 #include "Led.h"
 #include "combinationManager.h"
 
+// Forward declaration to avoid circular dependency
+class SpecialAction {
+public:
+    void saveSystemLedColor();
+    void restoreSystemLedColor();
+};
+extern SpecialAction specialAction;
+
 void ReactiveLightingController::enable(bool enable)
 {
     state.enabled = enable;
 
     if (enable)
     {
+        // Save system LED color before enabling reactive lighting
+        specialAction.saveSystemLedColor();
         Led::getInstance().getColor(
             state.savedLedColor[0],
             state.savedLedColor[1],
@@ -33,13 +43,10 @@ void ReactiveLightingController::enable(bool enable)
     {
         if (state.ledReactiveActive)
         {
-            Led::getInstance().setColor(
-                state.savedLedColor[0],
-                state.savedLedColor[1],
-                state.savedLedColor[2],
-                false);
             state.ledReactiveActive = false;
         }
+        // Restore system LED color with brightness
+        specialAction.restoreSystemLedColor();
         state.editMode = false;
         Logger::getInstance().log("Interactive Lighting DISABLED");
     }

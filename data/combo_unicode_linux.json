@@ -1,0 +1,38 @@
+{
+  "_settings": {
+    "unicode_platform": "linux",
+    "led_color": [255, 150, 0],
+    "comment": "Linux combo - emoji NON funzionano con Ctrl+Shift+U. Usa caratteri speciali che funzionano."
+  },
+  "1": [
+    "S_B:#!/bin/bash"
+  ],
+  "2": [
+    "S_B:sudo apt install "
+  ],
+  "3": [
+    "S_B:~/Documents/"
+  ],
+  "4": [
+    "S_B:àèéìòù"
+  ],
+  "5": [
+    "S_B:€ £ ¥"
+  ],
+  "6": [
+    "S_B:← → ↑ ↓"
+  ],
+  "7": [
+    "S_B:± × ÷ ≠"
+  ],
+  "8": [
+    "S_B:« » " ""
+  ],
+  "9": [
+    "S_B:© ® ™"
+  ],
+  "comment_emoji_picker": "Per emoji, usa l'emoji picker di sistema:",
+  "1+2": [
+    "S_B:CTRL+.,DELAY_300"
+  ]
+}

@@ -8,6 +8,14 @@
 #include <cmath>
 #include <cstring>
 
+// Forward declaration to avoid circular dependency
+class SpecialAction {
+public:
+    void saveSystemLedColor();
+    void restoreSystemLedColor();
+};
+extern SpecialAction specialAction;
+
 constexpr uint32_t kGyroReadyTimeoutMs = 300;
 constexpr uint32_t kGyroReadyPollDelayMs = 5;
 constexpr float kGyroReadyMinAccelSum = 0.05f;
@@ -1195,7 +1203,11 @@ void GestureRead::updateSampling()
 
     if (ledSetFull || ledSetIdle)
     {
-        Led::getInstance().setColor(true);
+        // Restore system LED color with brightness (not scaled values)
+        specialAction.restoreSystemLedColor();
+        // Reset flags to prevent continuous restore calls
+        ledSetFull = false;
+        ledSetIdle = false;
     }
 
     if (requestStop)
@@ -1210,5 +1222,7 @@ void GestureRead::setStreamingMode(bool enable)
     if (enable)
     {
         _bufferFull = false;
+        // Save system LED color before streaming (will be restored when sampling completes)
+        specialAction.saveSystemLedColor();
     }
 }

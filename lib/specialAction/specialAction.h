@@ -52,8 +52,10 @@ public:
     void setSystemLedColor(int red, int green, int blue, bool save = false);   // Set LED color with brightness (for system notifications)
     void adjustLedColor(int redDelta, int greenDelta, int blueDelta);          // Adjust RGB values relatively (with clamp)
     void turnOffLed();                                                         // Turn off LED (set to 0,0,0)
-    void saveLedColor();                                                       // Save current LED color
-    void restoreLedColor();                                                    // Restore saved LED color
+    void saveLedColor();                                                       // Save current LED color (scaled values)
+    void restoreLedColor();                                                    // Restore saved LED color (scaled values)
+    void saveSystemLedColor();                                                 // Save current system LED color (original + brightness)
+    void restoreSystemLedColor();                                              // Restore saved system LED color (reapply brightness)
     void showLedInfo();                                                        // Show current LED color info in log
     int ledAdjustmentStep = 5;                                                 // Default step for PLUS/MINUS (configurable)
 
@@ -78,6 +80,12 @@ private:
     int originalRed = 255;
     int originalGreen = 255;
     int originalBlue = 255;
+
+    // Saved system LED values (for temporary operations like sampling, reactive lighting)
+    int savedSystemRed = 255;
+    int savedSystemGreen = 255;
+    int savedSystemBlue = 255;
+    bool systemColorSaved = false;
 };
 
 #endif

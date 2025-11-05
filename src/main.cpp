@@ -382,18 +382,21 @@ void mainLoopTask(void *parameter)
                     const ComboSettings& comboSettings = comboManager.getSettings();
                     inputHub.updateReactiveLightingColors(comboSettings);
 
-                    // Visual feedback - brief LED flash using custom color from settings or default green
+                    // Visual feedback and LED color management based on combo settings
                     if (comboSettings.hasLedColor())
                     {
-                        // Use custom LED color from combo settings
-                        Led::getInstance().setColor(comboSettings.ledR, comboSettings.ledG, comboSettings.ledB, false);
+                        // Mode has custom LED color - show brief flash then set as permanent
+                        // Use setSystemLedColor to apply brightness scaling and maintain brightness control
+                        specialAction.setSystemLedColor(comboSettings.ledR, comboSettings.ledG, comboSettings.ledB, false);
+                        vTaskDelay(pdMS_TO_TICKS(150));
+                        // Set the permanent LED color for this mode and save it
+                        specialAction.setSystemLedColor(comboSettings.ledR, comboSettings.ledG, comboSettings.ledB, true);
                     }
                     else
                     {
-                        // Default green flash if no custom color is set
-                        Led::getInstance().setColor(0, 255, 0, false);
+                        // Mode has no custom LED color - keep current LED color (no flash, no change)
+                        // This maintains consistency when switching between modes without LED settings
                     }
-                    vTaskDelay(pdMS_TO_TICKS(150));
                 }
                 else
                 {

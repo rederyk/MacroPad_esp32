@@ -9,7 +9,7 @@
     "S_B:3"
   ],
   "4": [
-    "S_B:4"
+    "S_B:😀"
   ],
   "5": [
     "S_B:5"
@@ -46,7 +46,7 @@
     "<S_B:SUPER+t><DELAY_500><S_B:btop><DELAY_500><S_B:RETURN>"
   ],
   "3+5": [
-    "<S_B:parola ><S_B:SPAZIO Virgola,, e piu ++ escapeD con ,,,, o ++++ >"
+    "<S_B:parola 😀 ><S_B:SPAZIO Virgola,, e piu ++ escapeD con ,,,, o ++++ >"
   ],
   "4+5": [
     "S_B:CTRL+SUPER,LEFT_ARROW"

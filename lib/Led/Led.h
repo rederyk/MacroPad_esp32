@@ -51,8 +51,8 @@ public:
 
   static Led &getInstance();
   void begin(int redPin, int greenPin, int bluePin, bool commonAnode);
-  void setColor(int red, int green, int blue, bool save = true);
-  void setColor(bool restore);
+  bool setColor(int red, int green, int blue, bool save = true);
+  bool setColor(bool restore);
   void getColor(int &red, int &green, int &blue);
   String getColorLog(bool testo = true, bool emoji = true);
 };
