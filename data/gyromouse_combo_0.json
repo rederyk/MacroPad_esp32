@@ -14,11 +14,19 @@
     ]
   },
   "1": ["S_B:MOUSE_LEFT"],
-  "2": ["S_B:MOUSE_RIGHT"],
-  "3": ["S_B:MOUSE_MIDDLE"],
+  "2": ["S_B:MOUSE_MIDDLE"],
+  "3": ["S_B:MOUSE_RIGHT"],
   "4": ["S_B:MOUSE_BACKWARD"],
   "5": ["GYROMOUSE_STOP"],
   "6": ["S_B:MOUSE_FORWARD"],
+
+  "7": [
+    "S_B:BACKSPACE"
+  ],
+
+  "9": [
+    "S_B: "
+  ],
   "4+6": ["GYROMOUSE_RECENTER"],
   "CW": ["S_B:MOUSE_MOVE_0_0_1_0"],
   "CCW": ["S_B:MOUSE_MOVE_0_0_-1_0"],

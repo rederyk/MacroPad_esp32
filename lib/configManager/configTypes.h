@@ -93,6 +93,9 @@ struct SensitivitySettings
     float tiltScale;
     float tiltDeadzone;
     float hybridBlend;
+    int8_t invertXOverride = -1; // -1 = inherit global, 0 = false, 1 = true
+    int8_t invertYOverride = -1;
+    int8_t swapAxesOverride = -1;
 };
 
 struct GyroMouseConfig

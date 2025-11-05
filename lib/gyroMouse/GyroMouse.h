@@ -31,13 +31,6 @@ public:
     const GyroMouseConfig& getConfig() const { return config; }
 
 private:
-    enum class PointingMode : uint8_t
-    {
-        GyroRate,
-        TiltVelocity,
-        Hybrid
-    };
-
     struct SensorFrame
     {
         float gyroX;
@@ -47,6 +40,23 @@ private:
         float accelY;
         float accelZ;
         float accelMagnitude;
+    };
+
+    struct Quaternion
+    {
+        float w;
+        float x;
+        float y;
+        float z;
+
+        Quaternion() : w(1.0f), x(0.0f), y(0.0f), z(0.0f) {}
+        Quaternion(float w_, float x_, float y_, float z_) : w(w_), x(x_), y(y_), z(z_) {}
+
+        void normalize();
+        Quaternion conjugate() const;
+        Quaternion multiply(const Quaternion& q) const;
+        void rotateVector(float& vx, float& vy, float& vz) const;
+        void toEuler(float& pitch, float& roll, float& yaw) const;
     };
 
     // Riferimenti esterni
@@ -63,6 +73,11 @@ private:
     // Variabili movimento
     float smoothedMouseX;
     float smoothedMouseY;
+    float residualMouseX;
+    float residualMouseY;
+    float gyroBiasX;
+    float gyroBiasY;
+    float gyroBiasZ;
     unsigned long lastUpdateTime;
     float fusedPitchRad;
     float fusedRollRad;
@@ -70,17 +85,47 @@ private:
     float neutralRollRad;
     bool neutralCaptured;
 
+    // Quaternion-based orientation tracking
+    Quaternion currentOrientation;
+    Quaternion neutralOrientation;
+    Quaternion lastOrientation;
+
+    // Adaptive filtering
+    float gyroNoiseEstimate;
+    float adaptiveSmoothingFactor;
+    float velocityMagnitude;
+    unsigned long lastMotionTime;
+
     // Helper
     void calculateMouseMovement(const SensorFrame& frame, float deltaTime,
                                int8_t& mouseX, int8_t& mouseY);
     void updateOrientation(const SensorFrame& frame, float deltaTime);
     void updateNeutralBaseline(float deltaTime, const SensorFrame& frame);
-    PointingMode resolvePointingMode(const SensitivitySettings& settings) const;
-    void applyNeutralOrientationRotation(float& x, float& y, float& z) const;
+    void rotateVectorByNeutral(float& x, float& y, float& z) const;
     float applyDeadzone(float value, float threshold);
-    int8_t clampMouseValue(float value);
+    float applyDynamicDeadzone(float value, float baseThreshold, float noiseFactor);
+    float applySmoothCurve(float value, float deadzone, float maxValue);
+    int8_t clampMouseValue(float pending, float& residual);
+    void beginNeutralCapture();
+    void accumulateNeutralCapture(float pitchAcc, float rollAcc, const SensorFrame& frame);
     void performAbsoluteCentering();
     void dispatchRelativeMove(int deltaX, int deltaY);
+    void updateAdaptiveFiltering(const SensorFrame& frame, float deltaTime);
+
+    // New quaternion-based methods
+    Quaternion createQuaternionFromGyro(const SensorFrame& frame, float deltaTime) const;
+    void updateQuaternionOrientation(const SensorFrame& frame, float deltaTime);
+    void calculateMouseMovementFromRelativeRotation(const SensorFrame& frame, float deltaTime,
+                                                     int8_t& mouseX, int8_t& mouseY);
+    void extractLocalAngularVelocity(float& localPitch, float& localYaw) const;
+
+    bool neutralCapturePending;
+    uint16_t neutralCaptureSamples;
+    float neutralPitchAccum;
+    float neutralRollAccum;
+    float gyroBiasAccumX;
+    float gyroBiasAccumY;
+    float gyroBiasAccumZ;
 };
 
 #endif // GYROMOUSE_H

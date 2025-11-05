@@ -83,10 +83,26 @@ bool ConfigurationManager::loadConfig()
     gyroMouseConfig.invertY = false;
     gyroMouseConfig.swapAxes = false;
     gyroMouseConfig.defaultSensitivity = 1;
+    auto addDefaultSensitivity = [this](const char *name, float scale, float deadzone) {
+        SensitivitySettings settings;
+        settings.name = name;
+        settings.scale = scale;
+        settings.deadzone = deadzone;
+        settings.mode = "gyro";
+        settings.gyroScale = scale;
+        settings.tiltScale = scale * 20.0f;
+        settings.tiltDeadzone = deadzone;
+        settings.hybridBlend = 0.0f;
+        settings.invertXOverride = -1;
+        settings.invertYOverride = -1;
+        settings.swapAxesOverride = -1;
+        this->gyroMouseConfig.sensitivities.push_back(settings);
+    };
+
     gyroMouseConfig.sensitivities.clear();
-    gyroMouseConfig.sensitivities.push_back({"Slow", 0.6f, 1.5f});
-    gyroMouseConfig.sensitivities.push_back({"Medium", 1.0f, 1.2f});
-    gyroMouseConfig.sensitivities.push_back({"Fast", 1.4f, 1.0f});
+    addDefaultSensitivity("Slow", 0.6f, 1.5f);
+    addDefaultSensitivity("Medium", 1.0f, 1.2f);
+    addDefaultSensitivity("Fast", 1.4f, 1.0f);
     gyroMouseConfig.absoluteRecenter = false;
     gyroMouseConfig.absoluteRangeX = 0;
     gyroMouseConfig.absoluteRangeY = 0;
@@ -371,12 +387,24 @@ bool ConfigurationManager::loadConfig()
                 settings.tiltDeadzone = sensObj.containsKey("tiltDeadzone") ? sensObj["tiltDeadzone"].as<float>() : settings.deadzone;
                 settings.hybridBlend = sensObj.containsKey("hybridBlend") ? sensObj["hybridBlend"].as<float>() : 0.35f;
                 settings.hybridBlend = constrain(settings.hybridBlend, 0.0f, 1.0f);
+                if (sensObj.containsKey("invertX"))
+                {
+                    settings.invertXOverride = sensObj["invertX"].as<bool>() ? 1 : 0;
+                }
+                if (sensObj.containsKey("invertY"))
+                {
+                    settings.invertYOverride = sensObj["invertY"].as<bool>() ? 1 : 0;
+                }
+                if (sensObj.containsKey("swapAxes"))
+                {
+                    settings.swapAxesOverride = sensObj["swapAxes"].as<bool>() ? 1 : 0;
+                }
                 this->gyroMouseConfig.sensitivities.push_back(settings);
             }
 
             if (this->gyroMouseConfig.sensitivities.empty())
             {
-                this->gyroMouseConfig.sensitivities.push_back({"Medium", 1.0f, 1.2f});
+                addDefaultSensitivity("Medium", 1.0f, 1.2f);
             }
         }
 
