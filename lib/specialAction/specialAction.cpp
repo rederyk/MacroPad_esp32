@@ -1296,6 +1296,53 @@ void SpecialAction::setSystemLedColor(int red, int green, int blue, bool save)
     originalGreen = green;
     originalBlue = blue;
 
+    if (save)
+    {
+        savedSystemRed = red;
+        savedSystemGreen = green;
+        savedSystemBlue = blue;
+        systemColorSaved = true;
+    }
+
+    const bool reactiveOwnsLed = reactiveLightingActive && currentLedMode == LedMode::REACTIVE;
+    if (reactiveOwnsLed)
+    {
+        // Reactive lighting owns the LED - store values for later restore and schedule color restore
+        const bool colorChanged = !systemColorDeferred ||
+                                  deferredSystemRed != red ||
+                                  deferredSystemGreen != green ||
+                                  deferredSystemBlue != blue;
+
+        if (colorChanged || (save && !deferredSystemSave))
+        {
+            deferredSystemRed = red;
+            deferredSystemGreen = green;
+            deferredSystemBlue = blue;
+            systemColorDeferred = true;
+            deferredSystemSave = deferredSystemSave || save;
+
+            if (colorChanged)
+            {
+                deferredSystemLogged = false;
+            }
+
+            if (save && !deferredSystemLogged)
+            {
+                Logger::getInstance().log("LED system color update deferred (reactive lighting active)");
+                deferredSystemLogged = true;
+            }
+        }
+
+        constexpr unsigned long REACTIVE_RESTORE_DELAY_MS = 600;
+        inputHub.scheduleReactiveLightingRestore(REACTIVE_RESTORE_DELAY_MS);
+    }
+    else
+    {
+        systemColorDeferred = false;
+        deferredSystemSave = false;
+        deferredSystemLogged = false;
+    }
+
     // Apply brightness scaling (0-255)
     float brightnessScale = currentBrightness / 255.0f;
     int adjustedRed = (int)(red * brightnessScale);
@@ -1356,6 +1403,52 @@ void SpecialAction::restoreLedColor()
     {
         Logger::getInstance().log("No saved LED color available for restore");
     }
+}
+
+void SpecialAction::setReactiveLightingActive(bool active)
+{
+    if (active)
+    {
+        if (!reactiveLightingActive)
+        {
+            reactiveLightingActive = true;
+            if (currentLedMode == LedMode::NONE)
+            {
+                currentLedMode = LedMode::REACTIVE;
+            }
+        }
+        return;
+    }
+
+    reactiveLightingActive = false;
+    if (currentLedMode == LedMode::REACTIVE)
+    {
+        currentLedMode = LedMode::NONE;
+    }
+
+    if (systemColorDeferred)
+    {
+        applyDeferredSystemLedColor();
+    }
+}
+
+void SpecialAction::applyDeferredSystemLedColor()
+{
+    if (!systemColorDeferred)
+    {
+        return;
+    }
+
+    const int red = deferredSystemRed;
+    const int green = deferredSystemGreen;
+    const int blue = deferredSystemBlue;
+    const bool save = deferredSystemSave;
+
+    systemColorDeferred = false;
+    deferredSystemSave = false;
+    deferredSystemLogged = false;
+
+    setSystemLedColor(red, green, blue, save);
 }
 
 void SpecialAction::saveSystemLedColor()

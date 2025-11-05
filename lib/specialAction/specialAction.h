@@ -28,6 +28,7 @@ class SpecialAction
 public:
     enum class LedMode {
         NONE,
+        REACTIVE,
         IR_SCAN,
         IR_SEND,
         FLASHLIGHT
@@ -77,7 +78,12 @@ public:
     void toggleFlashlight();                                            // Toggle flashlight mode
     int brightnessAdjustmentStep = 10;                                  // Default step for brightness PLUS/MINUS (configurable)
 
+    void setReactiveLightingActive(bool active);                        // Mark reactive lighting as owner of the LED
+    bool isReactiveLightingActive() const { return reactiveLightingActive; }
+
 private:
+    void applyDeferredSystemLedColor();
+
     LedMode currentLedMode = LedMode::NONE;
     bool flashlightActive = false;
     int flashlightSavedColor[3] = {0, 0, 0};
@@ -99,6 +105,13 @@ private:
     int savedSystemGreen = 255;
     int savedSystemBlue = 255;
     bool systemColorSaved = false;
+    bool reactiveLightingActive = false;
+    bool systemColorDeferred = false;
+    bool deferredSystemSave = false;
+    bool deferredSystemLogged = false;
+    int deferredSystemRed = 0;
+    int deferredSystemGreen = 0;
+    int deferredSystemBlue = 0;
 };
 
 #endif

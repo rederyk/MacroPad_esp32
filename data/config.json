@@ -105,7 +105,7 @@
     "enabled": true,
     "smoothing": 0.3,
     "invertX": true,
-    "invertY": true,
+    "invertY": false,
     "swapAxes": true,
     "defaultSensitivity": 2,
     "orientationAlpha": 0.96,

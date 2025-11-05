@@ -18,6 +18,7 @@ public:
 
     void updateColors(const ComboSettings &settings);
     void saveColors() const;
+    void scheduleRestore(unsigned long delayMs);
 
 private:
     struct State
@@ -25,6 +26,9 @@ private:
         bool enabled = false;
         std::vector<std::array<int, 3>> keyColors;
         int savedLedColor[3] = {0, 0, 0};
+        int lastReactiveColor[3] = {0, 0, 0};
+        bool hasReactiveColor = false;
+        bool restorePending = false;
         unsigned long ledReactiveTime = 0;
         bool ledReactiveActive = false;
 
@@ -41,7 +45,8 @@ private:
 
     void ensureKeyColor(size_t keyIndex);
     std::array<int, 3> generateDefaultKeyColor(size_t keyIndex, size_t totalKeys) const;
-    void applyColorWithBrightness(int r, int g, int b) const;
+    void applyColorWithBrightness(int r, int g, int b, bool storeAsReactive);
+    void applyStoredReactiveColor();
     void applyCombinedColor(uint16_t activeKeysMask);
     const char *getChannelName(uint8_t channel) const;
 };

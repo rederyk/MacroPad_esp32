@@ -105,6 +105,7 @@ public:
     void updateReactiveLighting();
     void updateReactiveLightingColors(const ComboSettings &settings);
     void saveReactiveLightingColors() const;
+    void scheduleReactiveLightingRestore(unsigned long delayMs);
 
     void setGestureCaptureEnabled(bool enable);
     bool isGestureCaptureEnabled() const;

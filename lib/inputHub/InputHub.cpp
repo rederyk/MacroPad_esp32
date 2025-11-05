@@ -347,6 +347,11 @@ void InputHub::saveReactiveLightingColors() const
     reactiveLighting.saveColors();
 }
 
+void InputHub::scheduleReactiveLightingRestore(unsigned long delayMs)
+{
+    reactiveLighting.scheduleRestore(delayMs);
+}
+
 void InputHub::setGestureCaptureEnabled(bool enable)
 {
     if (gestureCaptureEnabled == enable)

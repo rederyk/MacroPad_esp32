@@ -6,27 +6,34 @@
 #include "Logger.h"
 #include "Led.h"
 #include "combinationManager.h"
+#include "specialAction.h"
 
-// Forward declaration to avoid circular dependency
-class SpecialAction {
-public:
-    void saveSystemLedColor();
-    void restoreSystemLedColor();
-};
 extern SpecialAction specialAction;
 
 void ReactiveLightingController::enable(bool enable)
 {
+    if (state.enabled == enable)
+    {
+        return;
+    }
+
     state.enabled = enable;
 
     if (enable)
     {
-        // Save system LED color before enabling reactive lighting
-        specialAction.saveSystemLedColor();
+        // Save current LED color before enabling reactive lighting
         Led::getInstance().getColor(
             state.savedLedColor[0],
             state.savedLedColor[1],
             state.savedLedColor[2]);
+
+        specialAction.saveSystemLedColor();
+        specialAction.setReactiveLightingActive(true);
+
+        state.hasReactiveColor = false;
+        state.restorePending = false;
+        state.ledReactiveActive = false;
+        state.editMode = false;
 
         if (state.keyColors.empty())
         {
@@ -45,7 +52,9 @@ void ReactiveLightingController::enable(bool enable)
         {
             state.ledReactiveActive = false;
         }
-        // Restore system LED color with brightness
+        state.restorePending = false;
+        state.hasReactiveColor = false;
+        specialAction.setReactiveLightingActive(false);
         specialAction.restoreSystemLedColor();
         state.editMode = false;
         Logger::getInstance().log("Interactive Lighting DISABLED");
@@ -57,14 +66,6 @@ void ReactiveLightingController::handleInput(uint8_t keyIndex, bool isEncoder, i
     if (!state.enabled)
     {
         return;
-    }
-
-    if (!state.ledReactiveActive)
-    {
-        Led::getInstance().getColor(
-            state.savedLedColor[0],
-            state.savedLedColor[1],
-            state.savedLedColor[2]);
     }
 
     if (isEncoder)
@@ -89,7 +90,8 @@ void ReactiveLightingController::handleInput(uint8_t keyIndex, bool isEncoder, i
                 {
                     Logger::getInstance().log("Interactive Brightness: " + String(state.baseBrightness));
 
-                    applyColorWithBrightness(255, 255, 255);
+                    applyColorWithBrightness(255, 255, 255, false);
+                    state.restorePending = true;
                     state.ledReactiveActive = true;
                     state.ledReactiveTime = millis() + LED_REACTIVE_DURATION;
                 }
@@ -138,7 +140,8 @@ void ReactiveLightingController::handleInput(uint8_t keyIndex, bool isEncoder, i
                         String(getChannelName(channel)) + ": " +
                         String(color[channel]));
 
-                    applyColorWithBrightness(color[0], color[1], color[2]);
+                    applyColorWithBrightness(color[0], color[1], color[2], true);
+                    state.restorePending = false;
                     state.ledReactiveActive = true;
                     state.ledReactiveTime = millis() + 2000;
                 }
@@ -157,8 +160,9 @@ void ReactiveLightingController::handleInput(uint8_t keyIndex, bool isEncoder, i
 
                     int flashColor[3] = {0, 0, 0};
                     flashColor[state.selectedChannel] = 255;
-                    applyColorWithBrightness(flashColor[0], flashColor[1], flashColor[2]);
+                    applyColorWithBrightness(flashColor[0], flashColor[1], flashColor[2], false);
 
+                    state.restorePending = true;
                     state.ledReactiveActive = true;
                     state.ledReactiveTime = millis() + 400;
                 }
@@ -173,21 +177,47 @@ void ReactiveLightingController::handleInput(uint8_t keyIndex, bool isEncoder, i
 
 void ReactiveLightingController::update()
 {
-    if (!state.ledReactiveActive)
+    if (!state.enabled || !state.ledReactiveActive)
     {
         return;
     }
 
     const unsigned long currentTime = millis();
-    if (currentTime >= state.ledReactiveTime)
+    if (currentTime < state.ledReactiveTime)
     {
-        Led::getInstance().setColor(
-            state.savedLedColor[0],
-            state.savedLedColor[1],
-            state.savedLedColor[2],
-            false);
-        state.ledReactiveActive = false;
-        state.editMode = false;
+        return;
+    }
+
+    if (state.restorePending)
+    {
+        applyStoredReactiveColor();
+    }
+
+    state.restorePending = false;
+    state.ledReactiveActive = false;
+    state.editMode = false;
+}
+
+void ReactiveLightingController::scheduleRestore(unsigned long delayMs)
+{
+    if (!state.enabled || !state.hasReactiveColor)
+    {
+        return;
+    }
+
+    const unsigned long safeDelay = std::max<unsigned long>(1, delayMs);
+    const unsigned long targetTime = millis() + safeDelay;
+
+    state.restorePending = true;
+    state.ledReactiveActive = true;
+
+    if (state.ledReactiveTime > millis())
+    {
+        state.ledReactiveTime = std::max(state.ledReactiveTime, targetTime);
+    }
+    else
+    {
+        state.ledReactiveTime = targetTime;
     }
 }
 
@@ -195,11 +225,9 @@ void ReactiveLightingController::applyCombinedColor(uint16_t activeKeysMask)
 {
     if (activeKeysMask == 0)
     {
-        // No keys pressed, restore saved color after a short delay
-        if (state.ledReactiveActive)
-        {
-            state.ledReactiveTime = millis() + 50; // 50ms delay before turning off
-        }
+        state.ledReactiveActive = false;
+        state.restorePending = false;
+        state.editMode = false;
         return;
     }
 
@@ -224,10 +252,9 @@ void ReactiveLightingController::applyCombinedColor(uint16_t activeKeysMask)
     combinedG = std::min(255, combinedG);
     combinedB = std::min(255, combinedB);
 
-    applyColorWithBrightness(combinedR, combinedG, combinedB);
-    state.ledReactiveActive = true;
-    // Set a long duration, as we'll manage the "off" state ourselves
-    state.ledReactiveTime = millis() + 10000;
+    applyColorWithBrightness(combinedR, combinedG, combinedB, true);
+    state.restorePending = false;
+    state.ledReactiveActive = false;
 }
 
 void ReactiveLightingController::updateColors(const ComboSettings &settings)
@@ -340,14 +367,42 @@ std::array<int, 3> ReactiveLightingController::generateDefaultKeyColor(size_t ke
         static_cast<int>((b + m) * 255)};
 }
 
-void ReactiveLightingController::applyColorWithBrightness(int r, int g, int b) const
+void ReactiveLightingController::applyStoredReactiveColor()
+{
+    if (state.hasReactiveColor)
+    {
+        applyColorWithBrightness(
+            state.lastReactiveColor[0],
+            state.lastReactiveColor[1],
+            state.lastReactiveColor[2],
+            false);
+    }
+    else
+    {
+        Led::getInstance().setColor(
+            state.savedLedColor[0],
+            state.savedLedColor[1],
+            state.savedLedColor[2],
+            false);
+    }
+}
+
+void ReactiveLightingController::applyColorWithBrightness(int r, int g, int b, bool storeAsReactive)
 {
     const float brightnessFactor = state.baseBrightness / 255.0f;
-    const int adjustedR = static_cast<int>(r * brightnessFactor);
-    const int adjustedG = static_cast<int>(g * brightnessFactor);
-    const int adjustedB = static_cast<int>(b * brightnessFactor);
+    const int adjustedR = std::max(0, std::min(255, static_cast<int>(r * brightnessFactor)));
+    const int adjustedG = std::max(0, std::min(255, static_cast<int>(g * brightnessFactor)));
+    const int adjustedB = std::max(0, std::min(255, static_cast<int>(b * brightnessFactor)));
 
     Led::getInstance().setColor(adjustedR, adjustedG, adjustedB, false);
+
+    if (storeAsReactive)
+    {
+        state.lastReactiveColor[0] = r;
+        state.lastReactiveColor[1] = g;
+        state.lastReactiveColor[2] = b;
+        state.hasReactiveColor = true;
+    }
 }
 
 const char *ReactiveLightingController::getChannelName(uint8_t channel) const
