@@ -10,14 +10,8 @@ namespace
     constexpr float kRateScaleFactor = 0.5f * 100.0f; // Empirical °/s -> px factor
     constexpr float kRadToDeg = 57.2957795f;
     constexpr float kDegToRad = 1.0f / kRadToDeg;
-    constexpr float kAccelReliableMin = 0.25f;   // g
-    constexpr float kAccelReliableMax = 1.85f;   // g
-    constexpr float kGyroQuietThreshold = 0.15f; // rad/s
     constexpr float kNeutralCaptureGyroThreshold = 0.15f; // rad/s (increased from 0.05)
     constexpr uint16_t kNeutralCaptureSampleTarget = 40; // reduced from 80
-    constexpr float kMotionTimeoutMs = 300.0f; // ms without motion for auto-recenter
-    constexpr float kMinNoiseEstimate = 0.01f;
-    constexpr float kMaxNoiseEstimate = 0.5f;
 }
 
 // Riferimento esterno al BLE controller
@@ -36,21 +30,7 @@ GyroMouse::GyroMouse()
       smoothedMouseY(0.0f),
       residualMouseX(0.0f),
       residualMouseY(0.0f),
-      gyroBiasX(0.0f),
-      gyroBiasY(0.0f),
-      gyroBiasZ(0.0f),
       lastUpdateTime(0),
-      fusedPitchRad(0.0f),
-      fusedRollRad(0.0f),
-      neutralPitchRad(0.0f),
-      neutralRollRad(0.0f),
-      neutralCaptured(false),
-      gyroNoiseEstimate(0.05f),
-      adaptiveSmoothingFactor(0.3f),
-      velocityMagnitude(0.0f),
-      lastMotionTime(0),
-      madgwickBeta(0.1f),  // Default beta for Madgwick filter
-      madgwickSampleFreq(200.0f),  // Assume 200Hz default
       clickSlowdownFactor(1.0f),
       lastClickCheckTime(0),
       neutralCapturePending(false),
@@ -74,67 +54,21 @@ bool GyroMouse::begin(GestureRead* sensor, const GyroMouseConfig& cfg) {
 
     gestureSensor = sensor;
     config = cfg;
-    config.smoothing = constrain(config.smoothing, 0.0f, 1.0f);
-    config.orientationAlpha = constrain(config.orientationAlpha, 0.0f, 0.999f);
-    if (config.orientationAlpha <= 0.0f) {
-        config.orientationAlpha = 0.96f;
-    }
-    if (config.tiltLimitDegrees <= 0.0f) {
-        config.tiltLimitDegrees = 55.0f;
-    }
-    config.tiltLimitDegrees = constrain(config.tiltLimitDegrees, 5.0f, 90.0f);
-    if (config.tiltDeadzoneDegrees < 0.0f) {
-        config.tiltDeadzoneDegrees = 0.0f;
-    }
-    if (config.tiltDeadzoneDegrees == 0.0f) {
-        config.tiltDeadzoneDegrees = 1.5f;
-    }
-    config.tiltDeadzoneDegrees = constrain(config.tiltDeadzoneDegrees, 0.0f, 15.0f);
-    config.recenterRate = constrain(config.recenterRate, 0.0f, 1.0f);
-    if (config.recenterThresholdDegrees <= 0.0f) {
-        config.recenterThresholdDegrees = 2.0f;
-    }
-    config.recenterThresholdDegrees = constrain(config.recenterThresholdDegrees, 0.1f, 20.0f);
 
-    for (auto &sens : config.sensitivities) {
-        if (sens.mode.length() == 0) {
-            sens.mode = "gyro";
-        }
-        if (sens.invertXOverride < -1 || sens.invertXOverride > 1) {
-            sens.invertXOverride = -1;
-        }
-        if (sens.invertYOverride < -1 || sens.invertYOverride > 1) {
-            sens.invertYOverride = -1;
-        }
-        if (sens.swapAxesOverride < -1 || sens.swapAxesOverride > 1) {
-            sens.swapAxesOverride = -1;
-        }
-        if (sens.gyroScale <= 0.0f) {
-            sens.gyroScale = sens.scale > 0.0f ? sens.scale : 1.0f;
-        }
-        if (sens.tiltScale <= 0.0f) {
-            sens.tiltScale = (sens.scale > 0.0f ? sens.scale : 1.0f) * 20.0f;
-        }
-        if (sens.tiltDeadzone < 0.0f) {
-            sens.tiltDeadzone = config.tiltDeadzoneDegrees;
-        }
-        if (sens.tiltDeadzone == 0.0f) {
-            sens.tiltDeadzone = config.tiltDeadzoneDegrees;
-        }
-        sens.hybridBlend = constrain(sens.hybridBlend, 0.0f, 1.0f);
-    }
+    SensorFusionConfig fusionConfig;
+    fusionConfig.smoothing = config.smoothing;
+    fusionConfig.orientationAlpha = config.orientationAlpha;
+    fusion.begin(fusionConfig);
 
     active = false;
     ownsSampling = false;
     gestureCaptureSuspended = false;
 
-    // Valida configurazione
     if (config.sensitivities.empty()) {
         Logger::getInstance().log("GyroMouse: No sensitivity settings defined");
         return false;
     }
 
-    // Imposta sensibilità default
     if (config.defaultSensitivity < config.sensitivities.size()) {
         currentSensitivityIndex = config.defaultSensitivity;
     } else {
@@ -170,7 +104,6 @@ void GyroMouse::start() {
 
     gestureSensor->setStreamingMode(true);
 
-    // Suspend gesture capture pipeline if active
     if (inputHub.isGestureCaptureEnabled()) {
         inputHub.setGestureCaptureEnabled(false);
         gestureCaptureSuspended = true;
@@ -196,21 +129,8 @@ void GyroMouse::start() {
 
     gyroAvailable = gestureSensor->getMotionSensor() &&
                     gestureSensor->getMotionSensor()->hasGyro();
-    fusedPitchRad = 0.0f;
-    fusedRollRad = 0.0f;
-    neutralPitchRad = 0.0f;
-    neutralRollRad = 0.0f;
-    neutralCaptured = false;
-    gyroNoiseEstimate = 0.05f;
-    adaptiveSmoothingFactor = 0.3f;
-    velocityMagnitude = 0.0f;
-    lastMotionTime = millis();
 
-    // Initialize quaternions
-    currentOrientation = Quaternion();
-    neutralOrientation = Quaternion();
-    lastOrientation = Quaternion();
-
+    fusion.reset();
     beginNeutralCapture();
     Logger::getInstance().log("GyroMouse: Neutral capture requested");
     lastUpdateTime = millis();
@@ -231,9 +151,6 @@ void GyroMouse::stop() {
     smoothedMouseY = 0.0f;
     residualMouseX = 0.0f;
     residualMouseY = 0.0f;
-    gyroBiasX = 0.0f;
-    gyroBiasY = 0.0f;
-    gyroBiasZ = 0.0f;
     neutralCapturePending = false;
     neutralCaptureSamples = 0;
     neutralPitchAccum = 0.0f;
@@ -242,11 +159,6 @@ void GyroMouse::stop() {
     gyroBiasAccumY = 0.0f;
     gyroBiasAccumZ = 0.0f;
     gyroAvailable = false;
-    neutralCaptured = false;
-    fusedPitchRad = 0.0f;
-    fusedRollRad = 0.0f;
-    neutralPitchRad = 0.0f;
-    neutralRollRad = 0.0f;
 
     if (ownsSampling && gestureSensor) {
         gestureSensor->ensureMinimumSamplingTime();
@@ -273,12 +185,10 @@ void GyroMouse::update() {
         return;
     }
 
-    // Calcola delta time
     unsigned long currentTime = millis();
-    float deltaTime = (currentTime - lastUpdateTime) / 1000.0f; // Converti in secondi
+    float deltaTime = (currentTime - lastUpdateTime) / 1000.0f;
     lastUpdateTime = currentTime;
 
-    // Evita delta troppo grandi (primo update o overflow)
     if (deltaTime > 0.1f || deltaTime <= 0.0f) {
         deltaTime = 0.005f; // Assume 200Hz
     }
@@ -293,17 +203,17 @@ void GyroMouse::update() {
     frame.accelMagnitude = sqrtf(frame.accelX * frame.accelX +
                                  frame.accelY * frame.accelY +
                                  frame.accelZ * frame.accelZ);
+    frame.gyroValid = gyroAvailable;
 
-    updateAdaptiveFiltering(frame, deltaTime);
+    fusion.update(frame, deltaTime);
 
-    // Use quaternion-based orientation tracking
-    updateQuaternionOrientation(frame, deltaTime);
+    if (neutralCapturePending) {
+        float pitchAcc = atan2f(-frame.accelX, sqrtf(frame.accelY * frame.accelY + frame.accelZ * frame.accelZ));
+        float rollAcc = atan2f(frame.accelY, frame.accelZ);
+        accumulateNeutralCapture(pitchAcc, rollAcc, frame);
+    }
 
-    // Keep legacy orientation for compatibility
-    updateOrientation(frame, deltaTime);
-    updateNeutralBaseline(deltaTime, frame);
-
-    if (!neutralCaptured) {
+    if (!fusion.hasNeutralOrientation()) {
         smoothedMouseX = 0.0f;
         smoothedMouseY = 0.0f;
         residualMouseX = 0.0f;
@@ -311,28 +221,20 @@ void GyroMouse::update() {
         return;
     }
 
-    // Update click slowdown factor
     updateClickSlowdown();
 
-    // Calcola movimento mouse usando il nuovo algoritmo basato su rotazione relativa
     int8_t mouseX = 0;
     int8_t mouseY = 0;
 
-    // Use new quaternion-based algorithm for all modes
     if (gyroAvailable) {
-        calculateMouseMovementFromRelativeRotation(frame, deltaTime, mouseX, mouseY);
-    } else {
-        // Fallback to legacy algorithm if gyro not available
         calculateMouseMovement(frame, deltaTime, mouseX, mouseY);
     }
 
-    // Apply click slowdown if any mouse button is pressed
     if (clickSlowdownFactor < 1.0f) {
         mouseX = static_cast<int8_t>(mouseX * clickSlowdownFactor);
         mouseY = static_cast<int8_t>(mouseY * clickSlowdownFactor);
     }
 
-    // Invia movimento se non nullo
     if (mouseX != 0 || mouseY != 0) {
         bleController.moveMouse(mouseX, mouseY, 0, 0);
     }
@@ -340,91 +242,69 @@ void GyroMouse::update() {
 
 void GyroMouse::calculateMouseMovement(const SensorFrame& frame, float deltaTime,
                                        int8_t& mouseX, int8_t& mouseY) {
-    // Legacy fallback (non usato - gyro non disponibile)
-    mouseX = 0;
-    mouseY = 0;
-}
-
-void GyroMouse::updateOrientation(const SensorFrame& frame, float deltaTime) {
-    float predictedPitch = fusedPitchRad;
-    float predictedRoll = fusedRollRad;
-
-    if (gyroAvailable && deltaTime > 0.0f) {
-        predictedPitch += (frame.gyroY - gyroBiasY) * deltaTime;
-        predictedRoll += (frame.gyroX - gyroBiasX) * deltaTime;
+    if (!fusion.hasNeutralOrientation() || config.sensitivities.empty()) {
+        mouseX = 0;
+        mouseY = 0;
+        return;
     }
 
-    bool accelReliable = (frame.accelMagnitude > kAccelReliableMin) &&
-                         (frame.accelMagnitude < kAccelReliableMax);
+    const SensitivitySettings& sens = config.sensitivities[currentSensitivityIndex];
+    const float rateScale = sens.gyroScale > 0.0f ? sens.gyroScale : sens.scale;
 
-    if (accelReliable) {
-        float pitchAcc = atan2f(-frame.accelX, sqrtf(frame.accelY * frame.accelY + frame.accelZ * frame.accelZ));
-        float rollAcc = atan2f(frame.accelY, frame.accelZ);
+    Quaternion relativeRotation = fusion.getRelativeOrientation();
 
-        if (!neutralCaptured) {
-            fusedPitchRad = pitchAcc;
-            fusedRollRad = rollAcc;
-            neutralPitchRad = pitchAcc;
-            neutralRollRad = rollAcc;
-            neutralCaptured = true;
+    float localPitch, localYaw, localRoll;
+    relativeRotation.toEuler(localPitch, localRoll, localYaw);
+
+    float gyroX, gyroY, gyroZ;
+    fusion.getGyroBias(gyroX, gyroY, gyroZ);
+
+    float gx = frame.gyroX - gyroX;
+    float gy = frame.gyroY - gyroY;
+    float gz = frame.gyroZ - gyroZ;
+
+    float rateX = applyDynamicDeadzone(gy * kRadToDeg, sens.deadzone, fusion.getFilterState().gyroNoiseEstimate);
+    float rateY = applyDynamicDeadzone(gz * kRadToDeg, sens.deadzone, fusion.getFilterState().gyroNoiseEstimate);
+
+    float rawMouseX = rateX * rateScale * deltaTime * kRateScaleFactor;
+    float rawMouseY = rateY * rateScale * deltaTime * kRateScaleFactor;
+
+    bool invertX = config.invertX;
+    bool invertY = config.invertY;
+    bool swapAxes = config.swapAxes;
+
+    if (sens.swapAxesOverride >= 0) {
+        swapAxes = sens.swapAxesOverride > 0;
+    }
+    if (sens.invertXOverride >= 0) {
+        invertX = sens.invertXOverride > 0;
+    }
+    if (sens.invertYOverride >= 0) {
+        invertY = sens.invertYOverride > 0;
+    }
+
+    if (swapAxes) {
+        float temp = rawMouseX;
+        rawMouseX = rawMouseY;
+        rawMouseY = temp;
+    }
+    if (invertX) rawMouseX = -rawMouseX;
+    if (invertY) rawMouseY = -rawMouseY;
+
+    float currentSmoothFactor = constrain(fusion.getFilterState().adaptiveSmoothingFactor, 0.0f, 0.95f);
+
+    auto applySmoothing = [&](float rawValue, float& smoothValue, float& residualValue) -> int8_t {
+        if (currentSmoothFactor <= 0.0f) {
+            smoothValue = rawValue;
         } else {
-            // Adaptive alpha: trust gyro more during fast motion, accel more when stationary
-            float alpha = config.orientationAlpha;
-            if (gyroAvailable) {
-                // Reduce alpha (trust accel more) when moving slowly for better accuracy
-                if (velocityMagnitude < 0.1f) {
-                    alpha = alpha * 0.85f; // More correction from accelerometer
-                } else if (velocityMagnitude > 0.8f) {
-                    alpha = fminf(alpha * 1.1f, 0.99f); // Trust gyro more during fast motion
-                }
-            }
-
-            if (!gyroAvailable) {
-                fusedPitchRad = fusedPitchRad * alpha + pitchAcc * (1.0f - alpha);
-                fusedRollRad = fusedRollRad * alpha + rollAcc * (1.0f - alpha);
-            } else {
-                fusedPitchRad = alpha * predictedPitch + (1.0f - alpha) * pitchAcc;
-                fusedRollRad = alpha * predictedRoll + (1.0f - alpha) * rollAcc;
-            }
+            smoothValue += (rawValue - smoothValue) * currentSmoothFactor;
         }
+        float pending = (currentSmoothFactor <= 0.0f ? rawValue : smoothValue) + residualValue;
+        return clampMouseValue(pending, residualValue);
+    };
 
-        accumulateNeutralCapture(pitchAcc, rollAcc, frame);
-    } else {
-        fusedPitchRad = predictedPitch;
-        fusedRollRad = predictedRoll;
-    }
-
-    const float limitRad = config.tiltLimitDegrees * kDegToRad * 2.0f;
-    fusedPitchRad = constrain(fusedPitchRad, -limitRad, limitRad);
-    fusedRollRad = constrain(fusedRollRad, -limitRad, limitRad);
-}
-
-void GyroMouse::updateNeutralBaseline(float deltaTime, const SensorFrame& frame) {
-    if (!neutralCaptured || config.recenterRate <= 0.0f || neutralCapturePending) {
-        return;
-    }
-
-    float tiltXDeg = (fusedRollRad - neutralRollRad) * kRadToDeg;
-    float tiltYDeg = (fusedPitchRad - neutralPitchRad) * kRadToDeg;
-
-    float threshold = config.recenterThresholdDegrees;
-    if (fabsf(tiltXDeg) > threshold || fabsf(tiltYDeg) > threshold) {
-        return;
-    }
-
-    if (fabsf(frame.gyroX - gyroBiasX) > kGyroQuietThreshold ||
-        fabsf(frame.gyroY - gyroBiasY) > kGyroQuietThreshold) {
-        return;
-    }
-
-    float gain = config.recenterRate * deltaTime;
-    gain = constrain(gain, 0.0f, 0.2f);
-
-    neutralRollRad += (fusedRollRad - neutralRollRad) * gain;
-    neutralPitchRad += (fusedPitchRad - neutralPitchRad) * gain;
-    gyroBiasX += (frame.gyroX - gyroBiasX) * gain;
-    gyroBiasY += (frame.gyroY - gyroBiasY) * gain;
-    gyroBiasZ += (frame.gyroZ - gyroBiasZ) * gain;
+    mouseX = applySmoothing(rawMouseX, smoothedMouseX, residualMouseX);
+    mouseY = applySmoothing(rawMouseY, smoothedMouseY, residualMouseY);
 }
 
 void GyroMouse::recenterNeutral() {
@@ -440,43 +320,7 @@ void GyroMouse::recenterNeutral() {
     Logger::getInstance().log("GyroMouse: Neutral capture requested");
 }
 
-void GyroMouse::rotateVectorByNeutral(float& x, float& y, float& z) const {
-    if (!neutralCaptured) {
-        return;
-    }
-
-    // Inverse rotation: rotate back from neutral orientation to world frame
-    // Apply roll rotation first (inverse: -roll angle)
-    float sinRoll = sinf(-neutralRollRad);
-    float cosRoll = cosf(-neutralRollRad);
-
-    float x1 = x;
-    float y1 = cosRoll * y - sinRoll * z;
-    float z1 = sinRoll * y + cosRoll * z;
-
-    // Then apply pitch rotation (inverse: -pitch angle)
-    float sinPitch = sinf(-neutralPitchRad);
-    float cosPitch = cosf(-neutralPitchRad);
-
-    float x2 = cosPitch * x1 + sinPitch * z1;
-    float y2 = y1;
-    float z2 = -sinPitch * x1 + cosPitch * z1;
-
-    x = x2;
-    y = y2;
-    z = z2;
-}
-
-float GyroMouse::applyDeadzone(float value, float threshold) {
-    if (fabsf(value) < threshold) {
-        return 0.0f;
-    }
-    return value;
-}
-
 int8_t GyroMouse::clampMouseValue(float pending, float& residual) {
-    // BLE HID reports are signed char, so stay within [-127, 127]
-    // Round-to-nearest so slow motion still accumulates
     float rounded = roundf(pending);
 
     if (rounded > 127.0f) {
@@ -494,7 +338,7 @@ int8_t GyroMouse::clampMouseValue(float pending, float& residual) {
 }
 
 void GyroMouse::beginNeutralCapture() {
-    neutralCaptured = false;
+    fusion.reset();
     neutralCapturePending = true;
     neutralCaptureSamples = 0;
     neutralPitchAccum = 0.0f;
@@ -506,77 +350,54 @@ void GyroMouse::beginNeutralCapture() {
     smoothedMouseY = 0.0f;
     residualMouseX = 0.0f;
     residualMouseY = 0.0f;
-    gyroBiasX = 0.0f;
-    gyroBiasY = 0.0f;
-    gyroBiasZ = 0.0f;
 }
 
-void GyroMouse::accumulateNeutralCapture(float pitchAcc, float rollAcc, const SensorFrame& frame) {
-    if (!neutralCapturePending) {
-        return;
-    }
+void GyroMouse::cycleSensitivity() {
+    currentSensitivityIndex = (currentSensitivityIndex + 1) % config.sensitivities.size();
 
-    const float gyroQuietX = fabsf(frame.gyroX - gyroBiasX);
-    const float gyroQuietY = fabsf(frame.gyroY - gyroBiasY);
-    const float gyroQuietZ = fabsf(frame.gyroZ - gyroBiasZ);
-    if (gyroQuietX > kNeutralCaptureGyroThreshold ||
-        gyroQuietY > kNeutralCaptureGyroThreshold ||
-        gyroQuietZ > kNeutralCaptureGyroThreshold) {
-        neutralCaptureSamples = 0;
-        neutralPitchAccum = 0.0f;
-        neutralRollAccum = 0.0f;
-        gyroBiasAccumX = 0.0f;
-        gyroBiasAccumY = 0.0f;
-        gyroBiasAccumZ = 0.0f;
-        return;
-    }
-
-    neutralPitchAccum += pitchAcc;
-    neutralRollAccum += rollAcc;
-    gyroBiasAccumX += frame.gyroX;
-    gyroBiasAccumY += frame.gyroY;
-    gyroBiasAccumZ += frame.gyroZ;
-    ++neutralCaptureSamples;
-
-    if (neutralCaptureSamples < kNeutralCaptureSampleTarget) {
-        return;
-    }
-
-    const float invCount = 1.0f / static_cast<float>(neutralCaptureSamples);
-    neutralPitchRad = neutralPitchAccum * invCount;
-    neutralRollRad = neutralRollAccum * invCount;
-    fusedPitchRad = neutralPitchRad;
-    fusedRollRad = neutralRollRad;
-    gyroBiasX = gyroBiasAccumX * invCount;
-    gyroBiasY = gyroBiasAccumY * invCount;
-    gyroBiasZ = gyroBiasAccumZ * invCount;
-
-    // Set neutral orientation quaternion from captured angles
-    float cr = cosf(neutralRollRad * 0.5f);
-    float sr = sinf(neutralRollRad * 0.5f);
-    float cp = cosf(neutralPitchRad * 0.5f);
-    float sp = sinf(neutralPitchRad * 0.5f);
-
-    neutralOrientation = Quaternion(
-        cr * cp,
-        sr * cp,
-        cr * sp,
-        -sr * sp
-    );
-    currentOrientation = neutralOrientation;
-    lastOrientation = neutralOrientation;
-
-    neutralCapturePending = false;
-    neutralCaptured = true;
     smoothedMouseX = 0.0f;
     smoothedMouseY = 0.0f;
     residualMouseX = 0.0f;
     residualMouseY = 0.0f;
-    lastUpdateTime = millis();
 
-    Logger::getInstance().log("GyroMouse: Neutral capture completed (" +
-                              String(neutralCaptureSamples) + " samples)");
-    Logger::getInstance().log("GyroMouse: Neutral orientation recentered");
+    beginNeutralCapture();
+
+    String sensName = config.sensitivities[currentSensitivityIndex].name;
+    Logger::getInstance().log("GyroMouse: Sensitivity changed to " + sensName);
+}
+
+String GyroMouse::getSensitivityName() const {
+    if (currentSensitivityIndex < config.sensitivities.size()) {
+        return config.sensitivities[currentSensitivityIndex].name;
+    }
+    return "unknown";
+}
+
+void GyroMouse::updateClickSlowdown() {
+    unsigned long currentTime = millis();
+    if (currentTime - lastClickCheckTime < 10) {
+        return;
+    }
+    lastClickCheckTime = currentTime;
+
+    bool anyButtonPressed = bleController.isAnyMouseButtonPressed();
+
+    if (anyButtonPressed) {
+        unsigned long timeSinceChange = bleController.getTimeSinceLastMouseButtonChange();
+        float baseSlowdown = config.clickSlowdownFactor;
+
+        if (timeSinceChange < 50) {
+            clickSlowdownFactor = baseSlowdown * 0.5f;
+        } else if (timeSinceChange < 150) {
+            clickSlowdownFactor = baseSlowdown * 0.75f;
+        } else if (timeSinceChange < 300) {
+            clickSlowdownFactor = baseSlowdown;
+        } else {
+            clickSlowdownFactor = fminf(baseSlowdown * 1.5f, 0.9f);
+        }
+    } else {
+        clickSlowdownFactor = 1.0f;
+    }
 }
 
 void GyroMouse::performAbsoluteCentering() {
@@ -649,62 +470,6 @@ void GyroMouse::dispatchRelativeMove(int deltaX, int deltaY) {
     }
 }
 
-void GyroMouse::cycleSensitivity() {
-    currentSensitivityIndex = (currentSensitivityIndex + 1) % config.sensitivities.size();
-
-    smoothedMouseX = 0.0f;
-    smoothedMouseY = 0.0f;
-    residualMouseX = 0.0f;
-    residualMouseY = 0.0f;
-
-    // Don't recenter on sensitivity change - just start neutral capture
-    // This avoids the blocking absolute recenter operation
-    beginNeutralCapture();
-
-    String sensName = config.sensitivities[currentSensitivityIndex].name;
-    Logger::getInstance().log("GyroMouse: Sensitivity changed to " + sensName);
-}
-
-String GyroMouse::getSensitivityName() const {
-    if (currentSensitivityIndex < config.sensitivities.size()) {
-        return config.sensitivities[currentSensitivityIndex].name;
-    }
-    return "unknown";
-}
-
-void GyroMouse::updateAdaptiveFiltering(const SensorFrame& frame, float /*deltaTime*/) {
-    float gyroX = frame.gyroX - gyroBiasX;
-    float gyroY = frame.gyroY - gyroBiasY;
-    float gyroZ = frame.gyroZ - gyroBiasZ;
-
-    float gyroMagnitude = sqrtf(gyroX * gyroX + gyroY * gyroY + gyroZ * gyroZ);
-
-    // Simple EMA on overall motion energy
-    const float velocityAlpha = 0.2f;
-    velocityMagnitude += (gyroMagnitude - velocityMagnitude) * velocityAlpha;
-
-    // Map the current motion into a 0..1 range
-    float motionIntensity = constrain((velocityMagnitude - 0.05f) * 2.0f, 0.0f, 1.0f);
-
-    float baseSmoothing = constrain(config.smoothing, 0.0f, 0.95f);
-    float slowSmoothing = constrain(baseSmoothing * 1.2f + 0.05f, 0.05f, 0.9f);
-    float fastSmoothing = constrain(baseSmoothing * 0.35f + 0.05f, 0.05f, slowSmoothing);
-    float targetSmoothing = slowSmoothing + (fastSmoothing - slowSmoothing) * motionIntensity;
-
-    adaptiveSmoothingFactor += (targetSmoothing - adaptiveSmoothingFactor) * 0.25f;
-
-    float noiseTarget = gyroMagnitude;
-    if (gyroMagnitude > 0.4f) {
-        noiseTarget = gyroNoiseEstimate;
-    }
-    gyroNoiseEstimate += (noiseTarget - gyroNoiseEstimate) * 0.1f;
-    gyroNoiseEstimate = constrain(gyroNoiseEstimate, kMinNoiseEstimate, kMaxNoiseEstimate);
-
-    if (gyroMagnitude > 0.05f) {
-        lastMotionTime = millis();
-    }
-}
-
 float GyroMouse::applyDynamicDeadzone(float value, float baseThreshold, float noiseFactor) {
     float base = fmaxf(baseThreshold, 0.0f);
     float dynamicThreshold = base + noiseFactor * kRadToDeg * 1.2f;
@@ -727,415 +492,53 @@ float GyroMouse::applyDynamicDeadzone(float value, float baseThreshold, float no
     return (value >= 0.0f) ? response : -response;
 }
 
-float GyroMouse::applySmoothCurve(float value, float deadzone, float maxValue) {
-    // Apply deadzone
-    if (fabsf(value) < deadzone) {
-        return 0.0f;
-    }
-
-    float sign = (value >= 0.0f) ? 1.0f : -1.0f;
-    float absValue = fabsf(value);
-
-    // Remove deadzone from calculation
-    float effective = absValue - deadzone;
-    float effectiveMax = maxValue - deadzone;
-
-    if (effectiveMax <= 0.0f) {
-        return 0.0f;
-    }
-
-    // Normalize to [0, 1]
-    float normalized = effective / effectiveMax;
-    normalized = constrain(normalized, 0.0f, 1.0f);
-
-    // Apply smooth S-curve (smoothstep function) for natural feel
-    // This gives slow start, fast middle, slow end
-    float smoothed = normalized * normalized * (3.0f - 2.0f * normalized);
-
-    // Map back to output range with some scaling
-    return sign * smoothed * effectiveMax;
-}
-
-// ============================================================================
-// Quaternion Implementation
-// ============================================================================
-
-void GyroMouse::Quaternion::normalize() {
-    float norm = sqrtf(w * w + x * x + y * y + z * z);
-    if (norm > 1e-6f) {
-        float invNorm = 1.0f / norm;
-        w *= invNorm;
-        x *= invNorm;
-        y *= invNorm;
-        z *= invNorm;
-    }
-}
-
-GyroMouse::Quaternion GyroMouse::Quaternion::conjugate() const {
-    return Quaternion(w, -x, -y, -z);
-}
-
-GyroMouse::Quaternion GyroMouse::Quaternion::multiply(const Quaternion& q) const {
-    return Quaternion(
-        w * q.w - x * q.x - y * q.y - z * q.z,
-        w * q.x + x * q.w + y * q.z - z * q.y,
-        w * q.y - x * q.z + y * q.w + z * q.x,
-        w * q.z + x * q.y - y * q.x + z * q.w
-    );
-}
-
-void GyroMouse::Quaternion::rotateVector(float& vx, float& vy, float& vz) const {
-    // v' = q * v * q^-1
-    // Optimized version for unit quaternion
-    float qx = x, qy = y, qz = z, qw = w;
-
-    // First rotation: q * v
-    float tx = qw * vx + qy * vz - qz * vy;
-    float ty = qw * vy + qz * vx - qx * vz;
-    float tz = qw * vz + qx * vy - qy * vx;
-    float tw = -qx * vx - qy * vy - qz * vz;
-
-    // Second rotation: result * q^-1 (conjugate)
-    vx = tw * (-qx) + tx * qw + ty * (-qz) - tz * (-qy);
-    vy = tw * (-qy) + ty * qw + tz * (-qx) - tx * (-qz);
-    vz = tw * (-qz) + tz * qw + tx * (-qy) - ty * (-qx);
-}
-
-void GyroMouse::Quaternion::toEuler(float& pitch, float& roll, float& yaw) const {
-    // Convert quaternion to Euler angles (Tait-Bryan angles)
-    // roll (x-axis rotation)
-    float sinr_cosp = 2.0f * (w * x + y * z);
-    float cosr_cosp = 1.0f - 2.0f * (x * x + y * y);
-    roll = atan2f(sinr_cosp, cosr_cosp);
-
-    // pitch (y-axis rotation)
-    float sinp = 2.0f * (w * y - z * x);
-    if (fabsf(sinp) >= 1.0f)
-        pitch = copysignf(M_PI / 2.0f, sinp); // use 90 degrees if out of range
-    else
-        pitch = asinf(sinp);
-
-    // yaw (z-axis rotation)
-    float siny_cosp = 2.0f * (w * z + x * y);
-    float cosy_cosp = 1.0f - 2.0f * (y * y + z * z);
-    yaw = atan2f(siny_cosp, cosy_cosp);
-}
-
-// ============================================================================
-// New Rotation-Relative Algorithm
-// ============================================================================
-
-GyroMouse::Quaternion GyroMouse::createQuaternionFromGyro(const SensorFrame& frame, float deltaTime) const {
-    // Create quaternion from angular velocity (axis-angle representation)
-    float gx = (frame.gyroX - gyroBiasX) * deltaTime;
-    float gy = (frame.gyroY - gyroBiasY) * deltaTime;
-    float gz = (frame.gyroZ - gyroBiasZ) * deltaTime;
-
-    float angle = sqrtf(gx * gx + gy * gy + gz * gz);
-
-    if (angle < 1e-6f) {
-        return Quaternion(1.0f, 0.0f, 0.0f, 0.0f);
-    }
-
-    float halfAngle = angle * 0.5f;
-    float sinHalfAngle = sinf(halfAngle);
-    float invAngle = 1.0f / angle;
-
-    return Quaternion(
-        cosf(halfAngle),
-        gx * invAngle * sinHalfAngle,
-        gy * invAngle * sinHalfAngle,
-        gz * invAngle * sinHalfAngle
-    );
-}
-
-void GyroMouse::updateQuaternionOrientation(const SensorFrame& frame, float deltaTime) {
-    if (!gyroAvailable || deltaTime <= 0.0f) {
+void GyroMouse::accumulateNeutralCapture(float pitchAcc, float rollAcc, const SensorFrame& frame) {
+    if (!neutralCapturePending) {
         return;
     }
 
-    // Store previous orientation
-    lastOrientation = currentOrientation;
+    float gyroX, gyroY, gyroZ;
+    fusion.getGyroBias(gyroX, gyroY, gyroZ);
 
-    // Update adaptive beta parameter based on current motion
-    updateMadgwickBeta();
-
-    // Apply bias-corrected gyro values
-    float gx = frame.gyroX - gyroBiasX;
-    float gy = frame.gyroY - gyroBiasY;
-    float gz = frame.gyroZ - gyroBiasZ;
-
-    // Check if accelerometer data is reliable
-    bool accelReliable = (frame.accelMagnitude > kAccelReliableMin) &&
-                         (frame.accelMagnitude < kAccelReliableMax);
-
-    if (accelReliable) {
-        // Use Madgwick filter with accelerometer correction
-        madgwickUpdate(gx, gy, gz, frame.accelX, frame.accelY, frame.accelZ, deltaTime);
-    } else {
-        // Gyro-only update when accelerometer is unreliable
-        // (e.g., during acceleration or vibration)
-        Quaternion deltaQ = createQuaternionFromGyro(frame, deltaTime);
-        currentOrientation = currentOrientation.multiply(deltaQ);
-        currentOrientation.normalize();
-    }
-}
-
-void GyroMouse::extractLocalAngularVelocity(float& localPitch, float& localYaw) const {
-    if (!neutralCaptured) {
-        localPitch = 0.0f;
-        localYaw = 0.0f;
+    const float gyroQuietX = fabsf(frame.gyroX - gyroX);
+    const float gyroQuietY = fabsf(frame.gyroY - gyroY);
+    const float gyroQuietZ = fabsf(frame.gyroZ - gyroZ);
+    if (gyroQuietX > kNeutralCaptureGyroThreshold ||
+        gyroQuietY > kNeutralCaptureGyroThreshold ||
+        gyroQuietZ > kNeutralCaptureGyroThreshold) {
+        neutralCaptureSamples = 0;
+        neutralPitchAccum = 0.0f;
+        neutralRollAccum = 0.0f;
+        gyroBiasAccumX = 0.0f;
+        gyroBiasAccumY = 0.0f;
+        gyroBiasAccumZ = 0.0f;
         return;
     }
 
-    // Calculate relative orientation: q_rel = q_neutral^-1 * q_current
-    Quaternion relativeOrientation = neutralOrientation.conjugate().multiply(currentOrientation);
+    neutralPitchAccum += pitchAcc;
+    neutralRollAccum += rollAcc;
+    gyroBiasAccumX += frame.gyroX;
+    gyroBiasAccumY += frame.gyroY;
+    gyroBiasAccumZ += frame.gyroZ;
+    ++neutralCaptureSamples;
 
-    // Extract pitch and yaw from relative quaternion
-    // This gives us the rotation in the neutral frame of reference
-    float pitch, roll, yaw;
-    relativeOrientation.toEuler(pitch, roll, yaw);
-
-    // Return pitch (up/down) and yaw (left/right) relative to neutral
-    // Roll is less important for cursor control
-    localPitch = pitch;
-    localYaw = yaw;
-}
-
-void GyroMouse::calculateMouseMovementFromRelativeRotation(const SensorFrame& frame, float deltaTime,
-                                                            int8_t& mouseX, int8_t& mouseY) {
-    if (!neutralCaptured || config.sensitivities.empty()) {
-        mouseX = 0;
-        mouseY = 0;
+    if (neutralCaptureSamples < kNeutralCaptureSampleTarget) {
         return;
     }
 
-    const SensitivitySettings& sens = config.sensitivities[currentSensitivityIndex];
-    const float rateScale = sens.gyroScale > 0.0f ? sens.gyroScale : sens.scale;
+    const float invCount = 1.0f / static_cast<float>(neutralCaptureSamples);
+    fusion.updateGyroBias(gyroBiasAccumX * invCount, gyroBiasAccumY * invCount, gyroBiasAccumZ * invCount);
 
-    // Calculate relative rotation in neutral space
-    Quaternion relativeRotation = neutralOrientation.conjugate().multiply(currentOrientation);
-    Quaternion lastRelativeRotation = neutralOrientation.conjugate().multiply(lastOrientation);
+    fusion.captureNeutralOrientation();
 
-    // Calculate delta rotation between frames in neutral space
-    Quaternion deltaRotation = lastRelativeRotation.conjugate().multiply(relativeRotation);
+    neutralCapturePending = false;
+    smoothedMouseX = 0.0f;
+    smoothedMouseY = 0.0f;
+    residualMouseX = 0.0f;
+    residualMouseY = 0.0f;
+    lastUpdateTime = millis();
 
-    // Extract angular velocity in local (neutral) frame
-    float deltaAngle = 2.0f * acosf(constrain(deltaRotation.w, -1.0f, 1.0f));
-
-    float rawMouseX = 0.0f;
-    float rawMouseY = 0.0f;
-
-    if (deltaAngle > 1e-6f && deltaTime > 1e-6f) {
-        float sinHalfAngle = sinf(deltaAngle * 0.5f);
-        if (fabsf(sinHalfAngle) > 1e-6f) {
-            // Extract rotation axis in local coordinates
-            float invSinHalf = 1.0f / sinHalfAngle;
-            float axisX = deltaRotation.x * invSinHalf;
-            float axisY = deltaRotation.y * invSinHalf;
-
-            // Angular velocity in local frame (rad/s)
-            float angularVelX = axisX * deltaAngle / deltaTime;
-            float angularVelY = axisY * deltaAngle / deltaTime;
-
-            // Convert to degrees
-            angularVelX *= kRadToDeg;
-            angularVelY *= kRadToDeg;
-
-            // Apply deadzone and scaling
-            float rateX = applyDynamicDeadzone(angularVelX, sens.deadzone, gyroNoiseEstimate);
-            float rateY = applyDynamicDeadzone(angularVelY, sens.deadzone, gyroNoiseEstimate);
-
-            // Scale by sensitivity and time
-            rawMouseX = rateX * rateScale * deltaTime * kRateScaleFactor;
-            rawMouseY = rateY * rateScale * deltaTime * kRateScaleFactor;
-        }
-    }
-
-    // Apply axis transformations
-    bool invertX = config.invertX;
-    bool invertY = config.invertY;
-    bool swapAxes = config.swapAxes;
-
-    if (sens.swapAxesOverride >= 0) {
-        swapAxes = sens.swapAxesOverride > 0;
-    }
-    if (sens.invertXOverride >= 0) {
-        invertX = sens.invertXOverride > 0;
-    }
-    if (sens.invertYOverride >= 0) {
-        invertY = sens.invertYOverride > 0;
-    }
-
-    if (swapAxes) {
-        float temp = rawMouseX;
-        rawMouseX = rawMouseY;
-        rawMouseY = temp;
-    }
-    if (invertX) rawMouseX = -rawMouseX;
-    if (invertY) rawMouseY = -rawMouseY;
-
-    // Apply adaptive smoothing
-    float currentSmoothFactor = constrain(adaptiveSmoothingFactor, 0.0f, 0.95f);
-
-    auto applySmoothing = [&](float rawValue, float& smoothValue, float& residualValue) -> int8_t {
-        if (currentSmoothFactor <= 0.0f) {
-            smoothValue = rawValue;
-        } else {
-            smoothValue += (rawValue - smoothValue) * currentSmoothFactor;
-        }
-        float pending = (currentSmoothFactor <= 0.0f ? rawValue : smoothValue) + residualValue;
-        return clampMouseValue(pending, residualValue);
-    };
-
-    mouseX = applySmoothing(rawMouseX, smoothedMouseX, residualMouseX);
-    mouseY = applySmoothing(rawMouseY, smoothedMouseY, residualMouseY);
-}
-
-// ============================================================================
-// Madgwick Filter Implementation
-// ============================================================================
-
-void GyroMouse::madgwickUpdate(float gx, float gy, float gz, float ax, float ay, float az, float deltaTime) {
-    // Madgwick AHRS algorithm
-    // Based on: https://x-io.co.uk/open-source-imu-and-ahrs-algorithms/
-
-    // Update sample frequency
-    if (deltaTime > 1e-6f) {
-        madgwickSampleFreq = 1.0f / deltaTime;
-    }
-
-    // Rate of change of quaternion from gyroscope
-    float qDot1 = 0.5f * (-currentOrientation.x * gx - currentOrientation.y * gy - currentOrientation.z * gz);
-    float qDot2 = 0.5f * (currentOrientation.w * gx + currentOrientation.y * gz - currentOrientation.z * gy);
-    float qDot3 = 0.5f * (currentOrientation.w * gy - currentOrientation.x * gz + currentOrientation.z * gx);
-    float qDot4 = 0.5f * (currentOrientation.w * gz + currentOrientation.x * gy - currentOrientation.y * gx);
-
-    // Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
-    if (!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f))) {
-        // Normalise accelerometer measurement
-        float recipNorm = 1.0f / sqrtf(ax * ax + ay * ay + az * az);
-        ax *= recipNorm;
-        ay *= recipNorm;
-        az *= recipNorm;
-
-        // Auxiliary variables to avoid repeated arithmetic
-        float _2q0 = 2.0f * currentOrientation.w;
-        float _2q1 = 2.0f * currentOrientation.x;
-        float _2q2 = 2.0f * currentOrientation.y;
-        float _2q3 = 2.0f * currentOrientation.z;
-        float _4q0 = 4.0f * currentOrientation.w;
-        float _4q1 = 4.0f * currentOrientation.x;
-        float _4q2 = 4.0f * currentOrientation.y;
-        float _8q1 = 8.0f * currentOrientation.x;
-        float _8q2 = 8.0f * currentOrientation.y;
-        float q0q0 = currentOrientation.w * currentOrientation.w;
-        float q1q1 = currentOrientation.x * currentOrientation.x;
-        float q2q2 = currentOrientation.y * currentOrientation.y;
-        float q3q3 = currentOrientation.z * currentOrientation.z;
-
-        // Gradient descent algorithm corrective step
-        float s0 = _4q0 * q2q2 + _2q2 * ax + _4q0 * q1q1 - _2q1 * ay;
-        float s1 = _4q1 * q3q3 - _2q3 * ax + 4.0f * q0q0 * currentOrientation.x - _2q0 * ay - _4q1 + _8q1 * q1q1 + _8q1 * q2q2 + _4q1 * az;
-        float s2 = 4.0f * q0q0 * currentOrientation.y + _2q0 * ax + _4q2 * q3q3 - _2q3 * ay - _4q2 + _8q2 * q1q1 + _8q2 * q2q2 + _4q2 * az;
-        float s3 = 4.0f * q1q1 * currentOrientation.z - _2q1 * ax + 4.0f * q2q2 * currentOrientation.z - _2q2 * ay;
-
-        // Normalise step magnitude
-        recipNorm = 1.0f / sqrtf(s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3);
-        s0 *= recipNorm;
-        s1 *= recipNorm;
-        s2 *= recipNorm;
-        s3 *= recipNorm;
-
-        // Apply feedback step
-        qDot1 -= madgwickBeta * s0;
-        qDot2 -= madgwickBeta * s1;
-        qDot3 -= madgwickBeta * s2;
-        qDot4 -= madgwickBeta * s3;
-    }
-
-    // Integrate rate of change of quaternion to yield quaternion
-    currentOrientation.w += qDot1 * deltaTime;
-    currentOrientation.x += qDot2 * deltaTime;
-    currentOrientation.y += qDot3 * deltaTime;
-    currentOrientation.z += qDot4 * deltaTime;
-
-    // Normalise quaternion
-    currentOrientation.normalize();
-}
-
-void GyroMouse::updateMadgwickBeta() {
-    // Adaptive beta based on motion
-    // Higher motion -> higher beta (more trust in gyro, faster response)
-    // Lower motion -> lower beta (more trust in accel, better drift correction)
-
-    float baseBeta = 0.1f;  // Default value for moderate motion
-
-    if (velocityMagnitude < 0.05f) {
-        // Very low motion - minimize drift
-        madgwickBeta = 0.033f;  // ~2 degree error convergence
-    } else if (velocityMagnitude < 0.2f) {
-        // Low motion - good balance
-        madgwickBeta = 0.066f;  // ~4 degree error convergence
-    } else if (velocityMagnitude < 0.5f) {
-        // Moderate motion
-        madgwickBeta = baseBeta;  // ~6 degree error convergence
-    } else if (velocityMagnitude < 1.0f) {
-        // High motion - trust gyro more
-        madgwickBeta = 0.15f;  // ~9 degree error convergence
-    } else {
-        // Very high motion - maximum gyro trust
-        madgwickBeta = 0.2f;  // ~12 degree error convergence
-    }
-
-    // Additional scaling based on noise estimate
-    float noiseFactor = constrain(gyroNoiseEstimate / 0.1f, 0.5f, 2.0f);
-    madgwickBeta *= noiseFactor;
-
-    // Keep beta in reasonable range
-    madgwickBeta = constrain(madgwickBeta, 0.01f, 0.5f);
-}
-
-void GyroMouse::updateClickSlowdown() {
-    // Check mouse button state every 10ms to avoid overhead
-    unsigned long currentTime = millis();
-    if (currentTime - lastClickCheckTime < 10) {
-        return;
-    }
-    lastClickCheckTime = currentTime;
-
-    // Check if any mouse button is pressed
-    bool anyButtonPressed = bleController.isAnyMouseButtonPressed();
-
-    if (anyButtonPressed) {
-        // Get time since button was pressed
-        unsigned long timeSinceChange = bleController.getTimeSinceLastMouseButtonChange();
-
-        // Get configured base slowdown factor (default 0.3 = 30% speed)
-        float baseSlowdown = config.clickSlowdownFactor;
-
-        // Adaptive slowdown based on click duration
-        // Slowdown phases:
-        // 0-50ms: Maximum slowdown - critical click time
-        // 50-150ms: Base slowdown + 50% - drag start stabilization
-        // 150-300ms: Base slowdown + 25% - active drag
-        // 300ms+: Base slowdown + 50% recovery - sustained drag
-
-        if (timeSinceChange < 50) {
-            // Maximum precision during initial click
-            clickSlowdownFactor = baseSlowdown * 0.5f;
-        } else if (timeSinceChange < 150) {
-            // Slower during drag start
-            clickSlowdownFactor = baseSlowdown * 0.75f;
-        } else if (timeSinceChange < 300) {
-            // Use configured slowdown for active drag
-            clickSlowdownFactor = baseSlowdown;
-        } else {
-            // Gradually recover speed for sustained drag
-            clickSlowdownFactor = fminf(baseSlowdown * 1.5f, 0.9f);
-        }
-    } else {
-        // No button pressed - full speed
-        clickSlowdownFactor = 1.0f;
-    }
+    Logger::getInstance().log("GyroMouse: Neutral capture completed (" +
+                              String(neutralCaptureSamples) + " samples)");
+    Logger::getInstance().log("GyroMouse: Neutral orientation recentered");
 }

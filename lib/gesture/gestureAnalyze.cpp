@@ -4,16 +4,12 @@
  */
 
 #include "gestureAnalyze.h"
-
-#include "MPU6050GestureRecognizer.h"
-#include "ADXL345GestureRecognizer.h"
 #include "Logger.h"
 
 GestureAnalyze::GestureAnalyze(GestureRead &gestureReader)
     : _gestureReader(gestureReader),
       _confidenceThreshold(0.5f),
-      _recognizer(nullptr),
-      _currentSensorType()
+      _currentSensorType("")
 {
 }
 
@@ -27,141 +23,59 @@ SampleBuffer &GestureAnalyze::getRawSample()
     return _gestureReader.getCollectedSamples();
 }
 
-bool GestureAnalyze::initRecognizer(const String &sensorType, const String &gestureMode)
+GestureRecognitionResult GestureAnalyze::recognize(SampleBuffer* buffer)
 {
-    _currentSensorType = sensorType;
-
-    String mode = gestureMode;
-    mode.toLowerCase();
-    String normalizedSensor = sensorType;
-    normalizedSensor.toLowerCase();
-
-    if (mode == "auto")
-    {
-        if (normalizedSensor == "mpu6050")
-        {
-            mode = "mpu6050";
-        }
-        else if (normalizedSensor == "adxl345")
-        {
-            mode = "adxl345";
-        }
-        else
-        {
-            Logger::getInstance().log("[GestureAnalyze] Unknown sensor type: " + sensorType);
-            return false;
-        }
-    }
-
-    const bool legacyShapeMode = (mode == "shape" || mode == "orientation");
-    const bool genericSwipeMode = (mode == "swipe" || mode == "simple");
-
-    bool useMPU = (mode == "mpu6050" || legacyShapeMode);
-    bool useADXL = (mode == "adxl345");
-
-    if (genericSwipeMode)
-    {
-        if (normalizedSensor == "adxl345")
-        {
-            useADXL = true;
-        }
-        else if (normalizedSensor == "mpu6050")
-        {
-            useMPU = true;
-        }
-        else
-        {
-            Logger::getInstance().log("[GestureAnalyze] Generic gesture mode requires known sensor type");
-            return false;
-        }
-    }
-
-    if (useMPU)
-    {
-        _recognizer.reset(new MPU6050GestureRecognizer());
-        if (legacyShapeMode || genericSwipeMode)
-        {
-            Logger::getInstance().log("[GestureAnalyze] Mode \"" + mode + "\" mapped to swipe/shake (MPU6050 accel+gyro)");
-        }
-        else
-        {
-            Logger::getInstance().log("[GestureAnalyze] Using swipe/shake recognizer for MPU6050 (accel+gyro)");
-        }
-    }
-    else if (useADXL)
-    {
-        _recognizer.reset(new ADXL345GestureRecognizer());
-        if (genericSwipeMode)
-        {
-            Logger::getInstance().log("[GestureAnalyze] Mode \"" + mode + "\" mapped to swipe/shake (ADXL345 accel only)");
-        }
-        else
-        {
-            Logger::getInstance().log("[GestureAnalyze] Using swipe/shake recognizer for ADXL345 (accelerometer only)");
-        }
-    }
-    else
-    {
-        Logger::getInstance().log("[GestureAnalyze] Gesture mode not supported: " + mode);
-        _recognizer.reset();
-        return false;
-    }
-
-    if (!_recognizer->init(normalizedSensor))
-    {
-        Logger::getInstance().log("[GestureAnalyze] Failed to initialize recognizer");
-        _recognizer.reset();
-        return false;
-    }
-
-    _recognizer->setConfidenceThreshold(_confidenceThreshold);
-    Logger::getInstance().log("[GestureAnalyze] Recognizer initialized: " + _recognizer->getModeName());
-    return true;
-}
-
-GestureRecognitionResult GestureAnalyze::recognizeWithRecognizer()
-{
-    if (!_recognizer)
-    {
-        Logger::getInstance().log("[GestureAnalyze] No recognizer initialized");
-        return GestureRecognitionResult();
-    }
-
-    SampleBuffer &buffer = getRawSample();
-    if (buffer.sampleCount == 0 || buffer.samples == nullptr)
+    if (!buffer || buffer->sampleCount == 0 || buffer->samples == nullptr)
     {
         Logger::getInstance().log("[GestureAnalyze] No samples to analyze");
         return GestureRecognitionResult();
     }
 
-    GestureRecognitionResult result = _recognizer->recognize(&buffer);
-    if (result.gestureID >= 0 && result.confidence >= _confidenceThreshold)
+    SimpleGestureConfig config;
+    String normalizedSensor = _currentSensorType;
+    normalizedSensor.toLowerCase();
+
+    if (normalizedSensor == "mpu6050")
     {
-        Logger::getInstance().log(String("[GestureAnalyze] Recognized: ") + result.gestureName +
-                                  " (ID: " + String(result.gestureID) +
-                                  ", conf: " + String(result.confidence, 2) + ")");
+        config.sensorTag = "MPU6050";
+        config.sensorMode = SENSOR_MODE_MPU6050;
+        config.useGyro = true;
+        config.gyroSwipeThreshold = 100.0f;
+        config.gyroShakeThreshold = 150.0f;
+        config.accelSwipeThreshold = 0.6f;
+        config.accelShakeThreshold = 1.2f;
+    }
+    else if (normalizedSensor == "adxl345")
+    {
+        config.sensorTag = "ADXL345";
+        config.sensorMode = SENSOR_MODE_ADXL345;
+        config.useGyro = false;
+        config.accelSwipeThreshold = 0.6f;
+        config.accelShakeThreshold = 1.2f;
     }
     else
     {
-        Logger::getInstance().log("[GestureAnalyze] No gesture recognized (low confidence)");
+        Logger::getInstance().log("[GestureAnalyze] Unknown sensor type: " + _currentSensorType);
+        return GestureRecognitionResult();
     }
+
+    GestureRecognitionResult result = detectSimpleGesture(buffer, config);
+    if (result.gestureID >= 0 && result.confidence < _confidenceThreshold)
+    {
+        Logger::getInstance().log("Gesture discarded (confidence " +
+                                  String(result.confidence, 2) + ")");
+        return GestureRecognitionResult();
+    }
+
     return result;
 }
 
-String GestureAnalyze::getRecognizerModeName() const
+void GestureAnalyze::setSensorType(const String& sensorType)
 {
-    if (!_recognizer)
-    {
-        return "None";
-    }
-    return _recognizer->getModeName();
+    _currentSensorType = sensorType;
 }
 
 void GestureAnalyze::setConfidenceThreshold(float threshold)
 {
     _confidenceThreshold = constrain(threshold, 0.0f, 1.0f);
-    if (_recognizer)
-    {
-        _recognizer->setConfidenceThreshold(_confidenceThreshold);
-    }
 }

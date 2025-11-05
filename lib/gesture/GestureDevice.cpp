@@ -164,14 +164,7 @@ bool GestureDevice::performRecognition()
         return false;
     }
 
-    if (!analyzer.hasRecognizer())
-    {
-        Logger::getInstance().log("GestureDevice: no recognizer available");
-        sensor.flushSensorBuffer(); // Prepare for next gesture
-        return false;
-    }
-
-    GestureRecognitionResult result = analyzer.recognizeWithRecognizer();
+    GestureRecognitionResult result = analyzer.recognize(&buffer);
     lastGestureId = result.gestureID;
     lastGestureName = (result.gestureID >= 0) ? result.gestureName : "";
 
@@ -184,8 +177,7 @@ bool GestureDevice::performRecognition()
     }
 
     Logger::getInstance().log("GestureDevice: recognized " + result.gestureName +
-                             " (mode: " + analyzer.getRecognizerModeName() +
-                             ", confidence: " + String(result.confidence * 100, 0) + "%)");
+                             " (confidence: " + String(result.confidence * 100, 0) + "%)");
 
     pendingEvent.type = InputEvent::EventType::MOTION;
     pendingEvent.value1 = result.gestureID;

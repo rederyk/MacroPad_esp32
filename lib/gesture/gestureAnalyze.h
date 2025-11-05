@@ -7,10 +7,8 @@
 #define GESTUREANALYZE_H
 
 #include <Arduino.h>
-#include <memory>
-
 #include "gestureRead.h"
-#include "IGestureRecognizer.h"
+#include "SimpleGestureDetector.h"
 
 class GestureAnalyze
 {
@@ -20,11 +18,9 @@ public:
     void clearSamples();
     SampleBuffer &getRawSample();
 
-    bool initRecognizer(const String &sensorType, const String &gestureMode);
-    GestureRecognitionResult recognizeWithRecognizer();
+    GestureRecognitionResult recognize(SampleBuffer* buffer);
 
-    bool hasRecognizer() const { return _recognizer != nullptr; }
-    String getRecognizerModeName() const;
+    void setSensorType(const String& sensorType);
 
     void setConfidenceThreshold(float threshold);
     float getConfidenceThreshold() const { return _confidenceThreshold; }
@@ -32,7 +28,6 @@ public:
 private:
     GestureRead &_gestureReader;
     float _confidenceThreshold;
-    std::unique_ptr<IGestureRecognizer> _recognizer;
     String _currentSensorType;
 };
 

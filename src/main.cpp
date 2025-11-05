@@ -173,23 +173,8 @@ void setup()
                 Logger::getInstance().log("Accelerometer calibration failed at startup.");
             }
 
-            // Initialize sensor-specific gesture recognizer
-            String sensorType = accelConfig.type;
-            String gestureMode = accelConfig.gestureMode;
-
-            if (gestureMode.isEmpty()) {
-                gestureMode = "auto"; // Default to auto
-            }
-
-            Logger::getInstance().log("Initializing gesture recognizer for sensor: " + sensorType +
-                                    " with mode: " + gestureMode);
-
-            if (gestureAnalyzer.initRecognizer(sensorType, gestureMode)) {
-                Logger::getInstance().log("Gesture recognizer initialized: " +
-                                        gestureAnalyzer.getRecognizerModeName());
-            } else {
-                Logger::getInstance().log("Warning: Failed to initialize gesture recognizer, using legacy mode");
-            }
+            gestureAnalyzer.setSensorType(accelConfig.type);
+            Logger::getInstance().log("Gesture analyzer is ready.");
 
             if (gyroMouse.begin(&gestureSensor, configManager.getGyroMouseConfig()))
             {

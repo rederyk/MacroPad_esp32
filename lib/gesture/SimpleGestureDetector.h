@@ -1,14 +1,33 @@
-/*
- * ESP32 MacroPad Project
- *
- * Simple and efficient gesture detection using gyroscope and accelerometer data.
- * Optimized for fast, reliable recognition without unnecessary complexity.
- */
-
 #ifndef SIMPLE_GESTURE_DETECTOR_H
 #define SIMPLE_GESTURE_DETECTOR_H
 
-#include "IGestureRecognizer.h"
+#include "gestureRead.h"
+
+/**
+ * Sensor-specific gesture recognition type
+ */
+enum SensorGestureMode {
+    SENSOR_MODE_MPU6050 = 0,    // MPU6050: Shape + Orientation (gyro available)
+    SENSOR_MODE_ADXL345,        // ADXL345: Legacy KNN (no gyro)
+    SENSOR_MODE_AUTO            // Auto-detect based on sensor type
+};
+
+/**
+ * Unified gesture result structure
+ */
+struct GestureRecognitionResult {
+    int gestureID;              // Gesture ID (-1 if unknown, 0-8 for custom, 100+ for predefined)
+    float confidence;           // Confidence score 0-1
+    SensorGestureMode sensorMode; // Which sensor mode was used
+    String gestureName;         // Human-readable name
+
+    // Mode-specific data (optional)
+    void* modeSpecificData;     // Can hold ShapeType, OrientationType, etc.
+
+    GestureRecognitionResult()
+        : gestureID(-1), confidence(0.0f), sensorMode(SENSOR_MODE_AUTO),
+          gestureName("G_UNKNOWN"), modeSpecificData(nullptr) {}
+};
 
 struct SimpleGestureConfig {
     const char *sensorTag;          // Short identifier used in logs
