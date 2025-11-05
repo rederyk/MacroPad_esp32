@@ -111,6 +111,7 @@ private:
     void drainSensorBuffer(uint32_t timeoutMs, uint32_t waitMs, uint8_t stableReads);
     bool waitForGyroReady(uint32_t timeoutMs);
     bool waitForFreshAccelerometer(uint32_t timeoutMs);
+    void clearMemoryNoLock(); // Clear buffer without acquiring lock (must be called with lock held)
 
     std::unique_ptr<MotionSensor> _sensor;
     AccelerometerConfig _config;

@@ -160,7 +160,6 @@ bool GestureDevice::performRecognition()
     if (buffer.sampleCount == 0 || buffer.samples == nullptr)
     {
         Logger::getInstance().log("GestureDevice: no samples collected");
-        sensor.clearMemory();
         sensor.flushSensorBuffer(); // Prepare for next gesture
         return false;
     }
@@ -168,7 +167,6 @@ bool GestureDevice::performRecognition()
     if (!analyzer.hasRecognizer())
     {
         Logger::getInstance().log("GestureDevice: no recognizer available");
-        sensor.clearMemory();
         sensor.flushSensorBuffer(); // Prepare for next gesture
         return false;
     }
@@ -181,7 +179,6 @@ bool GestureDevice::performRecognition()
     {
         Logger::getInstance().log("GestureDevice: gesture not recognized (low confidence)");
         lastGestureName = "";
-        sensor.clearMemory();
         sensor.flushSensorBuffer(); // Prepare for next gesture
         return false;
     }
@@ -196,10 +193,8 @@ bool GestureDevice::performRecognition()
     pendingEvent.state = true;
     pendingEvent.text = result.gestureName;
 
-    sensor.clearMemory();
-
     // Flush sensor's hardware buffer asynchronously to prepare for next gesture
-    // This is done AFTER recognition to avoid adding latency to gesture start
+    // Buffer will be cleared automatically on next startSampling()
     sensor.flushSensorBuffer();
 
     return true;

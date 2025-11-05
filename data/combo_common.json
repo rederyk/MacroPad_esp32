@@ -9,10 +9,10 @@
     "S_B:VOL_DOWN"
   ],
   "1+2,CW": [
-    "S_B:MOUSE_MOVE_0_0_5_0"
+    "S_B:MOUSE_MOVE_0_0_1_0"
   ],
   "1+2,CCW": [
-    "S_B:MOUSE_MOVE_0_0_-5_0"
+    "S_B:MOUSE_MOVE_0_0_-1_0"
   ],
   "1+5+9": [
     "CALIBRATE_SENSOR"
@@ -30,18 +30,73 @@
     "RESET_ALL"
   ],
   "G_SHAKE": [
-    "S_B:SPACE"
+    "S_B: "
   ],
-  "G_SWIPE_LEFT": [
-    "S_B:CTRL+SUPER,LEFT_ARROW"
-  ],
-  "G_SWIPE_RIGHT": [
-    "S_B:CTRL+SUPER,RIGHT_ARROW"
-  ],
-  "G_RANDOM": [
-    "S_B:CTRL+SUPER,RIGHT_ARROW"
-  ],
+
   "1+2+3+4+5+6+7+8+9": [
     "<DELAY_100><ENTER_SLEEP>"
+  ],
+  "1+3": [
+    "SCAN_IR_DEV_1"
+  ],
+  "7+9": [
+    "SEND_IR_DEV_1"
+  ],
+  "2+3": [
+    "SCAN_IR_DEV_2"
+  ],
+  "8+9": [
+    "SEND_IR_DEV_2"
+  ],
+  "5+7": [
+    "IR_CHECK"
+  ],
+  "3,BUTTON": [
+    "SEND_IR_tv_off"
+  ],
+  "3,CCW": [
+    "SEND_IR_tv_volup"
+  ],
+  "3,CW": [
+    "SEND_IR_tv_low"
+  ],
+  "2+7": [
+    "SEND_IR_led_on"
+  ],
+  "3+7": [
+    "SEND_IR_led_off"
+  ],
+  "9,CW": [
+    "SEND_IR_CMD_1_CMD1"
+  ],
+  "9,CCW": [
+    "SEND_IR_CMD_1_CMD2"
+  ],
+  "4+5+6,BUTTON": [
+    "TOGGLE_KEY_ORDER"
+  ],
+  "9+5+7,BUTTON": [
+    "<TOGGLE_KEY_ORDER><S_B:PasswordCorta>"
+  ],
+  "1+6": [
+    "FLASHLIGHT"
+  ],
+  "3+6": [
+    "LED_RGB_255_0_255"
+  ],
+  "4+6": [
+    "LED_OFF"
+  ],
+  "6,CCW": [
+    "LED_BRIGHTNESS_PLUS"
+  ],
+  "6,CW": [
+    "LED_BRIGHTNESS_MINUS"
+  ],
+  "1+2": [
+    "REACTIVE_LIGHTING"
+  ],
+  "5+7+9": [
+    "SWITCH_MY_COMBO_0"
   ]
 }

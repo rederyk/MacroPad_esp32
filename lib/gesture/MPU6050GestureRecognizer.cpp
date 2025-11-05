@@ -55,12 +55,17 @@ GestureRecognitionResult MPU6050GestureRecognizer::recognize(SampleBuffer *buffe
     config.sensorTag = "MPU6050";
     config.sensorMode = SENSOR_MODE_MPU6050;
     config.useGyro = true;
-    config.swipeAccelThreshold = 0.55f;
-    config.shakeBidirectionalMin = 0.6f;
-    config.shakeBidirectionalMax = 0.6f;
-    config.shakeRangeThreshold = 1.6f;
+
+    // Gyro thresholds (tuned for easy triggering)
+    config.gyroSwipeThreshold = 100.0f;   // deg/s - swipe threshold
+    config.gyroShakeThreshold = 150.0f;   // deg/s - shake threshold
+
+    // Accel fallback (in case gyro fails)
+    config.accelSwipeThreshold = 0.6f;
+    config.accelShakeThreshold = 1.2f;
 
     GestureRecognitionResult result = detectSimpleGesture(buffer, config);
+
     if (result.gestureID >= 0 && result.confidence < _confidenceThreshold)
     {
         Logger::getInstance().log("MPU6050GestureRecognizer: gesture discarded (confidence " +

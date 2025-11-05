@@ -78,8 +78,8 @@
     "sensitivity": 4.0,
     "sampleRate": 100,
     "threshold": 500,
-    "axisMap": "xzy",
-    "axisDir": "---",
+    "axisMap": "xyz",
+    "axisDir": "--+",
     "active": true,
     "type": "mpu6050",
     "address": 104,
@@ -88,7 +88,18 @@
     "motionWakeDuration": 2,
     "motionWakeHighPass": 2,
     "motionWakeCycleRate": 1,
-    "gestureMode": "auto"
+    "gestureMode": "auto",
+    "gestureEnhanced": {
+      "enabled": true,
+      "useOrientationTracking": true,
+      "angularVelocityThreshold": 1.5,
+      "swipeAngleThreshold": 15.0,
+      "shakeAngleThreshold": 20.0,
+      "deadzone": 0.5,
+      "smoothing": 0.3,
+      "madgwickBeta": 0.1,
+      "useAdaptiveFiltering": true
+    }
   },
   "gyromouse": {
     "enabled": true,

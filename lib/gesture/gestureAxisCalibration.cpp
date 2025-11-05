@@ -12,12 +12,12 @@
 #include <ArduinoJson.h>
 #include <cmath>
 
-AxisCalibrationResult AxisCalibration::calibrate(MotionSensor* sensor, uint32_t samplingTimeMs)
+AxisCalibrationResult AxisCalibration::calibrate(GestureRead* gestureRead, uint32_t samplingTimeMs)
 {
     AxisCalibrationResult result;
 
-    if (!sensor || !sensor->isReady()) {
-        Logger::getInstance().log("[AxisCalibration] Sensor not ready");
+    if (!gestureRead) {
+        Logger::getInstance().log("[AxisCalibration] GestureRead instance is null");
         return result;
     }
 
@@ -25,27 +25,43 @@ AxisCalibrationResult AxisCalibration::calibrate(MotionSensor* sensor, uint32_t 
     Logger::getInstance().log("[AxisCalibration] Hold device in normal position (buttons facing you, vertical)");
     Logger::getInstance().log("[AxisCalibration] Keep still for " + String(samplingTimeMs / 1000) + " seconds...");
 
-    // Wake up sensor
-    if (!sensor->start()) {
-        Logger::getInstance().log("[AxisCalibration] Failed to start sensor");
+    // Start sampling at 100Hz using the dedicated task
+    if (!gestureRead->startSampling()) {
+        Logger::getInstance().log("[AxisCalibration] Failed to start sampling");
         return result;
     }
 
-    // Wait a bit for sensor to stabilize
-    delay(500);
+    // Wait for the specified duration
+    delay(samplingTimeMs);
 
-    // Collect samples
+    // Stop sampling
+    gestureRead->stopSampling();
+
+    // Get collected samples
+    SampleBuffer& samples = gestureRead->getCollectedSamples();
+
+    if (samples.sampleCount == 0) {
+        Logger::getInstance().log("[AxisCalibration] No samples collected");
+        return result;
+    }
+
+    Logger::getInstance().log("[AxisCalibration] Collected " + String(samples.sampleCount) + " samples at " +
+                             String(samples.sampleHZ) + "Hz");
+
+    // Calculate averages from all samples
     float avgX = 0, avgY = 0, avgZ = 0;
-    if (!collectSamples(sensor, samplingTimeMs, &avgX, &avgY, &avgZ)) {
-        Logger::getInstance().log("[AxisCalibration] Failed to collect samples");
-        sensor->stop();
-        return result;
+    for (uint16_t i = 0; i < samples.sampleCount; i++) {
+        // Samples are already calibrated (offset removed), so we need to add offset back to get raw values
+        avgX += samples.samples[i].x;
+        avgY += samples.samples[i].y;
+        avgZ += samples.samples[i].z;
     }
 
-    // Put sensor back to standby
-    sensor->stop();
+    avgX /= samples.sampleCount;
+    avgY /= samples.sampleCount;
+    avgZ /= samples.sampleCount;
 
-    Logger::getInstance().log("[AxisCalibration] Raw averages: X=" + String(avgX, 3) +
+    Logger::getInstance().log("[AxisCalibration] Averages: X=" + String(avgX, 3) +
                              " Y=" + String(avgY, 3) + " Z=" + String(avgZ, 3));
 
     // Determine axis mapping
@@ -64,44 +80,6 @@ AxisCalibrationResult AxisCalibration::calibrate(MotionSensor* sensor, uint32_t 
     }
 
     return result;
-}
-
-bool AxisCalibration::collectSamples(MotionSensor* sensor, uint32_t durationMs,
-                                     float* avgX, float* avgY, float* avgZ)
-{
-    const uint32_t startTime = millis();
-    uint32_t sampleCount = 0;
-    float sumX = 0, sumY = 0, sumZ = 0;
-
-    while (millis() - startTime < durationMs) {
-        if (sensor->update()) {
-            // Get RAW sensor readings (before axis mapping)
-            // We need to access the driver directly for this
-            // For now, use getMapped which applies current mapping
-            float x = sensor->getMappedX();
-            float y = sensor->getMappedY();
-            float z = sensor->getMappedZ();
-
-            sumX += x;
-            sumY += y;
-            sumZ += z;
-            sampleCount++;
-        }
-
-        delay(10);  // Sample at ~100Hz
-    }
-
-    if (sampleCount == 0) {
-        return false;
-    }
-
-    *avgX = sumX / sampleCount;
-    *avgY = sumY / sampleCount;
-    *avgZ = sumZ / sampleCount;
-
-    Logger::getInstance().log("[AxisCalibration] Collected " + String(sampleCount) + " samples");
-
-    return true;
 }
 
 int AxisCalibration::findGravityAxis(float x, float y, float z)
@@ -194,8 +172,6 @@ void AxisCalibration::determineAxisMapping(float rawX, float rawY, float rawZ,
     }
 
     // Set directions for horizontal axes
-    // These should be small, so we just set them to + by default
-    // User can fine-tune if gestures are mirrored
     dirChars[0] = '+';
     dirChars[1] = '+';
 
@@ -204,6 +180,7 @@ void AxisCalibration::determineAxisMapping(float rawX, float rawY, float rawZ,
     Logger::getInstance().log("[AxisCalibration] Determined: axisMap=\"" + axisMap +
                              "\", axisDir=\"" + axisDir + "\"");
 }
+
 bool AxisCalibration::saveToConfig(const AxisCalibrationResult& result, const char* configPath)
 {
     if (!result.success) {
@@ -226,7 +203,7 @@ bool AxisCalibration::saveToConfig(const AxisCalibrationResult& result, const ch
     }
 
     // Parse JSON
-    DynamicJsonDocument doc(8192);  // Adjust size as needed
+    DynamicJsonDocument doc(8192);
     DeserializationError error = deserializeJson(doc, file);
     file.close();
 

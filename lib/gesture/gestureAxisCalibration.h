@@ -3,26 +3,13 @@
  * Copyright (C) [2025] [Enrico Mori]
  *
  * Automatic Axis Calibration for Accelerometer/Gyroscope
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 #ifndef GESTURE_AXIS_CALIBRATION_H
 #define GESTURE_AXIS_CALIBRATION_H
 
 #include <Arduino.h>
-#include "MotionSensor.h"
+#include "gestureRead.h"
 
 /**
  * Axis calibration result
@@ -39,14 +26,8 @@ struct AxisCalibrationResult {
 /**
  * Axis Calibration Class
  *
- * Automatically determines correct axis mapping by having user hold device
- * in its normal orientation (as when pressing buttons).
- *
- * The calibration assumes:
- * - Device held vertically with buttons facing user
- * - Gravity vector points downward (Z-axis should read ~-1g)
- * - X-axis should be horizontal (left-right)
- * - Y-axis should be horizontal (forward-backward)
+ * Automatically determines correct axis mapping by sampling at 100Hz
+ * using GestureRead infrastructure.
  */
 class AxisCalibration {
 public:
@@ -55,14 +36,11 @@ public:
     /**
      * Perform automatic axis calibration
      *
-     * User should hold device in normal position (buttons facing them, vertical)
-     * and keep it still during calibration.
-     *
-     * @param sensor Motion sensor to calibrate
+     * @param gestureRead GestureRead instance to use for sampling
      * @param samplingTimeMs Time to collect samples (default 2000ms)
      * @return AxisCalibrationResult with detected axis mapping
      */
-    AxisCalibrationResult calibrate(MotionSensor* sensor, uint32_t samplingTimeMs = 2000);
+    AxisCalibrationResult calibrate(GestureRead* gestureRead, uint32_t samplingTimeMs = 2000);
 
     /**
      * Save calibration to config file
@@ -74,11 +52,6 @@ public:
     bool saveToConfig(const AxisCalibrationResult& result, const char* configPath = "/config.json");
 
 private:
-    /**
-     * Collect samples from sensor
-     */
-    bool collectSamples(MotionSensor* sensor, uint32_t durationMs, float* avgX, float* avgY, float* avgZ);
-
     /**
      * Determine which physical axis corresponds to which logical axis
      * Returns index: 0=X, 1=Y, 2=Z

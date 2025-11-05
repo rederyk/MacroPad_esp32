@@ -13,8 +13,8 @@ constexpr uint32_t kGyroReadyPollDelayMs = 5;
 constexpr float kGyroReadyMinAccelSum = 0.05f;
 constexpr float kGyroReadyNoiseFloor = 1e-4f;
 constexpr uint8_t kGyroReadyZeroTolerance = 5;
-constexpr uint8_t kMinSamplingWindowSamples = 10;       // Aim to collect at least 10 samples per gesture
-constexpr uint32_t kMinSamplingWindowFloorMs = 50;      // Never wait less than 50ms
+constexpr uint8_t kMinSamplingWindowSamples = 20;       // Increased: collect at least 20 samples per gesture for better accuracy
+constexpr uint32_t kMinSamplingWindowFloorMs = 200;     // Increased: never wait less than 200ms for quaternion convergence
 constexpr float kSensorFlushStabilityEpsilon = 0.01f;   // Threshold to treat readings as stable
 constexpr uint32_t kSensorFlushTimeoutCeilingMs = 300;  // Upper bound for flush wait
 constexpr uint8_t kSensorFlushStableReadsMin = 3;
@@ -264,10 +264,8 @@ bool GestureRead::begin(const AccelerometerConfig &config)
     return ensureSamplingTask();
 }
 
-void GestureRead::clearMemory()
+void GestureRead::clearMemoryNoLock()
 {
-    std::lock_guard<std::mutex> lock(_bufferMutex);
-
     if (_sampleBuffer.samples)
     {
         memset(_sampleBuffer.samples, 0, _maxSamples * sizeof(Sample));
@@ -277,6 +275,12 @@ void GestureRead::clearMemory()
         _writeIndex = 0;
         _totalSamples = 0;
     }
+}
+
+void GestureRead::clearMemory()
+{
+    std::lock_guard<std::mutex> lock(_bufferMutex);
+    clearMemoryNoLock();
 }
 
 void GestureRead::flushSensorBuffer()
@@ -548,6 +552,8 @@ bool GestureRead::startSampling()
         {
             return false;
         }
+        // Clear buffer immediately while holding lock to prevent race with sampling task
+        clearMemoryNoLock();
     }
 
     if (!_sensor || !_sensor->isReady())
@@ -592,8 +598,6 @@ bool GestureRead::startSampling()
 
     // Prime driver with the most recent frame so the first stored sample is current
     _sensor->update();
-
-    clearMemory();
 
     {
         std::lock_guard<std::mutex> lock(_bufferMutex);
@@ -659,6 +663,10 @@ bool GestureRead::stopSampling()
 
     const bool bufferWasFull = _sampleBuffer.sampleCount >= _maxSamples;
     _isSampling = false;
+
+    // Clear buffer immediately after stopping to prevent stale data in next capture
+    // Keep the buffer content for recognition, but reset write index and counters
+    // Note: GestureDevice reads samples before calling stopSampling, so this is safe
     lock.unlock();
 
     if (bufferWasFull)
@@ -972,80 +980,108 @@ void GestureRead::updateSampling()
     if (sampling)
     {
         // Try to update sensor - this may fail if no new data is ready yet
-        if (_sensor->update())
+        if (!_sensor->update())
         {
-            const float mappedX = getMappedX();
-            const float mappedY = getMappedY();
-            const float mappedZ = getMappedZ();
+            // No new sensor data available yet - do not store duplicate samples
+            return;
+        }
 
-            if (!std::isfinite(mappedX) || !std::isfinite(mappedY) || !std::isfinite(mappedZ))
+        const float mappedX = getMappedX();
+        const float mappedY = getMappedY();
+        const float mappedZ = getMappedZ();
+
+        if (!std::isfinite(mappedX) || !std::isfinite(mappedY) || !std::isfinite(mappedZ))
+        {
+            return;
+        }
+
+        const float accelSum = fabsf(mappedX) + fabsf(mappedY) + fabsf(mappedZ);
+        if (accelSum < kMinValidAccelMagnitude)
+        {
+            // Skip clearly stale readings (all zeros)
+            return;
+        }
+
+        // Detect duplicate samples by comparing with last stored sample
+        if (count > 0)
+        {
+            const uint16_t lastIndex = (count - 1) % _maxSamples;
+            const Sample &lastSample = _sampleBuffer.samples[lastIndex];
+
+            const float accelDiff = fabsf(mappedX - (lastSample.x + _calibrationOffset.x)) +
+                                   fabsf(mappedY - (lastSample.y + _calibrationOffset.y)) +
+                                   fabsf(mappedZ - (lastSample.z + _calibrationOffset.z));
+
+            // If accelerometer values are identical (within epsilon), check gyro too
+            if (accelDiff < 0.001f)
             {
-                return;
-            }
-
-            const float accelSum = fabsf(mappedX) + fabsf(mappedY) + fabsf(mappedZ);
-            if (accelSum < kMinValidAccelMagnitude)
-            {
-                // Skip clearly stale readings (all zeros)
-                return;
-            }
-
-            const float calibratedX = mappedX - _calibrationOffset.x;
-            const float calibratedY = mappedY - _calibrationOffset.y;
-            const float calibratedZ = mappedZ - _calibrationOffset.z;
-
-            float mappedGyroX = 0.0f;
-            float mappedGyroY = 0.0f;
-            float mappedGyroZ = 0.0f;
-            const bool gyroAvailable = _sensor->hasGyro();
-            if (gyroAvailable)
-            {
-                getMappedGyro(mappedGyroX, mappedGyroY, mappedGyroZ);
-            }
-
-            const uint16_t writeIndex = (count < _maxSamples) ? count : _writeIndex;
-            Sample &sample = _sampleBuffer.samples[writeIndex];
-
-            // Apply calibration offset (set during manual calibration)
-            sample.x = calibratedX;
-            sample.y = calibratedY;
-            sample.z = calibratedZ;
-
-            sample.gyroValid = gyroAvailable;
-            if (sample.gyroValid)
-            {
-                sample.gyroX = mappedGyroX;
-                sample.gyroY = mappedGyroY;
-                sample.gyroZ = mappedGyroZ;
-            }
-            else
-            {
-                sample.gyroX = 0.0f;
-                sample.gyroY = 0.0f;
-                sample.gyroZ = 0.0f;
-            }
-
-            sample.temperatureValid = _sensor->hasTemperature();
-            sample.temperature = sample.temperatureValid ? _sensor->readTemperatureC() : 0.0f;
-
-            const uint32_t sampleNumber = _totalSamples++;
-
-            if (count < _maxSamples)
-            {
-                _sampleBuffer.sampleCount = count + 1;
-                if (_sampleBuffer.sampleCount == _maxSamples)
+                float mappedGyroX = 0.0f, mappedGyroY = 0.0f, mappedGyroZ = 0.0f;
+                if (_sensor->hasGyro())
                 {
-                    _bufferFull = true;
-                    if (!_streamingMode)
+                    getMappedGyro(mappedGyroX, mappedGyroY, mappedGyroZ);
+                    const float gyroDiff = fabsf(mappedGyroX - lastSample.gyroX) +
+                                          fabsf(mappedGyroY - lastSample.gyroY) +
+                                          fabsf(mappedGyroZ - lastSample.gyroZ);
+
+                    if (gyroDiff < 0.001f)
                     {
-                        ledSetFull = true;
-                        requestStop = true;
+                        // Identical sample detected - skip to avoid duplicate data
+                        return;
                     }
                 }
+                else
+                {
+                    // Accel-only sensor with identical reading - skip
+                    return;
+                }
             }
-            else
+        }
+
+        const float calibratedX = mappedX - _calibrationOffset.x;
+        const float calibratedY = mappedY - _calibrationOffset.y;
+        const float calibratedZ = mappedZ - _calibrationOffset.z;
+
+        float mappedGyroX = 0.0f;
+        float mappedGyroY = 0.0f;
+        float mappedGyroZ = 0.0f;
+        const bool gyroAvailable = _sensor->hasGyro();
+        if (gyroAvailable)
+        {
+            getMappedGyro(mappedGyroX, mappedGyroY, mappedGyroZ);
+        }
+
+        const uint16_t writeIndex = (count < _maxSamples) ? count : _writeIndex;
+        Sample &sample = _sampleBuffer.samples[writeIndex];
+
+        // Apply calibration offset (set during manual calibration)
+        sample.x = calibratedX;
+        sample.y = calibratedY;
+        sample.z = calibratedZ;
+
+        sample.gyroValid = gyroAvailable;
+        if (sample.gyroValid)
+        {
+            sample.gyroX = mappedGyroX;
+            sample.gyroY = mappedGyroY;
+            sample.gyroZ = mappedGyroZ;
+        }
+        else
+        {
+            sample.gyroX = 0.0f;
+            sample.gyroY = 0.0f;
+            sample.gyroZ = 0.0f;
+        }
+
+        sample.temperatureValid = _sensor->hasTemperature();
+        sample.temperature = sample.temperatureValid ? _sensor->readTemperatureC() : 0.0f;
+
+        const uint32_t sampleNumber = _totalSamples++;
+
+        if (count < _maxSamples)
+        {
+            _sampleBuffer.sampleCount = count + 1;
+            if (_sampleBuffer.sampleCount == _maxSamples)
             {
-                _sampleBuffer.sampleCount = _maxSamples;
                 _bufferFull = true;
                 if (!_streamingMode)
                 {
@@ -1053,89 +1089,99 @@ void GestureRead::updateSampling()
                     requestStop = true;
                 }
             }
-
-            _writeIndex = (writeIndex + 1) % _maxSamples;
-            // Only update lastSampleTime when we successfully got new data
-            lastSampleTime = currentTime;
-
-            static uint8_t initialDebugLogsRemaining = 0;
-            static unsigned long lastStreamingLogMs = 0;
-            static uint32_t lastStreamingLoggedSample = 0;
-
-            if (sampleNumber == 0)
+        }
+        else
+        {
+            _sampleBuffer.sampleCount = _maxSamples;
+            _bufferFull = true;
+            if (!_streamingMode)
             {
-                initialDebugLogsRemaining = 5;
-                lastStreamingLogMs = 0;
-                lastStreamingLoggedSample = 0;
+                ledSetFull = true;
+                requestStop = true;
             }
+        }
 
-            bool shouldEmitLog = false;
+        _writeIndex = (writeIndex + 1) % _maxSamples;
+        // Only update lastSampleTime when we successfully got new data
+        lastSampleTime = currentTime;
 
-            if (initialDebugLogsRemaining > 0)
+        static uint8_t initialDebugLogsRemaining = 0;
+        static unsigned long lastStreamingLogMs = 0;
+        static uint32_t lastStreamingLoggedSample = 0;
+
+        if (sampleNumber == 0)
+        {
+            initialDebugLogsRemaining = 5;
+            lastStreamingLogMs = 0;
+            lastStreamingLoggedSample = 0;
+        }
+
+        bool shouldEmitLog = false;
+
+        if (initialDebugLogsRemaining > 0)
+        {
+            shouldEmitLog = true;
+            initialDebugLogsRemaining--;
+        }
+        else if (_streamingMode)
+        {
+            const unsigned long elapsedMs = (lastStreamingLogMs <= currentTime)
+                                                ? (currentTime - lastStreamingLogMs)
+                                                : 0;
+            const uint32_t samplesSinceLast = (sampleNumber >= lastStreamingLoggedSample)
+                                                  ? (sampleNumber - lastStreamingLoggedSample)
+                                                  : 0;
+
+            if (elapsedMs >= 500 || samplesSinceLast >= 50)
             {
                 shouldEmitLog = true;
-                initialDebugLogsRemaining--;
             }
-            else if (_streamingMode)
-            {
-                const unsigned long elapsedMs = (lastStreamingLogMs <= currentTime)
-                                                    ? (currentTime - lastStreamingLogMs)
-                                                    : 0;
-                const uint32_t samplesSinceLast = (sampleNumber >= lastStreamingLoggedSample)
-                                                      ? (sampleNumber - lastStreamingLoggedSample)
-                                                      : 0;
-
-                if (elapsedMs >= 500 || samplesSinceLast >= 50)
-                {
-                    shouldEmitLog = true;
-                }
-            }
-
-            if (shouldEmitLog)
-            {
-                String logMsg = "gesture_sample idx=" + String(sampleNumber) +
-                                " mapped=[" + String(mappedX, 4) + "," + String(mappedY, 4) + "," + String(mappedZ, 4) + "]" +
-                                " offset=[" + String(_calibrationOffset.x, 4) + "," + String(_calibrationOffset.y, 4) + "," + String(_calibrationOffset.z, 4) + "]" +
-                                " calibrated=[" + String(sample.x, 4) + "," + String(sample.y, 4) + "," + String(sample.z, 4) + "]";
-
-                if (sample.gyroValid)
-                {
-                    logMsg += " gyro=[" + String(sample.gyroX, 4) + "," + String(sample.gyroY, 4) + "," + String(sample.gyroZ, 4) + "]";
-                }
-                else
-                {
-                    logMsg += " gyro=NA";
-                }
-
-                if (sample.temperatureValid)
-                {
-                    logMsg += " temp=" + String(sample.temperature, 2) + "C";
-                }
-
-                Logger::getInstance().log(logMsg);
-
-                if (_streamingMode)
-                {
-                    lastStreamingLogMs = currentTime;
-                    lastStreamingLoggedSample = sampleNumber;
-                }
-            }
-
-            float x = fabsf(sample.x);
-            float y = fabsf(sample.y);
-            float z = fabsf(sample.z);
-
-            const float maxRange = _config.sensitivity;
-            x = x > maxRange ? maxRange : x;
-            y = y > maxRange ? maxRange : y;
-            z = z > maxRange ? maxRange : z;
-
-            const int r = static_cast<int>(x * 255.0f / maxRange);
-            const int g = static_cast<int>(y * 255.0f / maxRange);
-            const int b = static_cast<int>(z * 255.0f / maxRange);
-
-            Led::getInstance().setColor(r, g, b, false);
         }
+
+        if (shouldEmitLog)
+        {
+            String logMsg = "gesture_sample idx=" + String(sampleNumber) +
+                            " mapped=[" + String(mappedX, 4) + "," + String(mappedY, 4) + "," + String(mappedZ, 4) + "]" +
+                            " offset=[" + String(_calibrationOffset.x, 4) + "," + String(_calibrationOffset.y, 4) + "," + String(_calibrationOffset.z, 4) + "]" +
+                            " calibrated=[" + String(sample.x, 4) + "," + String(sample.y, 4) + "," + String(sample.z, 4) + "]";
+
+            if (sample.gyroValid)
+            {
+                logMsg += " gyro=[" + String(sample.gyroX, 4) + "," + String(sample.gyroY, 4) + "," + String(sample.gyroZ, 4) + "]";
+            }
+            else
+            {
+                logMsg += " gyro=NA";
+            }
+
+            if (sample.temperatureValid)
+            {
+                logMsg += " temp=" + String(sample.temperature, 2) + "C";
+            }
+
+            Logger::getInstance().log(logMsg);
+
+            if (_streamingMode)
+            {
+                lastStreamingLogMs = currentTime;
+                lastStreamingLoggedSample = sampleNumber;
+            }
+        }
+
+        float x = fabsf(sample.x);
+        float y = fabsf(sample.y);
+        float z = fabsf(sample.z);
+
+        const float maxRange = _config.sensitivity;
+        x = x > maxRange ? maxRange : x;
+        y = y > maxRange ? maxRange : y;
+        z = z > maxRange ? maxRange : z;
+
+        const int r = static_cast<int>(x * 255.0f / maxRange);
+        const int g = static_cast<int>(y * 255.0f / maxRange);
+        const int b = static_cast<int>(z * 255.0f / maxRange);
+
+        Led::getInstance().setColor(r, g, b, false);
     }
     else
     {

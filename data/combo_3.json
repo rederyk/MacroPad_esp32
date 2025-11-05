@@ -1,12 +1,12 @@
 {
   "1": [
-    "S_B:SUPER+TAB"
+    "S_B:TAB"
   ],
   "2": [
     "S_B:UP_ARROW"
   ],
   "3": [
-    "S_B:SUPER"
+    "S_B:ESC"
   ],
   "4": [
     "S_B:LEFT_ARROW"
@@ -24,16 +24,16 @@
     "S_B:DOWN_ARROW"
   ],
   "9": [
-    "S_B:ESC"
+    "S_B: "
   ],
   "G_SHAKE": [
-    "S_B:SUPER+d"
+    "S_B:CTRL+SHIFT,n"
   ],
   "G_SWIPE_LEFT": [
-    "S_B:CTRL+SUPER,LEFT_ARROW"
+    "S_B:ALT+TAB"
   ],
   "G_SWIPE_RIGHT": [
-    "S_B:CTRL+SUPER,RIGHT_ARROW"
+    "S_B:ALT+SHIFT,TAB"
   ],
   "G_TILT_LEFT": [
     "S_B:CTRL+SHIFT,TAB"
@@ -42,61 +42,73 @@
     "S_B:CTRL+TAB"
   ],
   "G_TILT_FORWARD": [
-    "S_B:SUPER+UP_ARROW"
+    "S_B:PAGE_UP"
   ],
   "G_TILT_BACKWARD": [
-    "S_B:SUPER+DOWN_ARROW"
+    "S_B:PAGE_DOWN"
   ],
-  "1+5": [
-    "S_B:SUPER+r"
-  ],
-  "2+5": [
-    "S_B:ALT+F4"
-  ],
-  "3+5": [
-    "S_B:SUPER+l"
-  ],
-  "4+5": [
-    "S_B:SUPER+CTRL,LEFT_ARROW"
-  ],
-  "5+6": [
-    "S_B:SUPER+CTRL,RIGHT_ARROW"
-  ],
-  "1+4": [
-    "S_B:SUPER+e"
-  ],
-  "2+8": [
-    "S_B:SUPER+i"
-  ],
-  "3+6": [
-    "S_B:SUPER+a"
-  ],
-  "1+2+3": [
-    "S_B:CTRL+SHIFT,ESC"
-  ],
-  "7+8+9": [
-    "S_B:CTRL+ALT,DELETE"
-  ],
-  "4+5+6": [
-    "S_B:SUPER+x"
-  ],
-  "1+3": [
-    "S_B:SUPER+SHIFT,s"
-  ],
-  "7+9": [
-    "S_B:ALT+TAB"
+  "1+2": [
+    "S_B:CTRL+a"
   ],
   "2+3": [
-    "S_B:SUPER+v"
+    "S_B:CTRL+c"
+  ],
+  "7+8": [
+    "S_B:CTRL+v"
+  ],
+  "8+9": [
+    "S_B:CTRL+z"
+  ],
+  "1+5": [
+    "S_B:CTRL+t"
+  ],
+  "2+5": [
+    "S_B:CTRL+w"
+  ],
+  "3+5": [
+    "S_B:CTRL+l"
+  ],
+  "4+5": [
+    "S_B:CTRL+SHIFT,TAB"
+  ],
+  "5+6": [
+    "S_B:CTRL+TAB"
+  ],
+  "1+4": [
+    "S_B:CTRL+f"
+  ],
+  "3+6": [
+    "S_B:CTRL+h"
+  ],
+  "1+3": [
+    "S_B:CTRL+s"
+  ],
+  "7+9": [
+    "S_B:CTRL+r"
+  ],
+  "4+5+6": [
+    "S_B:CTRL+SHIFT,t"
+  ],
+  "1+2+3": [
+    "S_B:CTRL+n"
+  ],
+  "2+8": [
+    "S_B:VOL_UP"
+  ],
+  "4+6": [
+    "S_B:VOL_DOWN"
+  ],
+  "5+8": [
+    "S_B:PLAY_PAUSE"
+  ],
+  "4+8": [
+    "S_B:PREVIOUS_TRACK"
+  ],
+  "6+8": [
+    "S_B:NEXT_TRACK"
   ],
   "5,BUTTON": [
     "S_B:MOUSE_LEFT"
-  ],
-  "1,CW": [
-    "S_B:VOL_UP"
-  ],
-  "1,CCW": [
-    "S_B:VOL_DOWN"
   ],
   "CW": [
     "S_B:MOUSE_MOVE_0_0_1_0"
