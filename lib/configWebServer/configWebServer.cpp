@@ -682,17 +682,27 @@ void configWebServer::setupRoutes()
             Logger::getInstance().log("  → Added: " + fileName + " (" + String(rawContent.length()) + " bytes)");
         }
 
-        String payload;
+        if (doc.overflowed())
+        {
+            Logger::getInstance().log("⚠️ JSON document overflowed while building combo file list");
+            request->send(500, "text/plain", "❌ Internal error: combo list too large.");
+            return;
+        }
+
         size_t jsonSize = measureJson(doc);
         Logger::getInstance().log("📊 JSON size: " + String(jsonSize) + " bytes");
 
+        String payload;
+        if (!payload.reserve(jsonSize + 1))
+        {
+            Logger::getInstance().log("⚠️ Failed to reserve payload buffer of " + String(jsonSize + 1) + " bytes");
+            request->send(500, "text/plain", "❌ Out of memory while preparing response.");
+            return;
+        }
+
         serializeJson(doc, payload);
         Logger::getInstance().log("📤 Sending combo_files.json payload, size: " + String(payload.length()) + " bytes");
-
-        // Send with chunked transfer encoding if too large
-        AsyncResponseStream *response = request->beginResponseStream("application/json");
-        serializeJson(doc, *response);
-        request->send(response); });
+        request->send(200, "application/json", payload); });
 
     server.on("/combo_files.json", HTTP_POST, [](AsyncWebServerRequest *request) {},
               nullptr,

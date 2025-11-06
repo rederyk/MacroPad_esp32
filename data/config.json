@@ -79,7 +79,6 @@
     "sampleRate": 100,
     "threshold": 500,
     "axisMap": "xyz",
-    "axisDir": "+-+",
     "active": true,
     "type": "mpu6050",
     "address": 104,
@@ -104,7 +103,7 @@
   "gyromouse": {
     "enabled": true,
     "smoothing": 0.15,
-    "invertX": false,
+    "invertX": true,
     "invertY": false,
     "swapAxes": false,
     "defaultSensitivity": 1,

@@ -417,10 +417,10 @@ Il file `data/config.json` contiene tutta la configurazione hardware e sistema.
 ### Modalità GyroMouse
 
 - Premi `4+7` per attivare/disattivare la modalità (combinazione definita in `combo_common.json`).
-- All'attivazione vengono caricati i bindings dal file `gyromouse_combo_0.json` (tasti 1/2/3/4/6 per i pulsanti del mouse, encoder per lo scroll, tasto `5` per uscire, pulsante encoder per cambiare sensibilità).
+- All'attivazione vengono caricati i bindings dal file `combo_gyromouse_0.json` (tasti 1/2/3/4/6 per i pulsanti del mouse, encoder per lo scroll, tasto `5` per uscire, pulsante encoder per cambiare sensibilità).
 - Alla disattivazione il sistema ripristina automaticamente il set di combo precedente.
 - Per funzionare correttamente richiede **BLE attivo** e l'accelerometro inizializzato; se BLE è spento viene stampato un warning e la modalità non parte.
-- Puoi personalizzare sensibilità, deadzone e mapping modificando sia la sezione `gyromouse` in `config.json` sia il file `data/gyromouse_combo_0.json`.
+- Puoi personalizzare sensibilità, deadzone e mapping modificando sia la sezione `gyromouse` in `config.json` sia il file `data/combo_gyromouse_0.json`.
 
 ### Parametri Critici da Verificare
 

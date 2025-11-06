@@ -34,7 +34,7 @@
 #endif
 
 #ifndef COMBO_MAIN_DOC_SIZE
-    #define COMBO_MAIN_DOC_SIZE 3072    // Main buffer for all combined combos (~3KB)
+    #define COMBO_MAIN_DOC_SIZE 10240   // Main buffer for all combined combos (~10KB, increased to prevent overflow)
 #endif
 
 #ifndef COMBO_FILE_WARNING_SIZE

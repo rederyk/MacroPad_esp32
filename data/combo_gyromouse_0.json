@@ -19,6 +19,7 @@
   "4": ["S_B:MOUSE_BACKWARD"],
   "5": ["GYROMOUSE_STOP"],
   "6": ["S_B:MOUSE_FORWARD"],
+  "8": ["S_B:SUPER"],
 
   "7": [
     "S_B:BACKSPACE"

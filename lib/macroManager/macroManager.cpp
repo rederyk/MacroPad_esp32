@@ -322,7 +322,7 @@ void MacroManager::pressAction(const std::string &action)
             if (gyroModeActive)
             {
                 pendingComboSwitchFlag = true;
-                pendingComboPrefix = "gyromouse_combo";
+                pendingComboPrefix = "combo_gyromouse";
                 pendingComboSetNumber = 0;
             }
             else
