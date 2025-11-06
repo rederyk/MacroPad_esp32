@@ -20,9 +20,18 @@
 #include "powerManager.h"
 #include <vector>
 #include "gestureRead.h"
+#include "specialAction.h"
+#include "GyroMouse.h"
 #include <driver/rtc_io.h>
+
+extern SpecialAction specialAction;
+extern GyroMouse gyroMouse;
+
 PowerManager::PowerManager() : lastActivityTime(0),
                                inactivityTimeout(300000), // Default 5 minutes
+                               mouseInactivityTimeout(300000),
+                               irInactivityTimeout(300000),
+                               lastEffectiveTimeout(300000),
                                sleepEnabled(true),
                                isBleMode(false),
                                wakeupPin(GPIO_NUM_0), // Default pin
@@ -36,6 +45,17 @@ void PowerManager::begin(const SystemConfig &sysConfig, const KeypadConfig &keyp
     // Initialize with config values
     sleepEnabled = sysConfig.sleep_enabled;
     inactivityTimeout = sysConfig.sleep_timeout_ms;
+    mouseInactivityTimeout = sysConfig.sleep_timeout_mouse_ms;
+    irInactivityTimeout = sysConfig.sleep_timeout_ir_ms;
+    if (mouseInactivityTimeout == 0)
+    {
+        mouseInactivityTimeout = inactivityTimeout;
+    }
+    if (irInactivityTimeout == 0)
+    {
+        irInactivityTimeout = inactivityTimeout;
+    }
+    lastEffectiveTimeout = inactivityTimeout;
     isBleMode = sysConfig.enable_BLE;
 
     wakeupPin = sysConfig.wakeup_pin;
@@ -63,6 +83,23 @@ void PowerManager::registerActivity()
     resetActivityTimer();
 }
 
+unsigned long PowerManager::getEffectiveTimeout() const
+{
+    unsigned long effective = inactivityTimeout;
+
+    if (gyroMouse.isRunning() && mouseInactivityTimeout > 0)
+    {
+        effective = mouseInactivityTimeout;
+    }
+
+    if (specialAction.isIrModeActive() && irInactivityTimeout > 0)
+    {
+        effective = irInactivityTimeout;
+    }
+
+    return effective;
+}
+
 bool PowerManager::checkInactivity()
 {
     if (!sleepEnabled || !isBleMode)
@@ -70,12 +107,30 @@ bool PowerManager::checkInactivity()
         return false; // Sleep disabled or not in BLE mode
     }
 
-    return (millis() - lastActivityTime > inactivityTimeout);
+    const unsigned long effectiveTimeout = getEffectiveTimeout();
+    lastEffectiveTimeout = effectiveTimeout;
+
+    if (effectiveTimeout == 0)
+    {
+        return false;
+    }
+
+    return (millis() - lastActivityTime > effectiveTimeout);
 }
 
 void PowerManager::enterDeepSleep(bool force)
 {
-    if (!isBleMode&&!force)
+    if (force)
+    {
+        unsigned long computed = getEffectiveTimeout();
+        if (computed == 0)
+        {
+            computed = inactivityTimeout;
+        }
+        lastEffectiveTimeout = computed;
+    }
+
+    if (!isBleMode && !force)
     {
         Logger::getInstance().log("⚠️ Sleep mode only available in BLE mode ⚠️");
         return;
@@ -179,10 +234,26 @@ void PowerManager::enterDeepSleep(bool force)
     // Configure wakeup sources first (before animation)
     esp_sleep_enable_timer_wakeup(28800000000ULL); // 8h backup
     // Comprehensive sleep parameters table
+    const unsigned long timeoutForLog = lastEffectiveTimeout > 0 ? lastEffectiveTimeout : inactivityTimeout;
+    const String timeoutStr = String(timeoutForLog / 1000);
+    int timeoutPadding = 18 - timeoutStr.length();
+    if (timeoutPadding < 0)
+    {
+        timeoutPadding = 0;
+    }
+    String timeoutPaddingStr;
+    if (timeoutPadding > 0)
+    {
+        timeoutPaddingStr.reserve(timeoutPadding);
+        for (int i = 0; i < timeoutPadding; ++i)
+        {
+            timeoutPaddingStr += ' ';
+        }
+    }
     Logger::getInstance().log("╔═════════════════════════════════════════════════╗");
     Logger::getInstance().log("║                  🔋 SLEEP PARAMS                 ║");
     Logger::getInstance().log("╠═════════════════════════════════════════════════╣");
-    Logger::getInstance().log("║ Timeout (s):  " + String(inactivityTimeout / 1000) + String(" ").substring(0, 18 - String(inactivityTimeout / 1000).length()) + "║");
+    Logger::getInstance().log("║ Timeout (s):  " + timeoutStr + timeoutPaddingStr + "║");
     Logger::getInstance().log("║ Wakeup Pin:   " + String(wakeupPin) + String(" ").substring(0, 18 - String(wakeupPin).length()) + "║");
     Logger::getInstance().log("║ Backup Time:  8h" + String(" ").substring(0, 20) + "║");
     Logger::getInstance().log("║ Free Memory:  " + String(ESP.getFreeHeap() / 1024) + " KB" + String(" ").substring(0, 16 - String(ESP.getFreeHeap() / 1024).length()) + "║");

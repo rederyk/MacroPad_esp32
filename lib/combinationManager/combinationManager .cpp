@@ -20,6 +20,7 @@
 #include "combinationManager.h"
 #include <LittleFS.h>
 #include "Logger.h"
+#include "FileSystemManager.h"
 
 CombinationManager::CombinationManager() : currentSetNumber(0), currentPrefix("combo") {}
 
@@ -140,7 +141,7 @@ void CombinationManager::parseSettings(JsonObject& obj)
 
 bool CombinationManager::loadCombinationsInternal(int setNumber, const char* prefix)
 {
-    if (!LittleFS.begin(true))
+    if (!FileSystemManager::ensureMounted())
     {
         Logger::getInstance().log("Failed to mount LittleFS");
         return false;
@@ -172,7 +173,6 @@ bool CombinationManager::loadCombinationsInternal(int setNumber, const char* pre
         if (!mergeJsonFile("/combo_0.json", combinations))
         {
             Logger::getInstance().log("Failed to load combo_0.json");
-            LittleFS.end();
             return false;
         }
         // Reset to default if fallback was used
@@ -186,10 +186,8 @@ bool CombinationManager::loadCombinationsInternal(int setNumber, const char* pre
         currentPrefix = String(prefix);
     }
 
-    // Parse settings before closing LittleFS
+    // Parse settings while filesystem is available
     parseSettings(combinations);
-
-    LittleFS.end();
 
     // Validate that we have at least some combinations (excluding _settings)
     int comboCount = combinations.size();

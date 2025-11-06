@@ -3,6 +3,7 @@
 #include <IRremoteESP8266.h>
 #include <LittleFS.h>
 #include "IRutils.h"
+#include "FileSystemManager.h"
 
 IRStorage::IRStorage() : _fsInitialized(false)
 {
@@ -17,9 +18,7 @@ IRStorage::~IRStorage()
 
 bool IRStorage::begin()
 {
-    // Try to initialize LittleFS
-    _fsInitialized = LittleFS.begin();
-
+    _fsInitialized = FileSystemManager::ensureMounted();
     // Note: Cannot use Logger here as it might cause circular dependency
     // The calling code in main.cpp will log the success/failure
 
@@ -34,8 +33,7 @@ void IRStorage::end()
 {
     if (_fsInitialized)
     {
-       // saveIRData();
-        LittleFS.end();
+        // saveIRData();
         _fsInitialized = false;
     }
 }
@@ -226,4 +224,3 @@ JsonObject IRStorage::getDeviceCommands(const String &deviceName) {
 JsonObject IRStorage::getCommand(const String &deviceName, const String &commandName) {
     return _jsonDoc["devices"][deviceName][commandName].as<JsonObject>();
 }
-

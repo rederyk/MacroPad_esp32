@@ -139,6 +139,8 @@ struct SystemConfig
     // Nuovi campi per la gestione del power
     bool sleep_enabled;             // Abilitare il sleep mode
     unsigned long sleep_timeout_ms; // Timeout di inattività in millisecondi
+    unsigned long sleep_timeout_mouse_ms; // Timeout dedicato per modalità mouse
+    unsigned long sleep_timeout_ir_ms;    // Timeout dedicato per modalità IR
     gpio_num_t wakeup_pin;                 // Pin GPIO per il wakeup
 };
 // TODO add config for ir from json in all class

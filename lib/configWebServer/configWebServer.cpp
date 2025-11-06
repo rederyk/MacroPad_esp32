@@ -24,6 +24,7 @@
 #include <cctype>
 #include <vector>
 #include "Logger.h"
+#include "FileSystemManager.h"
 
 AsyncWebServer server(80);
 AsyncEventSource events("/log");
@@ -306,7 +307,7 @@ configWebServer::configWebServer() : server(80) {}
 
 void configWebServer::begin()
 {
-    if (!LittleFS.begin())
+    if (!FileSystemManager::ensureMounted())
     {
         Logger::getInstance().log("⚠️ Failed to mount LittleFS.");
         return;

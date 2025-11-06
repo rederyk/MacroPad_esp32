@@ -33,6 +33,7 @@
 #include "Led.h"
 #include "configManager.h"
 #include "InputHub.h"
+#include "FileSystemManager.h"
 
 extern InputHub inputHub;
 
@@ -429,7 +430,7 @@ void SpecialAction::printMemoryInfo()
     Logger::getInstance().log(String("Free flash memory: ") + String(ESP.getFlashChipSize() - ESP.getSketchSize()).c_str() + String(" bytes"));
 
     // Log LittleFS information
-    if (LittleFS.begin())
+    if (FileSystemManager::ensureMounted(false))
     {
         Logger::getInstance().log((String("LittleFS total space: ") + String(LittleFS.totalBytes())).c_str());
         Logger::getInstance().log(String("LittleFS used space: ") + String(LittleFS.usedBytes()).c_str());
@@ -452,7 +453,7 @@ void SpecialAction::hopBleDevice()
         return;
     }
 
-    if (LittleFS.begin())
+    if (FileSystemManager::ensureMounted())
     {
         File configFile = LittleFS.open("/config.json", "r");
         if (!configFile)
@@ -503,7 +504,7 @@ void SpecialAction::hopBleDevice()
 
 void SpecialAction::toggleBleWifi()
 {
-    if (!LittleFS.begin(true))
+    if (!FileSystemManager::ensureMounted())
     {
         Logger::getInstance().log("Failed to initialize LittleFS");
         return;
@@ -565,7 +566,7 @@ void SpecialAction::toggleBleWifi()
 void SpecialAction::toggleAP(bool toggle)
 {
     // Nuovo metodo per accendere in modo utile AP
-    if (!LittleFS.begin(true))
+    if (!FileSystemManager::ensureMounted())
     {
         Logger::getInstance().log("Failed to initialize LittleFS");
         return;
@@ -1403,6 +1404,11 @@ void SpecialAction::restoreLedColor()
     {
         Logger::getInstance().log("No saved LED color available for restore");
     }
+}
+
+bool SpecialAction::isIrModeActive() const
+{
+    return currentLedMode == LedMode::IR_SCAN || currentLedMode == LedMode::IR_SEND;
 }
 
 void SpecialAction::setReactiveLightingActive(bool active)

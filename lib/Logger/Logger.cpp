@@ -18,6 +18,13 @@
 
 
 #include "Logger.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/portmacro.h>
+
+namespace
+{
+    portMUX_TYPE g_logBufferMux = portMUX_INITIALIZER_UNLOCKED;
+}
 
 
 Logger &Logger::getInstance()
@@ -28,31 +35,41 @@ Logger &Logger::getInstance()
 
 void Logger::log(const String &message, bool newLine)
 {
-    // Inserisce il messaggio nel buffer circolare (con protezione in caso di interruzioni)
-    noInterrupts();
+    LogEntry newEntry{message, newLine};
+
+    portENTER_CRITICAL(&g_logBufferMux);
+    logBuffer[bufferWriteIndex] = newEntry;
+
     if (bufferCount < BUFFER_SIZE)
     {
-        logBuffer[bufferWriteIndex] = { message, newLine };
-        bufferWriteIndex = (bufferWriteIndex + 1) % BUFFER_SIZE;
-        bufferCount++;
+        ++bufferCount;
     }
     else
     {
-        // Buffer pieno: sovrascrive l'elemento più vecchio
-        logBuffer[bufferWriteIndex] = { message, newLine };
-        bufferWriteIndex = (bufferWriteIndex + 1) % BUFFER_SIZE;
         bufferReadIndex = (bufferReadIndex + 1) % BUFFER_SIZE;
     }
-    interrupts();
 
-
+    bufferWriteIndex = (bufferWriteIndex + 1) % BUFFER_SIZE;
+    portEXIT_CRITICAL(&g_logBufferMux);
 }
 
 void Logger::processBuffer()
 {
-    while (bufferCount > 0)
+    while (true)
     {
-        LogEntry entry = logBuffer[bufferReadIndex];
+        LogEntry entry;
+
+        portENTER_CRITICAL(&g_logBufferMux);
+        if (bufferCount == 0)
+        {
+            portEXIT_CRITICAL(&g_logBufferMux);
+            break;
+        }
+
+        entry = logBuffer[bufferReadIndex];
+        bufferReadIndex = (bufferReadIndex + 1) % BUFFER_SIZE;
+        --bufferCount;
+        portEXIT_CRITICAL(&g_logBufferMux);
 
         // Invio sull'output seriale, se abilitato
         if (serialEnabled && Serial)
@@ -75,9 +92,6 @@ void Logger::processBuffer()
                 output(entry.message);
             }
         }
-
-        bufferReadIndex = (bufferReadIndex + 1) % BUFFER_SIZE;
-        bufferCount--;
     }
 }
 

@@ -11,6 +11,7 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <cmath>
+#include "FileSystemManager.h"
 
 AxisCalibrationResult AxisCalibration::calibrate(GestureRead* gestureRead, uint32_t samplingTimeMs)
 {
@@ -189,7 +190,7 @@ bool AxisCalibration::saveToConfig(const AxisCalibrationResult& result, const ch
     }
 
     // Mount filesystem
-    if (!LittleFS.begin()) {
+    if (!FileSystemManager::ensureMounted()) {
         Logger::getInstance().log("[AxisCalibration] Failed to mount LittleFS");
         return false;
     }
@@ -198,7 +199,6 @@ bool AxisCalibration::saveToConfig(const AxisCalibrationResult& result, const ch
     File file = LittleFS.open(configPath, "r");
     if (!file) {
         Logger::getInstance().log("[AxisCalibration] Failed to open config file");
-        LittleFS.end();
         return false;
     }
 
@@ -209,7 +209,6 @@ bool AxisCalibration::saveToConfig(const AxisCalibrationResult& result, const ch
 
     if (error) {
         Logger::getInstance().log("[AxisCalibration] Failed to parse JSON: " + String(error.c_str()));
-        LittleFS.end();
         return false;
     }
 
@@ -219,7 +218,6 @@ bool AxisCalibration::saveToConfig(const AxisCalibrationResult& result, const ch
         doc["accelerometer"]["axisDir"] = result.axisDir;
     } else {
         Logger::getInstance().log("[AxisCalibration] No accelerometer section in config");
-        LittleFS.end();
         return false;
     }
 
@@ -227,13 +225,11 @@ bool AxisCalibration::saveToConfig(const AxisCalibrationResult& result, const ch
     file = LittleFS.open(configPath, "w");
     if (!file) {
         Logger::getInstance().log("[AxisCalibration] Failed to open config for writing");
-        LittleFS.end();
         return false;
     }
 
     serializeJson(doc, file);
     file.close();
-    LittleFS.end();
 
     Logger::getInstance().log("[AxisCalibration] Calibration saved to " + String(configPath));
     Logger::getInstance().log("[AxisCalibration] Restart device to apply changes");

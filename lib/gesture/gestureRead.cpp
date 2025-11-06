@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <cstdio>
 
 // Forward declaration to avoid circular dependency
 class SpecialAction {
@@ -1119,7 +1120,7 @@ void GestureRead::updateSampling()
 
         if (sampleNumber == 0)
         {
-            initialDebugLogsRemaining = 5;
+            initialDebugLogsRemaining = 3;
             lastStreamingLogMs = 0;
             lastStreamingLoggedSample = 0;
         }
@@ -1140,7 +1141,7 @@ void GestureRead::updateSampling()
                                                   ? (sampleNumber - lastStreamingLoggedSample)
                                                   : 0;
 
-            if (elapsedMs >= 500 || samplesSinceLast >= 50)
+            if (elapsedMs >= 2000 || samplesSinceLast >= 200)
             {
                 shouldEmitLog = true;
             }
@@ -1148,26 +1149,55 @@ void GestureRead::updateSampling()
 
         if (shouldEmitLog)
         {
-            String logMsg = "gesture_sample idx=" + String(sampleNumber) +
-                            " mapped=[" + String(mappedX, 4) + "," + String(mappedY, 4) + "," + String(mappedZ, 4) + "]" +
-                            " offset=[" + String(_calibrationOffset.x, 4) + "," + String(_calibrationOffset.y, 4) + "," + String(_calibrationOffset.z, 4) + "]" +
-                            " calibrated=[" + String(sample.x, 4) + "," + String(sample.y, 4) + "," + String(sample.z, 4) + "]";
+            char logBuffer[256];
+            int length = snprintf(
+                logBuffer,
+                sizeof(logBuffer),
+                "gesture_sample idx=%lu mapped=[%.4f,%.4f,%.4f] offset=[%.4f,%.4f,%.4f] calibrated=[%.4f,%.4f,%.4f]",
+                static_cast<unsigned long>(sampleNumber),
+                mappedX,
+                mappedY,
+                mappedZ,
+                _calibrationOffset.x,
+                _calibrationOffset.y,
+                _calibrationOffset.z,
+                sample.x,
+                sample.y,
+                sample.z);
+
+            if (length < 0)
+            {
+                length = 0;
+            }
 
             if (sample.gyroValid)
             {
-                logMsg += " gyro=[" + String(sample.gyroX, 4) + "," + String(sample.gyroY, 4) + "," + String(sample.gyroZ, 4) + "]";
+                length += snprintf(
+                    logBuffer + length,
+                    length < static_cast<int>(sizeof(logBuffer)) ? sizeof(logBuffer) - length : 0,
+                    " gyro=[%.4f,%.4f,%.4f]",
+                    sample.gyroX,
+                    sample.gyroY,
+                    sample.gyroZ);
             }
             else
             {
-                logMsg += " gyro=NA";
+                length += snprintf(
+                    logBuffer + length,
+                    length < static_cast<int>(sizeof(logBuffer)) ? sizeof(logBuffer) - length : 0,
+                    " gyro=NA");
             }
 
             if (sample.temperatureValid)
             {
-                logMsg += " temp=" + String(sample.temperature, 2) + "C";
+                snprintf(
+                    logBuffer + length,
+                    length < static_cast<int>(sizeof(logBuffer)) ? sizeof(logBuffer) - length : 0,
+                    " temp=%.2fC",
+                    sample.temperature);
             }
 
-            Logger::getInstance().log(logMsg);
+            Logger::getInstance().log(String(logBuffer));
 
             if (_streamingMode)
             {

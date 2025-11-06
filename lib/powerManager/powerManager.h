@@ -33,11 +33,16 @@ class PowerManager
 private:
     unsigned long lastActivityTime;
     unsigned long inactivityTimeout; // in milliseconds
+    unsigned long mouseInactivityTimeout;
+    unsigned long irInactivityTimeout;
+    unsigned long lastEffectiveTimeout;
     bool sleepEnabled;
     bool isBleMode;
     gpio_num_t wakeupPin;
     gpio_num_t fallbackWakePin;
     bool fallbackWakePinValid;
+
+    unsigned long getEffectiveTimeout() const;
 
 public:
     PowerManager();

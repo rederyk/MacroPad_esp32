@@ -21,12 +21,13 @@
 #include <ArduinoJson.h>
 #include <Arduino.h>
 #include "Logger.h"
+#include "FileSystemManager.h"
 
 ConfigurationManager::ConfigurationManager() : systemConfig() {}
 
 bool ConfigurationManager::loadConfig()
 {
-    if (!LittleFS.begin(true))
+    if (!FileSystemManager::ensureMounted())
     {
         Logger::getInstance().log("Failed to mount LittleFS");
         return false;
@@ -36,7 +37,6 @@ bool ConfigurationManager::loadConfig()
     if (!configFile)
     {
         Logger::getInstance().log("Failed to open config file");
-        LittleFS.end();
         return false;
     }
 
@@ -59,7 +59,6 @@ bool ConfigurationManager::loadConfig()
     {
         Logger::getInstance().log("Failed to parse config file: " + String(error.c_str()));
         configFile.close();
-        LittleFS.end();
         return false;
     }
 
@@ -107,6 +106,11 @@ bool ConfigurationManager::loadConfig()
     gyroMouseConfig.absoluteRangeX = 0;
     gyroMouseConfig.absoluteRangeY = 0;
 
+    systemConfig.sleep_enabled = true;
+    systemConfig.sleep_timeout_ms = 300000;
+    systemConfig.sleep_timeout_mouse_ms = 0;
+    systemConfig.sleep_timeout_ir_ms = 0;
+
     // Load wifi configuration if it exists
     JsonVariant wifiConfigJson = doc["wifi"];
     if (!wifiConfigJson.isNull() && wifiConfigJson.is<JsonObject>())
@@ -140,6 +144,10 @@ bool ConfigurationManager::loadConfig()
 
         if (systemConfigJson.containsKey("sleep_timeout_ms"))
             this->systemConfig.sleep_timeout_ms = systemConfigJson["sleep_timeout_ms"];
+        if (systemConfigJson.containsKey("sleep_timeout_mouse_ms"))
+            this->systemConfig.sleep_timeout_mouse_ms = systemConfigJson["sleep_timeout_mouse_ms"];
+        if (systemConfigJson.containsKey("sleep_timeout_ir_ms"))
+            this->systemConfig.sleep_timeout_ir_ms = systemConfigJson["sleep_timeout_ir_ms"];
 
         if (systemConfigJson.containsKey("BleMacAdd"))
             this->systemConfig.BleMacAdd = systemConfigJson["BleMacAdd"];
@@ -147,6 +155,15 @@ bool ConfigurationManager::loadConfig()
             this->systemConfig.combo_timeout = systemConfigJson["combo_timeout"];
         if (systemConfigJson.containsKey("BleName"))
             this->systemConfig.BleName = systemConfigJson["BleName"].as<String>();
+    }
+
+    if (this->systemConfig.sleep_timeout_mouse_ms == 0)
+    {
+        this->systemConfig.sleep_timeout_mouse_ms = this->systemConfig.sleep_timeout_ms;
+    }
+    if (this->systemConfig.sleep_timeout_ir_ms == 0)
+    {
+        this->systemConfig.sleep_timeout_ir_ms = this->systemConfig.sleep_timeout_ms;
     }
 
     // Load keypad configuration if it exists
@@ -496,7 +513,6 @@ bool ConfigurationManager::loadConfig()
     }
 
     configFile.close();
-    LittleFS.end();
     return true;
 }
 
@@ -533,7 +549,7 @@ bool ConfigurationManager::setLedBrightness(uint8_t brightness)
 {
     ledConfig.brightness = brightness;
 
-    if (!LittleFS.begin(true))
+    if (!FileSystemManager::ensureMounted())
     {
         Logger::getInstance().log("ConfigurationManager: failed to mount LittleFS for brightness update");
         return false;
@@ -543,7 +559,6 @@ bool ConfigurationManager::setLedBrightness(uint8_t brightness)
     if (!configFile)
     {
         Logger::getInstance().log("ConfigurationManager: failed to open config.json for reading (brightness update)");
-        LittleFS.end();
         return false;
     }
 
@@ -553,7 +568,6 @@ bool ConfigurationManager::setLedBrightness(uint8_t brightness)
     if (error)
     {
         Logger::getInstance().log("ConfigurationManager: failed to parse config.json (brightness update): " + String(error.c_str()));
-        LittleFS.end();
         return false;
     }
 
@@ -564,7 +578,6 @@ bool ConfigurationManager::setLedBrightness(uint8_t brightness)
     if (!outFile)
     {
         Logger::getInstance().log("ConfigurationManager: failed to open config.json for writing (brightness update)");
-        LittleFS.end();
         return false;
     }
 
@@ -572,12 +585,10 @@ bool ConfigurationManager::setLedBrightness(uint8_t brightness)
     {
         Logger::getInstance().log("ConfigurationManager: failed to write brightness to config.json");
         outFile.close();
-        LittleFS.end();
         return false;
     }
 
     outFile.close();
-    LittleFS.end();
     return true;
 }
 

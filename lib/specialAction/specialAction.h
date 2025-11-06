@@ -80,6 +80,7 @@ public:
 
     void setReactiveLightingActive(bool active);                        // Mark reactive lighting as owner of the LED
     bool isReactiveLightingActive() const { return reactiveLightingActive; }
+    bool isIrModeActive() const;
 
 private:
     void applyDeferredSystemLedColor();

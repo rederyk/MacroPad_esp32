@@ -30,7 +30,7 @@ struct LogEntry {
     bool newLine;
 };
 
-constexpr size_t BUFFER_SIZE = 100;
+constexpr size_t BUFFER_SIZE = 64;
 
 class Logger
 {

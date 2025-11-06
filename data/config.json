@@ -14,7 +14,11 @@
     "combo_timeout": 100,
     "BleName": "Macropad_esp32",
     "sleep_enabled": true,
+    
     "sleep_timeout_ms": 50000,
+    "sleep_timeout_mouse_ms": 550000,
+    "sleep_timeout_ir_ms": 550000,
+    
     "wakeup_pin": 32
   },
   "keypad": {
