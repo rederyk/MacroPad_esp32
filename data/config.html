@@ -28,551 +28,7 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/lint/lint.css"
     />
-    <style>
-      :root {
-        --bg-primary: #1e1e1e;
-        --bg-secondary: #252526;
-        --bg-tertiary: #2d2d30;
-        --accent: #0e639c;
-        --accent-hover: #1177bb;
-        --danger: #a1260d;
-        --danger-hover: #bf2b0d;
-        --success: #0e7a3a;
-        --text-primary: #f0f0f0;
-        --text-secondary: #b0b0b0;
-        --border-color: #3c3c3c;
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        background-color: var(--bg-primary);
-        color: var(--text-primary);
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      }
-
-      a {
-        color: var(--accent);
-      }
-
-      a:hover {
-        color: var(--accent-hover);
-      }
-
-      .app-container {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 24px;
-      }
-
-      .app-header {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        padding: 18px 24px;
-        background-color: var(--bg-secondary);
-        border: 1px solid var(--border-color);
-        border-radius: 10px;
-        margin-bottom: 20px;
-      }
-
-      .branding {
-        font-size: 1.4rem;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .header-status {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-
-      .status-chip {
-        background-color: var(--bg-tertiary);
-        border: 1px solid var(--border-color);
-        border-radius: 999px;
-        padding: 6px 14px;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 0.9rem;
-      }
-
-      .status-chip span {
-        color: var(--text-secondary);
-      }
-
-      #wifi_status,
-      #ap_ip,
-      #sta_ip {
-        color: #fff;
-        font-weight: 600;
-      }
-
-      .tab-nav {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
-      }
-
-      .tab-button {
-        background-color: var(--bg-secondary);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        color: var(--text-secondary);
-        padding: 10px 18px;
-        font-size: 0.95rem;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-        transition: background-color 0.2s ease;
-      }
-
-      .tab-button.active,
-      .tab-button:hover {
-        background-color: var(--accent);
-        color: #fff;
-        border-color: transparent;
-      }
-
-      .panel {
-        display: none;
-        background-color: var(--bg-secondary);
-        border: 1px solid var(--border-color);
-        border-radius: 10px;
-        padding: 20px;
-      }
-
-      .panel.active {
-        display: block;
-      }
-
-      .panel-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-        gap: 20px;
-      }
-
-      .card {
-        background-color: var(--bg-tertiary);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-      }
-
-      .card-title {
-        margin: 0;
-        font-size: 1.2rem;
-      }
-
-      .form-group {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
-
-      label {
-        font-weight: 500;
-        color: var(--text-secondary);
-      }
-
-      input[type="text"],
-      input[type="password"],
-      input[type="number"] {
-        background-color: var(--bg-secondary);
-        border: 1px solid var(--border-color);
-        border-radius: 6px;
-        padding: 10px 12px;
-        color: var(--text-primary);
-        font-size: 0.95rem;
-      }
-
-      input[type="text"]:focus,
-      input[type="password"]:focus,
-      input[type="number"]:focus {
-        outline: none;
-        border-color: var(--accent);
-        box-shadow: 0 0 0 2px rgba(14, 99, 156, 0.35);
-      }
-
-      .primary-btn,
-      .secondary-btn,
-      .danger-btn {
-        border: none;
-        border-radius: 6px;
-        padding: 10px 16px;
-        font-size: 0.95rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-        transition: background-color 0.2s ease;
-      }
-
-      .primary-btn {
-        background-color: var(--accent);
-        color: #fff;
-      }
-
-      .primary-btn:hover {
-        background-color: var(--accent-hover);
-      }
-
-      .secondary-btn {
-        background-color: var(--bg-secondary);
-        color: var(--text-secondary);
-        border: 1px solid var(--border-color);
-      }
-
-      .secondary-btn:hover {
-        color: #fff;
-        border-color: var(--accent);
-      }
-
-      .danger-btn {
-        background-color: var(--danger);
-        color: #fff;
-      }
-
-      .danger-btn:hover {
-        background-color: var(--danger-hover);
-      }
-
-      .form-status {
-        min-height: 20px;
-        font-size: 0.9rem;
-        color: var(--text-secondary);
-      }
-
-      .quick-actions {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      .quick-actions button {
-        width: fit-content;
-      }
-
-      .quick-links {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-
-      .status-list {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        color: var(--text-secondary);
-        font-size: 0.95rem;
-      }
-
-      .panel-heading {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      /* Combo editor styling */
-      .combo-shell {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-
-      .combo-tab-bar {
-        display: flex;
-        align-items: flex-start;
-        gap: 12px;
-        overflow-x: auto;
-        padding: 4px 0;
-      }
-
-      .combo-tab-group {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-
-      .combo-tab-group-title {
-        font-size: 0.75rem;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-        color: var(--text-secondary);
-        padding-left: 6px;
-      }
-
-      .combo-tab {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 14px;
-        background-color: var(--bg-tertiary);
-        border-radius: 6px 6px 0 0;
-        border: 1px solid var(--border-color);
-        border-bottom: none;
-        cursor: pointer;
-        color: var(--text-secondary);
-        user-select: none;
-      }
-
-      .combo-tab.active {
-        background-color: var(--bg-secondary);
-        color: #fff;
-        border-color: var(--accent);
-      }
-
-      .tab-close {
-        font-size: 0.85rem;
-        opacity: 0.6;
-      }
-
-      .tab-close:hover {
-        opacity: 1;
-      }
-
-      .tab-add {
-        border: none;
-        background: transparent;
-        color: var(--text-secondary);
-        font-size: 1.1rem;
-        padding: 6px 10px;
-        cursor: pointer;
-      }
-
-      .tab-add:hover {
-        color: #fff;
-      }
-
-      .ide-toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        background-color: var(--bg-secondary);
-        border: 1px solid var(--border-color);
-        padding: 10px;
-        border-radius: 6px;
-      }
-
-      .CodeMirror {
-        height: calc(100vh - 340px);
-        min-height: 320px;
-        border: 1px solid var(--border-color);
-        border-radius: 6px;
-        font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
-        font-size: 0.95rem;
-      }
-
-      .status-bar {
-        display: flex;
-        justify-content: space-between;
-        gap: 10px;
-        background-color: var(--accent);
-        color: #fff;
-        padding: 6px 12px;
-        border-radius: 6px;
-        font-size: 0.85rem;
-      }
-
-      .status-right {
-        display: flex;
-        gap: 12px;
-      }
-
-      .logs-container {
-        background-color: var(--bg-tertiary);
-        border: 1px solid var(--border-color);
-        border-radius: 6px;
-        overflow: hidden;
-      }
-
-      .logs-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 10px 12px;
-        background-color: var(--bg-secondary);
-        border-bottom: 1px solid var(--border-color);
-      }
-
-      .logs-header h5 {
-        margin: 0;
-        font-size: 1rem;
-      }
-
-      #comboLogContainer {
-        height: 200px;
-        overflow-y: auto;
-        padding: 10px;
-        font-family: "Cascadia Code", Consolas, monospace;
-        font-size: 0.85rem;
-        color: #ddd;
-      }
-
-      /* Wizard styling */
-      .wizard-shell {
-        display: flex;
-        flex-direction: column;
-        gap: 18px;
-      }
-
-      .wizard-progress {
-        display: flex;
-        justify-content: space-between;
-        gap: 10px;
-      }
-
-      .wizard-progress .step {
-        flex: 1;
-        text-align: center;
-        padding: 12px 10px;
-        border-radius: 8px;
-        background-color: var(--bg-tertiary);
-        border: 1px solid var(--border-color);
-        color: var(--text-secondary);
-        font-weight: 500;
-      }
-
-      .wizard-progress .step.active {
-        background-color: var(--accent);
-        color: #fff;
-        border-color: transparent;
-      }
-
-      .wizard-content {
-        min-height: 260px;
-      }
-
-      .wizard-step {
-        display: none;
-        flex-direction: column;
-        gap: 16px;
-      }
-
-      .wizard-step.active {
-        display: flex;
-      }
-
-      .wizard-options {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 12px;
-      }
-
-      .wizard-option {
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 14px;
-        background-color: var(--bg-secondary);
-        cursor: pointer;
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        transition: border-color 0.2s ease, background-color 0.2s ease;
-      }
-
-      .wizard-option input {
-        width: 16px;
-        height: 16px;
-      }
-
-      .wizard-option.active {
-        border-color: var(--accent);
-        background-color: rgba(14, 99, 156, 0.2);
-      }
-
-      .wizard-footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .wizard-footer .actions {
-        display: flex;
-        gap: 10px;
-      }
-
-      .summary-card {
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 16px;
-        background-color: var(--bg-tertiary);
-      }
-
-      .summary-card ul {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        color: var(--text-secondary);
-      }
-
-      /* Toast notification */
-      .toast {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background-color: var(--accent);
-        color: #fff;
-        padding: 12px 18px;
-        border-radius: 6px;
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.25s ease;
-        z-index: 999;
-      }
-
-      .toast.show {
-        opacity: 1;
-        pointer-events: auto;
-      }
-
-      .toast.success {
-        background-color: var(--success);
-      }
-
-      .toast.error {
-        background-color: var(--danger);
-      }
-
-      .toast.info {
-        background-color: var(--accent);
-      }
-
-      @media (max-width: 768px) {
-        .CodeMirror {
-          height: calc(100vh - 260px);
-        }
-
-        .wizard-footer {
-          flex-direction: column;
-          align-items: stretch;
-        }
-
-        .wizard-footer .actions {
-          width: 100%;
-          justify-content: space-between;
-        }
-      }
-    </style>
+    <link rel="stylesheet" href="/ui/app.css" />
   </head>
   <body>
     <div class="app-container">
@@ -604,6 +60,10 @@
         <button class="tab-button active" data-target="panel-overview">
           <i class="fas fa-sliders-h"></i>
           Configurazione Rapida
+        </button>
+        <button class="tab-button" data-target="panel-data">
+          <i class="fas fa-database"></i>
+          Data Explorer
         </button>
         <button class="tab-button" data-target="panel-combos">
           <i class="fas fa-code"></i>
@@ -678,16 +138,139 @@
                 <button class="secondary-btn" id="refreshWifiData">
                   <i class="fas fa-sync-alt"></i>Aggiorna dallo sp device
                 </button>
+                <button class="secondary-btn" id="openDataExplorer">
+                  <i class="fas fa-database"></i>Apri Data Explorer
+                </button>
                 <a class="secondary-btn" href="/advanced.html">
                   <i class="fas fa-terminal"></i> Configurazione avanzata
                 </a>
-                <span class="secondary-btn disabled-link" title="Gesture features are fissi per i recognizer correnti">
-                  <i class="fas fa-hand-sparkles"></i> Gesture features (fissi)
-                </span>
                 <a class="secondary-btn" href="/special_actions.html">
                   <i class="fas fa-bolt"></i> Azioni speciali
                 </a>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" id="panel-data">
+          <div class="panel-heading data-panel-heading">
+            <div>
+              <h2 class="card-title">
+                <i class="fas fa-database me-2"></i>Data Explorer
+              </h2>
+              <p class="panel-subtitle">
+                Visualizza e scarica gli snapshot di <code>config.json</code> e
+                <code>ir_data.json</code>.
+              </p>
+            </div>
+            <div class="panel-actions">
+              <button class="secondary-btn" id="refreshAllData">
+                <i class="fas fa-sync-alt"></i>Aggiorna dati
+              </button>
+            </div>
+          </div>
+
+          <div class="data-columns">
+            <div class="data-column">
+              <article class="card data-card">
+                <header class="card-header">
+                  <div>
+                    <h3 class="card-title">
+                      <i class="fas fa-sliders-h me-2"></i>config.json
+                    </h3>
+                    <p class="card-subtitle">
+                      Stato corrente della configurazione persistente.
+                    </p>
+                  </div>
+                  <div class="card-actions">
+                    <button class="secondary-btn icon-only" id="refreshConfigData" title="Ricarica config.json">
+                      <i class="fas fa-sync"></i>
+                    </button>
+                  </div>
+                </header>
+                <div class="data-meta">
+                  <span>
+                    Aggiornato: <strong id="configDataUpdated">Mai</strong>
+                  </span>
+                  <span>
+                    Sezioni: <strong id="configDataCount">0</strong>
+                  </span>
+                </div>
+                <div class="kv-collection" id="configDataSummary"></div>
+              </article>
+
+              <article class="card data-card">
+                <header class="card-header">
+                  <div>
+                    <h3 class="card-title">
+                      <i class="fas fa-code me-2"></i>config.json (raw)
+                    </h3>
+                    <p class="card-subtitle">
+                      JSON formattato per esportazione o copia.
+                    </p>
+                  </div>
+                  <div class="card-actions">
+                    <button class="secondary-btn" id="copyConfigJson">
+                      <i class="fas fa-copy"></i>Copia
+                    </button>
+                    <button class="secondary-btn" id="downloadConfigJson">
+                      <i class="fas fa-download"></i>Scarica
+                    </button>
+                  </div>
+                </header>
+                <pre class="json-block" id="configJsonRaw">{}</pre>
+              </article>
+            </div>
+
+            <div class="data-column">
+              <article class="card data-card">
+                <header class="card-header">
+                  <div>
+                    <h3 class="card-title">
+                      <i class="fas fa-remote me-2"></i>ir_data.json
+                    </h3>
+                    <p class="card-subtitle">
+                      Database dei comandi IR registrati.
+                    </p>
+                  </div>
+                  <div class="card-actions">
+                    <button class="secondary-btn icon-only" id="refreshIrData" title="Ricarica ir_data.json">
+                      <i class="fas fa-sync"></i>
+                    </button>
+                  </div>
+                </header>
+                <div class="data-meta">
+                  <span>
+                    Aggiornato: <strong id="irDataUpdated">Mai</strong>
+                  </span>
+                  <span>
+                    Dispositivi: <strong id="irDeviceCount">0</strong>
+                  </span>
+                </div>
+                <div class="kv-collection" id="irDataSummary"></div>
+              </article>
+
+              <article class="card data-card">
+                <header class="card-header">
+                  <div>
+                    <h3 class="card-title">
+                      <i class="fas fa-code me-2"></i>ir_data.json (raw)
+                    </h3>
+                    <p class="card-subtitle">
+                      JSON completo pronto per esportazione.
+                    </p>
+                  </div>
+                  <div class="card-actions">
+                    <button class="secondary-btn" id="copyIrJson">
+                      <i class="fas fa-copy"></i>Copia
+                    </button>
+                    <button class="secondary-btn" id="downloadIrJson">
+                      <i class="fas fa-download"></i>Scarica
+                    </button>
+                  </div>
+                </header>
+                <pre class="json-block" id="irJsonRaw">{}</pre>
+              </article>
             </div>
           </div>
         </section>
@@ -875,6 +458,14 @@
           original: {},
           lastUpdated: null,
         },
+        data: {
+          config: {},
+          configUpdated: null,
+          ir: {},
+          irUpdated: null,
+          rawConfig: "{}",
+          rawIr: "{}",
+        },
         combos: {
           files: [],
           currentIndex: 0,
@@ -972,16 +563,330 @@
         });
       }
 
+      function activateTab(panelId) {
+        document.querySelectorAll(".tab-button").forEach((btn) => {
+          const target = btn.getAttribute("data-target");
+          btn.classList.toggle("active", target === panelId);
+        });
+        switchPanel(panelId);
+      }
+
       function setupTabs() {
         document.querySelectorAll(".tab-button").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            document.querySelectorAll(".tab-button").forEach((b) => {
-              b.classList.remove("active");
-            });
-            btn.classList.add("active");
-            switchPanel(btn.getAttribute("data-target"));
-          });
+          btn.addEventListener("click", () =>
+            activateTab(btn.getAttribute("data-target"))
+          );
         });
+      }
+
+      function escapeHtml(value) {
+        if (value === null || value === undefined) {
+          return "";
+        }
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function describeValueType(value) {
+        if (Array.isArray(value)) {
+          return `Array (${value.length})`;
+        }
+        if (value === null) {
+          return "Null";
+        }
+        if (typeof value === "object") {
+          return `Object (${Object.keys(value).length})`;
+        }
+        return typeof value;
+      }
+
+      function renderPrimitive(value) {
+        if (value === null) {
+          return '<span class="kv-primitive">null</span>';
+        }
+        switch (typeof value) {
+          case "boolean":
+            return `<span class="kv-primitive">${value ? "true" : "false"}</span>`;
+          case "number":
+            return `<span class="kv-number">${value}</span>`;
+          case "string":
+            return `<span class="kv-string">"${escapeHtml(value)}"</span>`;
+          default:
+            return `<span class="kv-primitive">${escapeHtml(String(value))}</span>`;
+        }
+      }
+
+      function renderArrayValue(arr, depth = 0) {
+        if (!Array.isArray(arr) || arr.length === 0) {
+          return '<span class="kv-primitive">[]</span>';
+        }
+        if (depth >= 2) {
+          return `<span class="kv-summary">Array(${arr.length})</span>`;
+        }
+        const rows = arr
+          .map(
+            (item, index) => `
+              <div class="kv-row depth-${depth + 1}">
+                <span class="kv-key">[${index}]</span>
+                <span class="kv-value">${renderValue(item, depth + 1)}</span>
+              </div>
+            `
+          )
+          .join("");
+
+        if (depth === 0) {
+          return `<div class="kv-children">${rows}</div>`;
+        }
+
+        return `
+          <details class="kv-details"${depth === 1 ? " open" : ""}>
+            <summary>Array (${arr.length})</summary>
+            <div class="kv-children">${rows}</div>
+          </details>
+        `;
+      }
+
+      function renderObjectValue(obj, depth = 0) {
+        if (obj === null || typeof obj !== "object") {
+          return renderPrimitive(obj);
+        }
+        const keys = Object.keys(obj);
+        if (keys.length === 0) {
+          return '<span class="kv-primitive">{}</span>';
+        }
+        if (depth >= 2) {
+          return `<span class="kv-summary">Object(${keys.length})</span>`;
+        }
+
+        const rows = keys
+          .map(
+            (key) => `
+              <div class="kv-row depth-${depth + 1}">
+                <span class="kv-key">${escapeHtml(key)}</span>
+                <span class="kv-value">${renderValue(obj[key], depth + 1)}</span>
+              </div>
+            `
+          )
+          .join("");
+
+        if (depth === 0) {
+          return `<div class="kv-children">${rows}</div>`;
+        }
+
+        return `
+          <details class="kv-details"${depth === 1 ? " open" : ""}>
+            <summary>Object (${keys.length})</summary>
+            <div class="kv-children">${rows}</div>
+          </details>
+        `;
+      }
+
+      function renderValue(value, depth = 0) {
+        if (value === null || typeof value !== "object") {
+          return renderPrimitive(value);
+        }
+        if (Array.isArray(value)) {
+          return renderArrayValue(value, depth);
+        }
+        return renderObjectValue(value, depth);
+      }
+
+      function renderConfigDataExplorer() {
+        const container = document.getElementById("configDataSummary");
+        if (!container) {
+          return;
+        }
+        const data = state.data.config || {};
+        const entries = Object.entries(data);
+        document.getElementById("configDataCount").textContent = entries.length;
+
+        if (entries.length === 0) {
+          container.innerHTML =
+            '<div class="empty-state">Nessuna sezione disponibile. Premi "Aggiorna dati".</div>';
+          return;
+        }
+
+        container.innerHTML = entries
+          .map(
+            ([key, value]) => `
+              <article class="kv-group">
+                <header class="kv-group-header">
+                  <span class="kv-group-title">${escapeHtml(key)}</span>
+                  <span class="kv-group-meta">${describeValueType(value)}</span>
+                </header>
+                <div class="kv-group-body">
+                  ${renderValue(value, 0)}
+                </div>
+              </article>
+            `
+          )
+          .join("");
+      }
+
+      function renderIrCommand(name, payload) {
+        const badges = [];
+        if (payload && payload.protocol) {
+          badges.push(
+            `<span class="chip chip-accent">${escapeHtml(payload.protocol)}</span>`
+          );
+        }
+        if (payload && typeof payload.bits === "number") {
+          badges.push(`<span class="chip">${payload.bits} bit</span>`);
+        }
+        if (payload && payload.value !== undefined) {
+          badges.push(
+            `<code class="chip chip-code">${escapeHtml(payload.value)}</code>`
+          );
+        }
+
+        const meta = [];
+        if (payload && payload.address !== undefined) {
+          meta.push(`Addr ${escapeHtml(payload.address)}`);
+        }
+        if (payload && payload.command !== undefined) {
+          meta.push(`Cmd ${escapeHtml(payload.command)}`);
+        }
+        if (payload && Array.isArray(payload.raw)) {
+          meta.push(`RAW x${payload.raw.length}`);
+        }
+
+        const detail =
+          payload && typeof payload === "object"
+            ? renderValue(payload, 1)
+            : "";
+
+        return `
+          <div class="kv-group-item">
+            <div class="kv-row depth-1">
+              <span class="kv-key">${escapeHtml(name)}</span>
+              <span class="kv-value">${
+                badges.length > 0 ? badges.join(" ") : "-"
+              }</span>
+            </div>
+            ${
+              meta.length > 0
+                ? `<div class="kv-meta">${meta.join(" · ")}</div>`
+                : ""
+            }
+            ${
+              detail
+                ? `<div class="kv-details-wrapper">${detail}</div>`
+                : ""
+            }
+          </div>
+        `;
+      }
+
+      function renderIrDataExplorer() {
+        const container = document.getElementById("irDataSummary");
+        if (!container) {
+          return;
+        }
+        const devices = state.data.ir || {};
+        const entries = Object.entries(devices);
+        document.getElementById("irDeviceCount").textContent = entries.length;
+
+        if (entries.length === 0) {
+          container.innerHTML =
+            '<div class="empty-state">Nessun dispositivo IR registrato.</div>';
+          return;
+        }
+
+        container.innerHTML = entries
+          .map(([device, commands]) => {
+            const commandEntries = Object.entries(commands || {});
+            const body =
+              commandEntries.length === 0
+                ? '<div class="empty-state nested">Nessun comando per questo dispositivo.</div>'
+                : commandEntries
+                    .map(([name, payload]) => renderIrCommand(name, payload))
+                    .join("");
+            return `
+              <article class="kv-group">
+                <header class="kv-group-header">
+                  <span class="kv-group-title">${escapeHtml(device)}</span>
+                  <span class="kv-group-meta">
+                    ${commandEntries.length} comando${
+              commandEntries.length === 1 ? "" : "i"
+            }
+                  </span>
+                </header>
+                <div class="kv-group-body">
+                  ${body}
+                </div>
+              </article>
+            `;
+          })
+          .join("");
+      }
+
+      function formatTimestamp(date) {
+        if (!date) {
+          return "Mai";
+        }
+        try {
+          return date.toLocaleString();
+        } catch (error) {
+          return date.toString();
+        }
+      }
+
+      function updateDataMetaLabels() {
+        const configLabel = document.getElementById("configDataUpdated");
+        if (configLabel) {
+          configLabel.textContent = formatTimestamp(state.data.configUpdated);
+        }
+        const irLabel = document.getElementById("irDataUpdated");
+        if (irLabel) {
+          irLabel.textContent = formatTimestamp(state.data.irUpdated);
+        }
+      }
+
+      function updateRawJsonBlocks() {
+        const configRawEl = document.getElementById("configJsonRaw");
+        if (configRawEl) {
+          configRawEl.textContent = state.data.rawConfig || "{}";
+        }
+        const irRawEl = document.getElementById("irJsonRaw");
+        if (irRawEl) {
+          irRawEl.textContent = state.data.rawIr || "{}";
+        }
+      }
+
+      async function copyToClipboard(value, successMessage) {
+        if (!value) {
+          showToast("Nessun contenuto da copiare.", "error");
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(value);
+          showToast(successMessage || "Contenuto copiato negli appunti.", "success");
+        } catch (error) {
+          console.error("Clipboard error:", error);
+          showToast("Impossibile copiare negli appunti.", "error");
+        }
+      }
+
+      function downloadJson(filename, content) {
+        try {
+          const blob = new Blob([content], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = url;
+          anchor.download = filename;
+          document.body.appendChild(anchor);
+          anchor.click();
+          document.body.removeChild(anchor);
+          URL.revokeObjectURL(url);
+          showToast(`${filename} scaricato.`, "success");
+        } catch (error) {
+          console.error("Download error:", error);
+          showToast(`Impossibile scaricare ${filename}.`, "error");
+        }
       }
 
       function applyDeviceStatus(status) {
@@ -1046,8 +951,16 @@
           const response = await fetch("/config.json");
           if (!response.ok) throw new Error("Impossibile recuperare config.json");
 
-          state.wifi.original = await response.json();
-          const wifi = state.wifi.original.wifi || {};
+          const config = await response.json();
+          state.wifi.original = config;
+          state.data.config = config || {};
+          try {
+            state.data.rawConfig = formatJsonValue(config || {}, { silent: true });
+          } catch (error) {
+            console.warn("Impossibile formattare config.json:", error);
+            state.data.rawConfig = JSON.stringify(config || {});
+          }
+          const wifi = (config && config.wifi) || {};
           document.getElementById("ap_ssid").value = wifi.ap_ssid || "";
           document.getElementById("ap_password").value =
             wifi.ap_password || "";
@@ -1058,8 +971,13 @@
 
           hydrateWizardFromWifi(wifi);
           updateWifiModeLabel(wifi);
-          state.wifi.lastUpdated = new Date();
+          const now = new Date();
+          state.wifi.lastUpdated = now;
+          state.data.configUpdated = now;
           updateWifiUpdatedLabel();
+          renderConfigDataExplorer();
+          updateDataMetaLabels();
+          updateRawJsonBlocks();
           statusEl.textContent = "Configurazione caricata dal dispositivo.";
           if (showNotification) {
             showToast("Configurazione Wi-Fi aggiornata.", "success");
@@ -1068,6 +986,47 @@
           console.error(error);
           statusEl.textContent = "Errore nel caricamento della configurazione.";
           showToast("Errore nel recupero della configurazione Wi-Fi.", "error");
+        }
+      }
+
+      async function loadIrData(showNotification = false) {
+        const container = document.getElementById("irDataSummary");
+        if (container && !showNotification) {
+          container.innerHTML =
+            '<div class="loading-state">Caricamento dati IR...</div>';
+        }
+        try {
+          const response = await fetch("/ir_data.json", { cache: "no-cache" });
+          if (!response.ok) {
+            throw new Error("Impossibile recuperare ir_data.json");
+          }
+
+          const irPayload = await response.json();
+          const devices = (irPayload && irPayload.devices) || {};
+          state.data.ir = devices;
+          try {
+            state.data.rawIr = formatJsonValue(irPayload || {}, { silent: true });
+          } catch (error) {
+            console.warn("Impossibile formattare ir_data.json:", error);
+            state.data.rawIr = JSON.stringify(irPayload || {});
+          }
+          state.data.irUpdated = new Date();
+
+          renderIrDataExplorer();
+          updateDataMetaLabels();
+          updateRawJsonBlocks();
+          if (showNotification) {
+            showToast("Dati IR aggiornati.", "success");
+          }
+        } catch (error) {
+          console.error(error);
+          if (container) {
+            container.innerHTML =
+              '<div class="empty-state error">Errore nel caricamento di ir_data.json.</div>';
+          }
+          if (showNotification) {
+            showToast("Errore nel recupero di ir_data.json.", "error");
+          }
         }
       }
 
@@ -1806,6 +1765,58 @@
         document
           .getElementById("fillWizardFromForm")
           .addEventListener("click", sendFormValuesToWizard);
+
+        const openDataExplorerBtn = document.getElementById("openDataExplorer");
+        if (openDataExplorerBtn) {
+          openDataExplorerBtn.addEventListener("click", () =>
+            activateTab("panel-data")
+          );
+        }
+
+        const refreshAllBtn = document.getElementById("refreshAllData");
+        if (refreshAllBtn) {
+          refreshAllBtn.addEventListener("click", async () => {
+            await Promise.all([loadWifiConfig(true), loadIrData(true)]);
+          });
+        }
+
+        const refreshConfigBtn = document.getElementById("refreshConfigData");
+        if (refreshConfigBtn) {
+          refreshConfigBtn.addEventListener("click", () => loadWifiConfig(true));
+        }
+
+        const refreshIrBtn = document.getElementById("refreshIrData");
+        if (refreshIrBtn) {
+          refreshIrBtn.addEventListener("click", () => loadIrData(true));
+        }
+
+        const copyConfigBtn = document.getElementById("copyConfigJson");
+        if (copyConfigBtn) {
+          copyConfigBtn.addEventListener("click", () =>
+            copyToClipboard(state.data.rawConfig, "config.json copiato.")
+          );
+        }
+
+        const copyIrBtn = document.getElementById("copyIrJson");
+        if (copyIrBtn) {
+          copyIrBtn.addEventListener("click", () =>
+            copyToClipboard(state.data.rawIr, "ir_data.json copiato.")
+          );
+        }
+
+        const downloadConfigBtn = document.getElementById("downloadConfigJson");
+        if (downloadConfigBtn) {
+          downloadConfigBtn.addEventListener("click", () =>
+            downloadJson("config.json", state.data.rawConfig || "{}")
+          );
+        }
+
+        const downloadIrBtn = document.getElementById("downloadIrJson");
+        if (downloadIrBtn) {
+          downloadIrBtn.addEventListener("click", () =>
+            downloadJson("ir_data.json", state.data.rawIr || "{}")
+          );
+        }
       }
 
       async function init() {
@@ -1813,8 +1824,13 @@
         setupWizard();
         initializeEventHandlers();
         setupComboEditor();
+        renderConfigDataExplorer();
+        renderIrDataExplorer();
+        updateDataMetaLabels();
+        updateRawJsonBlocks();
         await refreshDeviceStatus();
         await loadWifiConfig();
+        await loadIrData();
         await loadComboFiles();
         setupComboLogs();
       }

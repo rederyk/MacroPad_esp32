@@ -29,6 +29,244 @@
 AsyncWebServer server(80);
 AsyncEventSource events("/log");
 
+struct SpecialActionDescriptor
+{
+    const char *id;
+    const char *label;
+    const char *endpoint;
+    const char *method;
+    const char *description;
+    bool requiresParams;
+    const char *examplePayload;
+    const char *actionId;
+};
+
+static const SpecialActionDescriptor kSpecialActions[] = {
+    {"reset_device", "Riavvio dispositivo", "/resetDevice", "POST", "Esegue un riavvio immediato dell'ESP32.", false, nullptr, nullptr},
+    {"calibrate_sensor", "Calibra sensore", "/calibrateSensor", "POST", "Avvia la routine di calibrazione dell'accelerometro.", false, nullptr, nullptr},
+    {"print_memory_info", "Stato memoria", "/special_action", "POST", "Invia ai log le informazioni sull'utilizzo di heap e memoria.", false, "{\"actionId\":\"print_memory_info\"}", "print_memory_info"},
+    {"execute_gesture", "Esegui gesture", "/special_action", "POST", "Avvia o termina la cattura gesture in base al flag 'pressed'.", true, "{\"actionId\":\"execute_gesture\",\"params\":{\"pressed\":true}}", "execute_gesture"},
+    {"toggle_flashlight", "Toggle flashlight", "/special_action", "POST", "Attiva o disattiva il LED come torcia, mantenendo il colore precedente.", false, "{\"actionId\":\"toggle_flashlight\"}", "toggle_flashlight"},
+    {"set_led_color", "Imposta colore LED", "/special_action", "POST", "Aggiorna il colore RGB principale del LED di stato.", true, "{\"actionId\":\"set_led_color\",\"params\":{\"r\":255,\"g\":128,\"b\":64,\"save\":false}}", "set_led_color"},
+    {"set_system_led_color", "Imposta colore sistema", "/special_action", "POST", "Imposta il colore del LED di sistema e opzionalmente lo salva come default.", true, "{\"actionId\":\"set_system_led_color\",\"params\":{\"r\":32,\"g\":128,\"b\":255,\"save\":true}}", "set_system_led_color"},
+    {"restore_led_color", "Ripristina colore LED", "/special_action", "POST", "Ripristina il colore originale del LED salvato in precedenza.", false, "{\"actionId\":\"restore_led_color\"}", "restore_led_color"},
+    {"set_brightness", "Imposta luminosità", "/special_action", "POST", "Imposta la luminosità del LED (0-255) e la salva su config.json.", true, "{\"actionId\":\"set_brightness\",\"params\":{\"value\":180}}", "set_brightness"},
+    {"adjust_brightness", "Regola luminosità", "/special_action", "POST", "Incrementa/decrementa la luminosità attuale del LED.", true, "{\"actionId\":\"adjust_brightness\",\"params\":{\"delta\":15}}", "adjust_brightness"},
+    {"show_led_info", "Mostra info LED", "/special_action", "POST", "Scrive nei log il colore corrente e la luminosità del LED.", false, "{\"actionId\":\"show_led_info\"}", "show_led_info"},
+    {"show_brightness_info", "Mostra luminosità", "/special_action", "POST", "Scrive nei log il livello di luminosità corrente del LED.", false, "{\"actionId\":\"show_brightness_info\"}", "show_brightness_info"},
+    {"check_ir_signal", "Verifica segnale IR", "/special_action", "POST", "Verifica rapidamente la presenza di un segnale IR e lo riporta nei log.", false, "{\"actionId\":\"check_ir_signal\"}", "check_ir_signal"},
+    {"send_ir_command", "Invia comando IR", "/special_action", "POST", "Invia un comando IR memorizzato specificando dispositivo e comando.", true, "{\"actionId\":\"send_ir_command\",\"params\":{\"device\":\"tv\",\"command\":\"off\"}}", "send_ir_command"}};
+
+String readIrDataFile()
+{
+    File file = LittleFS.open("/ir_data.json", "r");
+    if (!file)
+    {
+        Logger::getInstance().log("⚠️ Failed to open ir_data.json");
+        return "{\"devices\":{}}";
+    }
+
+    String json = file.readString();
+    file.close();
+
+    if (json.length() == 0)
+    {
+        Logger::getInstance().log("⚠️ ir_data.json is empty!");
+        return "{\"devices\":{}}";
+    }
+
+    return json;
+}
+
+bool writeIrDataFile(const String &json)
+{
+    File file = LittleFS.open("/ir_data.json", "w");
+    if (!file)
+    {
+        Logger::getInstance().log("⚠️ Failed to open ir_data.json for writing.");
+        return false;
+    }
+
+    size_t written = file.print(json);
+    file.close();
+    Logger::getInstance().log("💾 Saved ir_data.json (" + String(written) + " bytes)");
+    return written > 0;
+}
+
+bool handleSpecialActionRequest(const String &actionId, JsonVariantConst params, String &message, int &statusCode)
+{
+    statusCode = 200;
+    message = "Action executed.";
+
+    if (actionId == "print_memory_info")
+    {
+        specialAction.printMemoryInfo();
+        message = "Dump memoria richiesto nei log.";
+        return true;
+    }
+
+    if (actionId == "execute_gesture")
+    {
+        bool pressed = false;
+        if (!params.isNull())
+        {
+            pressed = params["pressed"] | false;
+        }
+        specialAction.executeGesture(pressed);
+        message = pressed ? "Acquisizione gesture avviata." : "Acquisizione gesture terminata.";
+        return true;
+    }
+
+    if (actionId == "toggle_flashlight")
+    {
+        specialAction.toggleFlashlight();
+        message = "Flashlight toggled.";
+        return true;
+    }
+
+    if (actionId == "set_led_color")
+    {
+        if (!params.is<JsonObjectConst>())
+        {
+            statusCode = 400;
+            message = "Parametri mancanti per set_led_color.";
+            return false;
+        }
+        JsonObjectConst obj = params.as<JsonObjectConst>();
+        int red = obj["r"] | -1;
+        int green = obj["g"] | -1;
+        int blue = obj["b"] | -1;
+        bool save = obj["save"] | false;
+        if (red < 0 || red > 255 || green < 0 || green > 255 || blue < 0 || blue > 255)
+        {
+            statusCode = 400;
+            message = "Valori RGB fuori range (0-255).";
+            return false;
+        }
+        specialAction.setLedColor(red, green, blue, save);
+        message = "Colore LED aggiornato.";
+        return true;
+    }
+
+    if (actionId == "set_system_led_color")
+    {
+        if (!params.is<JsonObjectConst>())
+        {
+            statusCode = 400;
+            message = "Parametri mancanti per set_system_led_color.";
+            return false;
+        }
+        JsonObjectConst obj = params.as<JsonObjectConst>();
+        int red = obj["r"] | -1;
+        int green = obj["g"] | -1;
+        int blue = obj["b"] | -1;
+        bool save = obj["save"] | false;
+        if (red < 0 || red > 255 || green < 0 || green > 255 || blue < 0 || blue > 255)
+        {
+            statusCode = 400;
+            message = "Valori RGB fuori range (0-255).";
+            return false;
+        }
+        specialAction.setSystemLedColor(red, green, blue, save);
+        message = "Colore LED di sistema aggiornato.";
+        return true;
+    }
+
+    if (actionId == "restore_led_color")
+    {
+        specialAction.restoreLedColor();
+        message = "Colore LED ripristinato.";
+        return true;
+    }
+
+    if (actionId == "set_brightness")
+    {
+        if (!params.is<JsonObjectConst>())
+        {
+            statusCode = 400;
+            message = "Parametro 'value' richiesto.";
+            return false;
+        }
+        int value = params["value"] | -1;
+        if (value < 0 || value > 255)
+        {
+            statusCode = 400;
+            message = "Brightness fuori range (0-255).";
+            return false;
+        }
+        specialAction.setBrightness(value);
+        message = "Luminosità impostata a " + String(value) + ".";
+        return true;
+    }
+
+    if (actionId == "adjust_brightness")
+    {
+        if (!params.is<JsonObjectConst>())
+        {
+            statusCode = 400;
+            message = "Parametro 'delta' richiesto.";
+            return false;
+        }
+        int delta = params["delta"] | 0;
+        if (delta == 0)
+        {
+            statusCode = 400;
+            message = "Il delta deve essere diverso da 0.";
+            return false;
+        }
+        specialAction.adjustBrightness(delta);
+        message = "Luminosità regolata di " + String(delta) + ".";
+        return true;
+    }
+
+    if (actionId == "show_led_info")
+    {
+        specialAction.showLedInfo();
+        message = "Informazioni LED scritte nei log.";
+        return true;
+    }
+
+    if (actionId == "show_brightness_info")
+    {
+        specialAction.showBrightnessInfo();
+        message = "Informazioni luminosità scritte nei log.";
+        return true;
+    }
+
+    if (actionId == "check_ir_signal")
+    {
+        specialAction.checkIRSignal();
+        message = "Controllo segnale IR avviato.";
+        return true;
+    }
+
+    if (actionId == "send_ir_command")
+    {
+        if (!params.is<JsonObjectConst>())
+        {
+            statusCode = 400;
+            message = "Parametri 'device' e 'command' richiesti.";
+            return false;
+        }
+        JsonObjectConst obj = params.as<JsonObjectConst>();
+        String device = obj["device"] | "";
+        String command = obj["command"] | "";
+        if (device.isEmpty() || command.isEmpty())
+        {
+            statusCode = 400;
+            message = "Device o command mancanti.";
+            return false;
+        }
+        specialAction.sendIRCommand(device, command);
+        message = "Comando IR inviato a " + device + ":" + command;
+        return true;
+    }
+
+    statusCode = 404;
+    message = "Azione non supportata: " + actionId;
+    return false;
+}
+
 // Funzioni helper per leggere/scrivere il file di configurazione
 String readConfigFile()
 {
@@ -336,6 +574,8 @@ void configWebServer::updateStatus(const String &apIP, const String &staIP, cons
 void configWebServer::setupRoutes()
 {
 
+    server.serveStatic("/ui", LittleFS, "/ui");
+
     // --- Endpoint per la configurazione completa (es. WiFi) ---
     server.on("/config.json", HTTP_GET, [](AsyncWebServerRequest *request)
               { request->send(200, "application/json", readConfigFile()); });
@@ -399,6 +639,65 @@ void configWebServer::setupRoutes()
             ESP.restart();
         } else {
             request->send(500, "text/plain", "❌ Failed to save configuration.");
+        } });
+
+    // --- Endpoint per la gestione dei dati IR ---
+    server.on("/ir_data.json", HTTP_GET, [](AsyncWebServerRequest *request)
+              { request->send(200, "application/json", readIrDataFile()); });
+
+    server.on("/ir_data.json", HTTP_POST, [](AsyncWebServerRequest *request) {}, nullptr, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+              {
+        static String payload;
+        if (index == 0)
+        {
+            payload = "";
+        }
+
+        payload.reserve(payload.length() + len);
+        for (size_t i = 0; i < len; ++i)
+        {
+            payload += static_cast<char>(data[i]);
+        }
+
+        if (index + len == total)
+        {
+            Logger::getInstance().log("📥 Received IR data update, size: " + String(total));
+            DynamicJsonDocument doc(32768);
+            DeserializationError error = deserializeJson(doc, payload);
+            if (error)
+            {
+                Logger::getInstance().log("⚠️ Failed to parse ir_data.json payload: " + String(error.c_str()));
+                payload = "";
+                request->send(400, "text/plain", "❌ Invalid JSON payload.");
+                return;
+            }
+
+            if (!doc.containsKey("devices") || !doc["devices"].is<JsonObject>())
+            {
+                payload = "";
+                request->send(400, "text/plain", "❌ JSON must contain a 'devices' object.");
+                return;
+            }
+
+            if (doc.overflowed())
+            {
+                Logger::getInstance().log("⚠️ ir_data.json payload overflowed buffer.");
+                payload = "";
+                request->send(413, "text/plain", "❌ IR data payload too large.");
+                return;
+            }
+
+            String normalized;
+            serializeJson(doc, normalized);
+            if (!writeIrDataFile(normalized))
+            {
+                payload = "";
+                request->send(500, "text/plain", "❌ Failed to save ir_data.json.");
+                return;
+            }
+
+            payload = "";
+            request->send(200, "text/plain", "✅ IR data salvati con successo.");
         } });
 
     // --- Endpoint per la gestione delle "combinations" (originale) ---
@@ -869,6 +1168,84 @@ void configWebServer::setupRoutes()
             ESP.restart();
         } else {
             request->send(500, "text/plain", "❌ Failed to save advanced configuration.");
+        } });
+
+    // --- Endpoint per elencare le special actions disponibili ---
+    server.on("/special_actions.json", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+        StaticJsonDocument<2048> doc;
+        JsonArray actions = doc.createNestedArray("actions");
+        for (const auto &action : kSpecialActions)
+        {
+            JsonObject item = actions.createNestedObject();
+            item["id"] = action.id;
+            item["label"] = action.label;
+            item["endpoint"] = action.endpoint;
+            item["method"] = action.method;
+            item["description"] = action.description;
+            item["requiresParams"] = action.requiresParams;
+            if (action.examplePayload)
+            {
+                item["example"] = action.examplePayload;
+            }
+            if (action.actionId)
+            {
+                item["actionId"] = action.actionId;
+            }
+        }
+        String payload;
+        serializeJson(doc, payload);
+        request->send(200, "application/json", payload); });
+
+    // --- Endpoint unificato per richiamare le special actions parametrizzabili ---
+    server.on("/special_action", HTTP_POST, [](AsyncWebServerRequest *request) {}, nullptr, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+              {
+        static String payload;
+        if (index == 0)
+        {
+            payload = "";
+        }
+
+        payload.reserve(payload.length() + len);
+        for (size_t i = 0; i < len; ++i)
+        {
+            payload += static_cast<char>(data[i]);
+        }
+
+        if (index + len == total)
+        {
+            DynamicJsonDocument doc(2048);
+            DeserializationError error = deserializeJson(doc, payload);
+            if (error)
+            {
+                Logger::getInstance().log("⚠️ Failed to parse special_action payload: " + String(error.c_str()));
+                payload = "";
+                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Payload JSON non valido\"}");
+                return;
+            }
+
+            String actionId = doc["actionId"] | "";
+            JsonVariantConst params = doc["params"];
+
+            if (actionId.isEmpty())
+            {
+                payload = "";
+                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Campo actionId obbligatorio\"}");
+                return;
+            }
+
+            String message;
+            int statusCode = 200;
+            bool handled = handleSpecialActionRequest(actionId, params, message, statusCode);
+            payload = "";
+
+            StaticJsonDocument<256> response;
+            response["action"] = actionId;
+            response["message"] = message;
+            response["status"] = (statusCode >= 200 && statusCode < 300 && handled) ? "ok" : "error";
+            String responseBody;
+            serializeJson(response, responseBody);
+            request->send(statusCode, "application/json", responseBody);
         } });
 
     // --- Endpoint per servire la pagina principale (config.html) ---

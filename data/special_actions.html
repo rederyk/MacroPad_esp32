@@ -3,229 +3,519 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Special Actions</title>
-    <!-- Bootstrap CSS -->
+    <title>MacroPad · Special Actions</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMwZTYzOWMiLz48dGV4dCB4PSI1MCUiIHk9IjU1JSIgZm9udC1zaXplPSIzMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZmZmZiIgZm9udC1mYW1pbHk9IlNlZ29lIFVJLCBBcmlhbCwgc2Fucy1zZXJpZiI+TTwvdGV4dD48L3N2Zz4K" />
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
-    <!-- Bootstrap Bundle con Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <style>
-      /* Stili personalizzati */
-      .panel {
-        border: 1px solid #ddd;
-        padding: 15px;
-        border-radius: 8px;
-        background: #f9f9f9;
-      }
-      .log-panel {
-        border: 1px solid #007bff;
-        background: #f4f4f4;
-        padding: 15px;
-        border-radius: 8px;
-        display: flex;
-        flex-direction: column;
-        height: calc(100vh - 100px);
-        overflow-y: auto;
-      }
-      #sseTestOutput {
-        flex: 1;
-        overflow-y: auto;
-      }
-      /* Stile per la sezione tastierino */
-      .keypad-status {
-        margin-bottom: 10px;
-        font-weight: bold;
-      }
-    </style>
+    <link rel="stylesheet" href="/ui/app.css" />
   </head>
-  <body class="container mt-5">
-    <div class="row d-flex align-items-stretch">
-      <!-- Colonna sinistra: due blocchi impilati -->
-      <div class="col-md-6 d-flex flex-column">
-        <!-- Primo blocco: Azioni -->
-        <div class="panel flex-fill mb-3">
-          <h1>Special Actions</h1>
-          <div class="d-grid gap-2">
-            <button class="btn btn-primary" onclick="resetDevice()">
-              Reset Device
-            </button>
-            <button class="btn btn-primary" onclick="calibrateSensor()">
-              Calibrate Sensor
-            </button>
-            <div class="alert alert-info">
-              Gesture training and manual storage have been retired. The
-              predefined motion library is always active.
-            </div>
-            <div class="d-flex">
-              <button
-                class="btn btn-success flex-fill me-1"
-                onclick="executeGesture(true)"
-              >
-                Start Execution
-              </button>
-              <button
-                class="btn btn-danger flex-fill ms-1"
-                onclick="executeGesture(false)"
-              >
-                Stop Execution
-              </button>
-            </div>
-            <!--   <button class="btn btn-dark" onclick="toggleAp()">Toggle AP</button>
-            <button class="btn btn-dark" onclick="toggleSTA()">
-              Toggle STA
-            </button>-->
-            <button class="btn btn-secondary" onclick="printMemoryInfo()">
-              Print Memory Info
-            </button>
+  <body>
+    <div class="app-container">
+      <header class="app-header">
+        <div class="branding">
+          <i class="fas fa-bolt"></i>
+          <span>MacroPad · Special Actions</span>
+        </div>
+        <div class="header-status">
+          <div class="status-chip">
+            <i class="fas fa-list-check"></i>
+            <span>Azioni:</span>
+            <span id="actionsCount">0</span>
+          </div>
+          <div class="status-chip">
+            <i class="fas fa-link"></i>
+            <span>Endpoint base:</span>
+            <span id="endpointBase">/special_action</span>
           </div>
         </div>
-        <!-- Secondo blocco: Navigazione -->
-        <div class="panel flex-fill">
-          <h2>Navigation</h2>
-          <div class="row row-cols-2 g-2">
-            <div class="col">
-              <button
-                type="button"
-                class="btn btn-outline-primary btn-sm w-100"
-                onclick="window.location.href='/'"
-              >
-                Main Config
-              </button>
+      </header>
+
+      <div class="data-columns actions-layout">
+        <div class="data-column">
+          <section class="panel active">
+            <div class="panel-heading data-panel-heading">
+              <div>
+                <h2 class="card-title"><i class="fas fa-wrench me-2"></i>Catalogo azioni</h2>
+                <p class="panel-subtitle">
+                  Richiami rapidi e operazioni avanzate sul dispositivo.
+                </p>
+              </div>
+              <div class="panel-actions">
+                <button class="secondary-btn" id="reloadActions">
+                  <i class="fas fa-sync-alt"></i>Ricarica elenco
+                </button>
+              </div>
             </div>
-            <div class="col">
-              <button
-                type="button"
-                class="btn btn-outline-secondary btn-sm w-100"
-                onclick="window.location.href='/combinations.html'"
-              >
-                Manage Combinations
-              </button>
+            <div class="actions-grid" id="actionCatalog">
+              <div class="loading-state">Caricamento azioni...</div>
             </div>
-            <div class="col">
-              <button
-                type="button"
-                class="btn btn-outline-success btn-sm w-100"
-                onclick="window.location.href='/advanced.html'"
-              >
-                Manage Advanced Config
-              </button>
-            </div>
-            <div class="col">
-              <button
-                type="button"
-                class="btn btn-outline-warning btn-sm w-100"
-                disabled
-                title="Gesture features are fixed for predefined recognizers"
-              >
-                Gesture Features (Fixed)
-              </button>
-            </div>
-          </div>
+          </section>
         </div>
-      </div>
-      <!-- Colonna destra: Log -->
-      <div class="col-md-6">
-        <div class="panel log-panel">
-          <div class="d-flex justify-content-between align-items-center">
-            <h2 class="mb-0">Test EventSource Connection</h2>
-            <button
-              class="btn btn-outline-secondary btn-sm"
-              onclick="clearLog()"
-            >
-              Clear Log
-            </button>
-          </div>
-          <div id="sseTestOutput">
-            <p class="text-muted">⌛ Connecting to EventSource...</p>
-          </div>
+        <div class="data-column">
+          <section class="panel active">
+            <div class="panel-heading data-panel-heading">
+              <div>
+                <h2 class="card-title"><i class="fas fa-terminal me-2"></i>Stream log</h2>
+                <p class="panel-subtitle">
+                  Monitor live degli eventi inviati dal dispositivo.
+                </p>
+              </div>
+              <div class="panel-actions">
+                <button class="secondary-btn" id="logsReconnect">
+                  <i class="fas fa-sync-alt"></i>Riconnetti
+                </button>
+                <button class="secondary-btn" id="logsClear">
+                  <i class="fas fa-broom"></i>Pulisci
+                </button>
+              </div>
+            </div>
+            <div class="logs-container">
+              <div class="logs-header">
+                <h5>EventSource /log</h5>
+              </div>
+              <div id="logStream"></div>
+            </div>
+          </section>
         </div>
       </div>
     </div>
 
-    <footer class="text-center mt-4 text-muted">
-      <p>ESP32 Web Interface - 2025</p>
-    </footer>
+    <div class="toast" id="toast"></div>
+
     <script>
-      // Funzione helper per inviare richieste POST
-      async function sendRequest(endpoint) {
-        try {
-          const response = await fetch(endpoint, { method: "POST" });
-          if (!response.ok) {
-            console.warn("⚠️ Server responded with:", response.status);
-          }
-          console.log("✅ Request sent to:", endpoint);
-        } catch (error) {
-          console.error("❌ Error sending request:", error);
-        }
-      }
+      (() => {
+        const state = {
+          actions: [],
+          payloadTemplates: {},
+          eventSource: null,
+        };
 
-      // Funzioni per i pulsanti
-      function resetDevice() {
-        sendRequest("/resetDevice");
-      }
-      function calibrateSensor() {
-        sendRequest("/calibrateSensor");
-      }
-      function executeGesture(pressed) {
-        sendRequest("/executeGesture?pressed=" + pressed);
-      }
-      function toggleAp() {
-        const ssid = prompt("Enter AP SSID:");
-        const pass = prompt("Enter AP Password:");
-        if (ssid && pass) {
-          sendRequest(
-            "/toggleAp?ssid=" +
-              encodeURIComponent(ssid) +
-              "&pass=" +
-              encodeURIComponent(pass)
-          );
+        const actionContainer = document.getElementById("actionCatalog");
+        const actionsCountEl = document.getElementById("actionsCount");
+        const toastEl = document.getElementById("toast");
+        const endpointBaseEl = document.getElementById("endpointBase");
+        if (endpointBaseEl) {
+          endpointBaseEl.textContent = "/special_action";
         }
-      }
-      function toggleSTA() {
-        const ssid = prompt("Enter STA SSID:");
-        const pass = prompt("Enter STA Password:");
-        if (ssid && pass) {
-          sendRequest(
-            "/toggleSTA?ssid=" +
-              encodeURIComponent(ssid) +
-              "&pass=" +
-              encodeURIComponent(pass)
-          );
-        }
-      }
-      function printMemoryInfo() {
-        sendRequest("/printMemoryInfo");
-      }
-      function clearLog() {
-        document.getElementById("sseTestOutput").innerHTML = "";
-      }
 
-      document.addEventListener("DOMContentLoaded", function () {
-        const sseOutput = document.getElementById("sseTestOutput");
-        console.log("🟢 SSE: Inizio connessione a /log...");
-        const testSource = new EventSource("/log");
-        testSource.onopen = function (event) {
-          console.log("✅ SSE: Connessione aperta.", event);
-          sseOutput.innerHTML += "<p>✅ Connessione SSE stabilita.</p>";
-        };
-        testSource.onmessage = function (event) {
-          const logEntry = document.createElement("p");
-          logEntry.textContent = event.data;
-          sseOutput.appendChild(logEntry);
-          while (sseOutput.childNodes.length > 100) {
-            sseOutput.removeChild(sseOutput.firstChild);
+        function showToast(message, type = "info") {
+          if (!toastEl) return;
+          toastEl.textContent = message;
+          toastEl.className = `toast show ${type}`;
+          setTimeout(() => {
+            toastEl.className = "toast";
+          }, 3200);
+        }
+
+        function escapeHtml(value) {
+          if (value === null || value === undefined) {
+            return "";
           }
-          sseOutput.scrollTop = sseOutput.scrollHeight;
-        };
-        testSource.onerror = function (err) {
-          console.error("❌ SSE: Errore durante la connessione:", err);
-          sseOutput.innerHTML +=
-            "<p style='color: red;'>❌ Errore SSE verificato.</p>";
-          testSource.close();
-        };
-      });
+          return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+        }
+
+        function assignActionKey(action, index) {
+          if (!action) {
+            return `action-${index}`;
+          }
+          if (action._key) {
+            return action._key;
+          }
+          const base =
+            action.id || action.actionId || action.endpoint || `action-${index}`;
+          action._key = String(base);
+          return action._key;
+        }
+
+        function getPayloadTemplate(action) {
+          if (!action || !action.actionId) {
+            return "";
+          }
+          if (action.example) {
+            try {
+              const parsed = JSON.parse(action.example);
+              return JSON.stringify(parsed, null, 2);
+            } catch (error) {
+              return action.example;
+            }
+          }
+          const payload = { actionId: action.actionId };
+          if (action.requiresParams) {
+            payload.params = {};
+          }
+          return JSON.stringify(payload, null, 2);
+        }
+
+        function buildActionCard(action, template) {
+          const key = action._key || assignActionKey(action, 0);
+          const method = (action.method || "POST").toUpperCase();
+          const isAggregator = Boolean(action.actionId);
+          const endpoint = action.endpoint || (isAggregator ? "/special_action" : "");
+          const badgeClass = `method-${method.toLowerCase()}`;
+          const description = action.description || "";
+          const actionIdBadge = isAggregator
+            ? `<span class="action-id-badge">actionId: <strong>${escapeHtml(
+                action.actionId
+              )}</strong></span>`
+            : "";
+          const editorBlock = isAggregator
+            ? `<textarea class="action-editor" data-action-editor>${escapeHtml(
+                template
+              )}</textarea>`
+            : "";
+          const resetButton = isAggregator
+            ? '<button class="secondary-btn" data-action-reset><i class="fas fa-undo"></i>Reset</button>'
+            : "";
+          const copyButton =
+            '<button class="secondary-btn" data-action-copy><i class="fas fa-copy"></i>cURL</button>';
+
+          return `
+            <article class="card action-card" data-action-key="${escapeHtml(
+              key
+            )}" data-aggregator="${isAggregator}">
+              <header class="card-header">
+                <div>
+                  <h3 class="card-title">${escapeHtml(action.label || key)}</h3>
+                  <p class="card-subtitle">${escapeHtml(description)}</p>
+                </div>
+                <span class="endpoint-pill ${badgeClass}">${method}</span>
+              </header>
+              <div class="action-body">
+                <div class="endpoint-row">
+                  <code class="endpoint-path">${escapeHtml(endpoint)}</code>
+                  ${actionIdBadge}
+                </div>
+                ${editorBlock}
+                <div class="action-buttons">
+                  <button class="primary-btn" data-action-run>
+                    <i class="fas fa-play"></i>Esegui
+                  </button>
+                  ${resetButton}
+                  ${copyButton}
+                </div>
+                <div class="action-status" data-action-status></div>
+              </div>
+            </article>
+          `;
+        }
+
+        function renderActionCatalog(actions) {
+          state.payloadTemplates = {};
+          if (!Array.isArray(actions) || actions.length === 0) {
+            if (actionContainer) {
+              actionContainer.innerHTML =
+                '<div class="empty-state">Nessuna azione disponibile.</div>';
+            }
+            if (actionsCountEl) {
+              actionsCountEl.textContent = "0";
+            }
+            return;
+          }
+
+          const sorted = [...actions].sort((a, b) => {
+            const left = (a.label || a.id || "").toLowerCase();
+            const right = (b.label || b.id || "").toLowerCase();
+            return left.localeCompare(right);
+          });
+
+          const markup = sorted
+            .map((action, index) => {
+              assignActionKey(action, index);
+              const template = getPayloadTemplate(action);
+              state.payloadTemplates[action._key] = template;
+              return buildActionCard(action, template);
+            })
+            .join("");
+
+          if (actionContainer) {
+            actionContainer.innerHTML = markup;
+          }
+          if (actionsCountEl) {
+            actionsCountEl.textContent = String(sorted.length);
+          }
+        }
+
+        function getActionByKey(key) {
+          if (!key) return undefined;
+          return state.actions.find((action) => action._key === key);
+        }
+
+        function setActionStatus(card, message, type) {
+          if (!card) return;
+          const statusEl = card.querySelector("[data-action-status]");
+          if (!statusEl) return;
+          statusEl.textContent = message || "";
+          statusEl.classList.remove("success", "error");
+          if (type === "success" || type === "error") {
+            statusEl.classList.add(type);
+          }
+        }
+
+        async function handleRunAction(action, card) {
+          if (!action || !card) return;
+          const isAggregator = Boolean(action.actionId);
+          const method = (action.method || "POST").toUpperCase();
+          const endpoint = action.endpoint || (isAggregator ? "/special_action" : "");
+          const headers = {};
+          let body = null;
+
+          if (isAggregator) {
+            const editor = card.querySelector(".action-editor");
+            let payloadText = editor ? editor.value.trim() : "";
+            if (!payloadText) {
+              payloadText =
+                state.payloadTemplates[action._key] ||
+                JSON.stringify({ actionId: action.actionId }, null, 2);
+              if (editor) {
+                editor.value = payloadText;
+              }
+            }
+            let payloadObject;
+            try {
+              payloadObject = JSON.parse(payloadText);
+            } catch (error) {
+              setActionStatus(card, "JSON non valido.", "error");
+              showToast("Payload JSON non valido.", "error");
+              return;
+            }
+            if (!payloadObject.actionId) {
+              payloadObject.actionId = action.actionId;
+            }
+            headers["Content-Type"] = "application/json";
+            body = JSON.stringify(payloadObject);
+          }
+
+          setActionStatus(card, "Esecuzione in corso...");
+
+          try {
+            const response = await fetch(endpoint, {
+              method,
+              headers,
+              body,
+            });
+            const raw = await response.text();
+            if (!response.ok) {
+              setActionStatus(card, raw || `Errore ${response.status}`, "error");
+              showToast(
+                `Errore ${response.status} durante ${action.label || action.id}`,
+                "error"
+              );
+              return;
+            }
+            let message = raw;
+            if (raw) {
+              try {
+                const parsed = JSON.parse(raw);
+                message = parsed.message || parsed.status || raw;
+              } catch (error) {
+                message = raw;
+              }
+            }
+            setActionStatus(card, message || "Azione eseguita.", "success");
+            showToast(`${action.label || action.id} eseguita.`, "success");
+          } catch (error) {
+            console.error(error);
+            setActionStatus(card, error.message || "Errore inaspettato.", "error");
+            showToast("Errore durante l'esecuzione.", "error");
+          }
+        }
+
+        function handleResetAction(action, card) {
+          if (!action || !card) return;
+          const editor = card.querySelector(".action-editor");
+          if (!editor) return;
+          const template = state.payloadTemplates[action._key];
+          if (template !== undefined) {
+            editor.value = template;
+            setActionStatus(card, "Payload ripristinato.");
+          }
+        }
+
+        function buildCurlCommand(action, payloadText) {
+          const method = (action.method || "POST").toUpperCase();
+          const endpoint = action.endpoint || (action.actionId ? "/special_action" : "");
+          const url = `${window.location.origin}${endpoint}`;
+          if (action.actionId) {
+            const template =
+              payloadText && payloadText.trim()
+                ? payloadText.trim()
+                : state.payloadTemplates[action._key] ||
+                  JSON.stringify({ actionId: action.actionId }, null, 2);
+            const escapedPayload = template.replace(/'/g, "'\\''");
+            return `curl -X ${method} "${url}" -H "Content-Type: application/json" -d '${escapedPayload}'`;
+          }
+          return `curl -X ${method} "${url}"`;
+        }
+
+        async function handleCopyCurl(action, card) {
+          if (!action || !card) return;
+          let payloadText = "";
+          if (action.actionId) {
+            const editor = card.querySelector(".action-editor");
+            payloadText = editor ? editor.value : "";
+          }
+          const command = buildCurlCommand(action, payloadText);
+          await copyToClipboard(command, "Comando cURL copiato.");
+          setActionStatus(card, "Comando cURL copiato.");
+        }
+
+        async function copyToClipboard(value, successMessage) {
+          if (!value) {
+            showToast("Nessun contenuto da copiare.", "error");
+            return;
+          }
+          try {
+            await navigator.clipboard.writeText(value);
+            showToast(successMessage || "Copiato negli appunti.", "success");
+          } catch (error) {
+            console.error("Clipboard error:", error);
+            showToast("Impossibile copiare negli appunti.", "error");
+          }
+        }
+
+        function handleActionContainerClick(event) {
+          const card = event.target.closest(".action-card");
+          if (!card) return;
+          const key = card.getAttribute("data-action-key");
+          const action = getActionByKey(key);
+          if (!action) return;
+
+          if (event.target.closest("[data-action-run]")) {
+            handleRunAction(action, card);
+            return;
+          }
+
+          if (event.target.closest("[data-action-reset]")) {
+            handleResetAction(action, card);
+            return;
+          }
+
+          if (event.target.closest("[data-action-copy]")) {
+            handleCopyCurl(action, card);
+          }
+        }
+
+        async function loadActionCatalog(showFeedback = false) {
+          if (actionContainer) {
+            actionContainer.innerHTML =
+              '<div class="loading-state">Caricamento azioni...</div>';
+          }
+          try {
+            const response = await fetch("/special_actions.json", {
+              cache: "no-cache",
+            });
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+            }
+            const payload = await response.json();
+            const actions = Array.isArray(payload.actions)
+              ? payload.actions
+              : [];
+            actions.forEach((action, index) => assignActionKey(action, index));
+            state.actions = actions;
+            renderActionCatalog(actions);
+            if (showFeedback) {
+              showToast("Elenco azioni aggiornato.", "success");
+            }
+          } catch (error) {
+            console.error(error);
+            if (actionContainer) {
+              actionContainer.innerHTML =
+                '<div class="empty-state error">Errore nel caricamento delle azioni.</div>';
+            }
+            if (actionsCountEl) {
+              actionsCountEl.textContent = "0";
+            }
+            showToast("Errore nel caricamento delle azioni.", "error");
+          }
+        }
+
+        function appendLog(message, variant = "info") {
+          const container = document.getElementById("logStream");
+          if (!container) return;
+          const entry = document.createElement("div");
+          entry.className = `log-entry ${variant}`;
+          entry.textContent = message;
+          container.appendChild(entry);
+          while (container.childNodes.length > 400) {
+            container.removeChild(container.firstChild);
+          }
+          container.scrollTop = container.scrollHeight;
+        }
+
+        function setupLogs() {
+          if (state.eventSource) {
+            state.eventSource.close();
+            state.eventSource = null;
+          }
+          const stream = document.getElementById("logStream");
+          if (stream) {
+            stream.innerHTML = "";
+          }
+          try {
+            const source = new EventSource("/log");
+            state.eventSource = source;
+            source.onopen = () => appendLog("Connessione log stabilita.", "success");
+            source.onmessage = (event) => appendLog(event.data);
+            source.onerror = () => {
+              appendLog("Connessione log interrotta.", "error");
+              showToast("Connessione ai log interrotta.", "error");
+              source.close();
+              state.eventSource = null;
+            };
+          } catch (error) {
+            console.error(error);
+            appendLog("Impossibile inizializzare lo stream log.", "error");
+            showToast("Errore nell'apertura dei log.", "error");
+          }
+        }
+
+        function setupEventHandlers() {
+          const reloadBtn = document.getElementById("reloadActions");
+          if (reloadBtn) {
+            reloadBtn.addEventListener("click", () => loadActionCatalog(true));
+          }
+          const logsReconnect = document.getElementById("logsReconnect");
+          if (logsReconnect) {
+            logsReconnect.addEventListener("click", setupLogs);
+          }
+          const logsClear = document.getElementById("logsClear");
+          if (logsClear) {
+            logsClear.addEventListener("click", () => {
+              const stream = document.getElementById("logStream");
+              if (stream) {
+                stream.innerHTML = "";
+              }
+            });
+          }
+          if (actionContainer) {
+            actionContainer.addEventListener("click", handleActionContainerClick);
+          }
+        }
+
+        window.addEventListener("beforeunload", () => {
+          if (state.eventSource) {
+            state.eventSource.close();
+          }
+        });
+
+        async function init() {
+          setupEventHandlers();
+          await loadActionCatalog();
+          setupLogs();
+        }
+
+        document.addEventListener("DOMContentLoaded", init);
+      })();
     </script>
   </body>
 </html>
