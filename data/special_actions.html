@@ -500,36 +500,7 @@
             </div>
           </article>
 
-          <article class="card" id="irIdentificationCard">
-            <div class="card-header">
-              <div>
-                <h3 class="card-title">
-                  <i class="fas fa-fingerprint"></i>Identificazione automatica
-                </h3>
-                <p class="card-subtitle">
-                  Trova automaticamente il dataset IRDB più adatto al tuo dispositivo
-                </p>
-              </div>
-              <span class="badge info" id="identificationBadge">Pronto</span>
-            </div>
-            <div class="form-group">
-              <label>Metodo di identificazione</label>
-              <div class="flex-row">
-                <button class="secondary-btn" id="identifyFromScan" title="Acquisci 2-3 codici IR e trova il dataset migliore">
-                  <i class="fas fa-radar"></i>Scansiona nuovi codici
-                </button>
-                <button class="secondary-btn" id="identifyFromProfile" title="Usa i comandi già salvati per identificare il dataset">
-                  <i class="fas fa-chart-bar"></i>Usa comandi esistenti
-                </button>
-              </div>
-            </div>
-            <div id="identificationStatus" class="muted">
-              Seleziona un metodo di identificazione per iniziare.
-            </div>
-            <div id="identificationResults">
-              <!-- Popolato dinamicamente con i risultati -->
-            </div>
-          </article>
+          <!-- Card identificazione rimossa - spostata nel tab IR Scan -->
 
           <article class="card" id="irManualCard">
             <div class="card-header">
@@ -691,6 +662,40 @@
               <button class="primary-btn" id="saveScannedCodes" disabled>
                 <i class="fas fa-save"></i>Salva tutti nel dispositivo
               </button>
+            </div>
+          </article>
+
+          <article class="card" id="irIdentificationCard">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title">
+                  <i class="fas fa-fingerprint"></i>Identificazione automatica IRDB
+                </h3>
+                <p class="card-subtitle">
+                  Trova automaticamente il dataset IRDB migliore per i tuoi codici
+                </p>
+              </div>
+              <span class="badge info" id="identificationBadge">Pronto</span>
+            </div>
+
+            <div class="form-group">
+              <label>Come identificare il dispositivo</label>
+              <div class="flex-row">
+                <button class="secondary-btn" id="identifyFromScan" title="Usa i codici acquisiti sopra per trovare il dataset">
+                  <i class="fas fa-radar"></i>Usa codici acquisiti
+                </button>
+                <button class="secondary-btn" id="identifyFromProfile" title="Usa i comandi già salvati per identificare il dataset">
+                  <i class="fas fa-chart-bar"></i>Usa comandi salvati
+                </button>
+              </div>
+            </div>
+
+            <div id="identificationStatus" class="muted">
+              Acquisisci almeno 2-3 codici IR e poi clicca "Usa codici acquisiti" per identificare automaticamente il dataset IRDB migliore.
+            </div>
+
+            <div id="identificationResults">
+              <!-- Popolato dinamicamente con i risultati -->
             </div>
           </article>
         </div>
@@ -2500,11 +2505,107 @@
         }
 
         async function identifyDeviceFromScan() {
-          showToast("Modalità scansione: premi 2-3 tasti del telecomando...", "info");
-          state.irFingerprinting.scanning = true;
-          state.irFingerprinting.scannedCodes = [];
-          updateIdentificationBadge("In attesa codici...", "info");
-          updateIdentificationStatus("Premi 2-3 tasti sul telecomando. I codici verranno acquisiti automaticamente tramite IR_SCAN o dal log.");
+          // Usa i codici già acquisiti nel tab IR Scan
+          if (!state.irScan.scannedCodes || state.irScan.scannedCodes.length < 2) {
+            showToast("Acquisisci almeno 2-3 codici IR prima di identificare.", "error");
+            return;
+          }
+
+          const fingerprints = state.irScan.scannedCodes.map((code) =>
+            generateFingerprint(code, { type: "scan" })
+          );
+
+          state.irFingerprinting.identifying = true;
+          updateIdentificationBadge("Identificazione...", "info");
+          updateIdentificationStatus(`Analizzando ${fingerprints.length} codici acquisiti...`);
+
+          await loadIrdbIndex();
+
+          if (!state.irdb.index.length) {
+            showToast("Indice IRDB non disponibile. Caricalo prima dal tab IR.", "error");
+            state.irFingerprinting.identifying = false;
+            updateIdentificationBadge("Errore", "error");
+            return;
+          }
+
+          // Determina protocollo dominante
+          const protocolCounts = {};
+          fingerprints.forEach((fp) => {
+            protocolCounts[fp.protocol] = (protocolCounts[fp.protocol] || 0) + 1;
+          });
+
+          const dominantProtocol = Object.keys(protocolCounts).sort(
+            (a, b) => protocolCounts[b] - protocolCounts[a]
+          )[0];
+
+          console.log("Dominant protocol from scan:", dominantProtocol);
+
+          // Filtra candidati IRDB per categoria/protocollo
+          const categoryHints = {
+            NEC: ["tv", "audio", "video", "projector"],
+            SAMSUNG: ["tv", "audio", "video"],
+            SONY: ["tv", "audio", "video", "camera"],
+            RC5: ["tv", "audio", "video"],
+            RC6: ["tv", "audio", "video"],
+          };
+
+          let candidateEntries = state.irdb.index.filter((entry) => {
+            const hints = categoryHints[dominantProtocol] || [];
+            return hints.some((cat) =>
+              entry.category?.toLowerCase().includes(cat.toLowerCase())
+            );
+          });
+
+          // Fallback se nessun candidato
+          if (candidateEntries.length === 0) {
+            candidateEntries = state.irdb.index.filter(
+              (entry) =>
+                entry.category?.toLowerCase().includes("tv") ||
+                entry.category?.toLowerCase().includes("audio") ||
+                entry.category?.toLowerCase().includes("video")
+            );
+          }
+
+          console.log(`Testing ${candidateEntries.length} candidate datasets`);
+
+          const testLimit = Math.min(50, candidateEntries.length);
+          const matches = [];
+
+          for (let i = 0; i < testLimit; i++) {
+            const entry = candidateEntries[i];
+            const dataset = await loadIrdbDatasetQuiet(entry);
+            const matchScore = scoreDatasetMatch(fingerprints, dataset);
+
+            console.log(
+              `Scan dataset ${entry.manufacturer}/${entry.file}: ${matchScore.matchCount} matches, confidence ${matchScore.confidence}%`
+            );
+
+            if (matchScore.matchCount >= 1) {
+              matches.push({ entry, ...matchScore });
+            }
+
+            if (i % 10 === 0) {
+              updateIdentificationStatus(`Testati ${i + 1}/${testLimit} dataset...`);
+            }
+          }
+
+          state.irFingerprinting.identifying = false;
+          matches.sort((a, b) => b.confidence - a.confidence || b.score - a.score);
+          state.irFingerprinting.matches = matches.slice(0, 5);
+
+          if (matches.length > 0) {
+            updateIdentificationBadge(`${matches.length} trovati`, "success");
+            updateIdentificationStatus(
+              `Identificazione completata! Trovati ${matches.length} dataset compatibili.`
+            );
+            showToast(`Trovati ${matches.length} dataset compatibili!`, "success");
+          } else {
+            updateIdentificationBadge("Nessun match", "error");
+            updateIdentificationStatus("Nessun dataset compatibile trovato.");
+            showToast("Nessun dataset IRDB compatibile trovato.", "error");
+          }
+
+          renderIdentificationResults();
         }
 
         async function identifyDeviceFromProfile() {
@@ -2850,6 +2951,10 @@
           renderScannedCodes();
           updateScannedCountBadge();
           if (dom.saveScannedCodes) dom.saveScannedCodes.disabled = true;
+          if (dom.identifyFromScan) dom.identifyFromScan.disabled = true;
+          updateIdentificationStatus(
+            "Acquisisci almeno 2-3 codici IR e poi clicca 'Usa codici acquisiti' per identificare automaticamente il dataset IRDB migliore."
+          );
           showToast("Lista svuotata.", "success");
         }
 
@@ -2931,8 +3036,12 @@
             state.irScan.scannedCodes.splice(index, 1);
             renderScannedCodes();
             updateScannedCountBadge();
-            if (state.irScan.scannedCodes.length === 0 && dom.saveScannedCodes) {
-              dom.saveScannedCodes.disabled = true;
+            if (state.irScan.scannedCodes.length === 0) {
+              if (dom.saveScannedCodes) dom.saveScannedCodes.disabled = true;
+              if (dom.identifyFromScan) dom.identifyFromScan.disabled = true;
+            }
+            if (state.irScan.scannedCodes.length < 2 && dom.identifyFromScan) {
+              dom.identifyFromScan.disabled = true;
             }
           }
         }
@@ -2968,6 +3077,16 @@
           updateScanStatus(`${state.irScan.scannedCodes.length} codici acquisiti`);
 
           if (dom.saveScannedCodes) dom.saveScannedCodes.disabled = false;
+
+          // Abilita identificazione se abbiamo almeno 2 codici
+          if (state.irScan.scannedCodes.length >= 2) {
+            if (dom.identifyFromScan) {
+              dom.identifyFromScan.disabled = false;
+            }
+            updateIdentificationStatus(
+              `${state.irScan.scannedCodes.length} codici acquisiti. Clicca "Usa codici acquisiti" per identificare il dataset IRDB.`
+            );
+          }
 
           console.log("[IR SCAN] IR code added to scan tab:", code);
         }
