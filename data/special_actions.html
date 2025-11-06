@@ -6,12 +6,268 @@
     <title>MacroPad · Special Actions</title>
     <link
       rel="icon"
-      href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMwZTYzOWMiLz48dGV4dCB4PSI1MCUiIHk9IjU1JSIgZm9udC1zaXplPSIzMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZmZmZiIgZm9udC1mYW1pbHk9IlNlZ29lIFVJLCBBcmlhbCwgc2Fucy1zZXJpZiI+TTwvdGV4dD48L3N2Zz4K" />
+      href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMwZTYzOWMiLz48dGV4dCB4PSI1MCUiIHk9IjU1JSIgZm9udC1zaXplPSIzMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZmZmZiIgZm9udC1mYW1pbHk9IlNlZ29lIFVJLCBBcmlhbCwgc2Fucy1zZXJpZiI+TTwvdGV4dD48L3N2Zz4K"
+    />
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
     <link rel="stylesheet" href="/ui/app.css" />
+    <style>
+      .tab-nav {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+      .tab-button {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-secondary);
+        padding: 10px 18px;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+      .tab-button.active,
+      .tab-button:hover {
+        background-color: var(--accent);
+        color: #fff;
+        border-color: transparent;
+      }
+      .panel {
+        display: none;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+      }
+      .panel.active {
+        display: block;
+      }
+      .panel-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .panel-heading .card-title {
+        margin: 0;
+      }
+      .panel-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 20px;
+      }
+      .card {
+        background-color: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      .card-subtitle {
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+      }
+      .simple-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+      }
+      .simple-table thead {
+        background-color: rgba(255, 255, 255, 0.04);
+      }
+      .simple-table th,
+      .simple-table td {
+        text-align: left;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border-color);
+        vertical-align: top;
+      }
+      .simple-table tbody tr:hover {
+        background-color: rgba(255, 255, 255, 0.03);
+      }
+      .stacked {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 0.75rem;
+        border: 1px solid transparent;
+      }
+      .badge.success {
+        background: rgba(14, 122, 58, 0.15);
+        color: #4fe49c;
+        border-color: rgba(14, 122, 58, 0.4);
+      }
+      .badge.error {
+        background: rgba(161, 38, 13, 0.15);
+        color: #ff9070;
+        border-color: rgba(161, 38, 13, 0.4);
+      }
+      .badge.info {
+        background: rgba(14, 99, 156, 0.15);
+        color: #7bc6ff;
+        border-color: rgba(14, 99, 156, 0.4);
+      }
+      .muted {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+      }
+      .list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-height: 320px;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 10px;
+        background-color: rgba(255, 255, 255, 0.02);
+      }
+      .list-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+      .list-item:hover {
+        background-color: rgba(14, 99, 156, 0.18);
+        border-color: rgba(14, 99, 156, 0.4);
+      }
+      .list-item.active {
+        background-color: rgba(14, 99, 156, 0.28);
+        border-color: rgba(14, 99, 156, 0.6);
+      }
+      .flex-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+      }
+      .flex-row.stretch > * {
+        flex: 1;
+      }
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      label {
+        font-weight: 500;
+        color: var(--text-secondary);
+      }
+      input[type="text"],
+      input[type="number"],
+      select,
+      textarea {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 10px 12px;
+        color: var(--text-primary);
+        font-size: 0.95rem;
+      }
+      input[type="text"]:focus,
+      input[type="number"]:focus,
+      select:focus,
+      textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(14, 99, 156, 0.35);
+      }
+      textarea {
+        min-height: 140px;
+        resize: vertical;
+      }
+      .actions-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .primary-btn,
+      .secondary-btn,
+      .danger-btn {
+        border: none;
+        border-radius: 6px;
+        padding: 10px 16px;
+        font-size: 0.95rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+      .primary-btn {
+        background-color: var(--accent);
+        color: #fff;
+      }
+      .primary-btn:disabled {
+        background-color: rgba(14, 99, 156, 0.35);
+        cursor: not-allowed;
+      }
+      .primary-btn:hover:not(:disabled) {
+        background-color: var(--accent-hover);
+      }
+      .secondary-btn {
+        background-color: rgba(255, 255, 255, 0.08);
+        color: var(--text-primary);
+      }
+      .secondary-btn:hover {
+        background-color: rgba(255, 255, 255, 0.15);
+      }
+      .danger-btn {
+        background-color: var(--danger);
+        color: #fff;
+      }
+      .danger-btn:hover {
+        background-color: var(--danger-hover);
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background-color: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--border-color);
+        font-size: 0.85rem;
+      }
+      @media (max-width: 720px) {
+        .panel-grid {
+          grid-template-columns: 1fr;
+        }
+        .simple-table {
+          font-size: 0.82rem;
+        }
+      }
+    </style>
   </head>
   <body>
     <div class="app-container">
@@ -34,80 +290,379 @@
         </div>
       </header>
 
-      <div class="data-columns actions-layout">
-        <div class="data-column">
-          <section class="panel active">
-            <div class="panel-heading data-panel-heading">
+      <nav class="tab-nav">
+        <button class="tab-button active" data-tab-target="tab-actions">
+          <i class="fas fa-bolt"></i> Azioni rapide
+        </button>
+        <button class="tab-button" data-tab-target="tab-ir">
+          <i class="fas fa-wave-square"></i> Gestione comandi IR
+        </button>
+      </nav>
+
+      <section class="panel active" id="tab-actions">
+        <div class="panel-heading">
+          <div>
+            <h2 class="card-title">
+              <i class="fas fa-wrench me-2"></i>Catalogo azioni
+            </h2>
+            <p class="card-subtitle">
+              Richiami rapidi e operazioni avanzate sul dispositivo.
+            </p>
+          </div>
+          <div class="actions-bar">
+            <button class="secondary-btn" id="reloadActions">
+              <i class="fas fa-sync-alt"></i>Ricarica elenco
+            </button>
+          </div>
+        </div>
+        <div class="data-columns actions-layout">
+          <div class="data-column">
+            <div class="panel-grid">
+              <article class="card" style="grid-column: 1 / -1;">
+                <div class="actions-grid" id="actionCatalog">
+                  <div class="loading-state">Caricamento azioni...</div>
+                </div>
+              </article>
+            </div>
+          </div>
+          <div class="data-column">
+            <article class="card">
+              <div class="card-header">
+                <div>
+                  <h3 class="card-title">
+                    <i class="fas fa-terminal me-2"></i>Stream log
+                  </h3>
+                  <p class="card-subtitle">
+                    Monitor live degli eventi inviati dal dispositivo.
+                  </p>
+                </div>
+                <div class="actions-bar">
+                  <button class="secondary-btn" id="logsReconnect">
+                    <i class="fas fa-sync-alt"></i>Riconnetti
+                  </button>
+                  <button class="secondary-btn" id="logsClear">
+                    <i class="fas fa-broom"></i>Pulisci
+                  </button>
+                </div>
+              </div>
+              <div class="logs-container">
+                <div class="logs-header">
+                  <h5>EventSource /log</h5>
+                </div>
+                <div id="logStream"></div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="tab-ir">
+        <div class="panel-heading">
+          <div>
+            <h2 class="card-title">
+              <i class="fas fa-remote"></i>Gestione database IR
+            </h2>
+            <p class="card-subtitle">
+              Consulta i comandi salvati sul dispositivo, esplora il database
+              irdb e importa rapidamente i tasti.
+            </p>
+          </div>
+          <div class="chip">
+            <i class="fas fa-database"></i>
+            <span id="irDirtyStatus" class="muted">Nessuna modifica</span>
+          </div>
+        </div>
+        <div class="panel-grid">
+          <article class="card" id="irLocalCard">
+            <div class="card-header">
               <div>
-                <h2 class="card-title"><i class="fas fa-wrench me-2"></i>Catalogo azioni</h2>
-                <p class="panel-subtitle">
-                  Richiami rapidi e operazioni avanzate sul dispositivo.
+                <h3 class="card-title">
+                  <i class="fas fa-save"></i>Archivio locale
+                </h3>
+                <p class="card-subtitle">
+                  Gestisci i dispositivi e i comandi salvati in
+                  <code>/ir_data.json</code>.
                 </p>
               </div>
-              <div class="panel-actions">
-                <button class="secondary-btn" id="reloadActions">
-                  <i class="fas fa-sync-alt"></i>Ricarica elenco
-                </button>
+              <button class="secondary-btn" id="irReloadLocal">
+                <i class="fas fa-sync-alt"></i>Ricarica
+              </button>
+            </div>
+            <div class="form-group">
+              <label for="irDeviceSelect">Dispositivo</label>
+              <select id="irDeviceSelect"></select>
+            </div>
+            <div class="actions-bar">
+              <button class="secondary-btn" id="irAddDevice">
+                <i class="fas fa-plus"></i>Nuovo dispositivo
+              </button>
+              <button class="secondary-btn" id="irRenameDevice">
+                <i class="fas fa-i-cursor"></i>Rinomina
+              </button>
+              <button class="danger-btn" id="irDeleteDevice">
+                <i class="fas fa-trash"></i>Elimina
+              </button>
+            </div>
+            <div>
+              <div class="flex-row">
+                <span class="muted"
+                  >Comandi registrati: <strong id="irCommandCount">0</strong></span
+                >
+                <span class="muted"
+                  >Dimensione stimata:
+                  <strong id="irEstimatedSize">0 B</strong></span
+                >
               </div>
             </div>
-            <div class="actions-grid" id="actionCatalog">
-              <div class="loading-state">Caricamento azioni...</div>
+            <div id="irCommandsContainer">
+              <div class="muted">Seleziona un dispositivo per vedere i comandi.</div>
             </div>
-          </section>
-        </div>
-        <div class="data-column">
-          <section class="panel active">
-            <div class="panel-heading data-panel-heading">
+            <div class="actions-bar">
+              <button class="primary-btn" id="irSaveChanges" disabled>
+                <i class="fas fa-cloud-upload-alt"></i>Salva su dispositivo
+              </button>
+            </div>
+          </article>
+
+          <article class="card" id="irdbSearchCard">
+            <div class="card-header">
               <div>
-                <h2 class="card-title"><i class="fas fa-terminal me-2"></i>Stream log</h2>
-                <p class="panel-subtitle">
-                  Monitor live degli eventi inviati dal dispositivo.
+                <h3 class="card-title">
+                  <i class="fas fa-search"></i>Libreria irdb
+                </h3>
+                <p class="card-subtitle">
+                  Consulta il catalogo <strong>irdb</strong> direttamente dal
+                  tuo browser.
                 </p>
               </div>
-              <div class="panel-actions">
-                <button class="secondary-btn" id="logsReconnect">
-                  <i class="fas fa-sync-alt"></i>Riconnetti
+              <button class="secondary-btn" id="irdbLoadIndex">
+                <i class="fas fa-download"></i>Carica indice
+              </button>
+            </div>
+            <div class="form-group">
+              <label for="irdbSearchInput">Filtra per produttore, categoria o modello</label>
+              <input
+                type="text"
+                id="irdbSearchInput"
+                placeholder="Es. Samsung TV, Sony, Receiver..."
+              />
+            </div>
+            <div class="muted">
+              <span id="irdbIndexStatus">Indice non caricato.</span>
+            </div>
+            <div class="list" id="irdbResults">
+              <div class="muted">Premi "Carica indice" per iniziare.</div>
+            </div>
+          </article>
+
+          <article class="card" id="irdbDatasetCard">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title">
+                  <i class="fas fa-table"></i>Dettaglio dataset
+                </h3>
+                <p class="card-subtitle">
+                  Analizza i comandi e importali in un dispositivo locale.
+                </p>
+              </div>
+              <span class="badge info" id="irdbDatasetBadge">Nessun dataset selezionato</span>
+            </div>
+            <div class="stacked">
+              <div class="flex-row stretch">
+                <div class="form-group" style="flex: 1;">
+                  <label for="irdbTargetDevice">Importa in dispositivo</label>
+                  <select id="irdbTargetDevice"></select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                  <label for="irdbNewDeviceName">...oppure crea nuovo</label>
+                  <input
+                    type="text"
+                    id="irdbNewDeviceName"
+                    placeholder="Es. tv_soggiorno"
+                  />
+                </div>
+              </div>
+              <div class="flex-row">
+                <button class="primary-btn" id="irdbImportSelected">
+                  <i class="fas fa-file-import"></i>Importa selezionati
                 </button>
-                <button class="secondary-btn" id="logsClear">
-                  <i class="fas fa-broom"></i>Pulisci
-                </button>
+                <span class="muted" id="irdbSelectionSummary">0 comandi selezionati.</span>
               </div>
             </div>
-            <div class="logs-container">
-              <div class="logs-header">
-                <h5>EventSource /log</h5>
+            <div id="irdbCommandsContainer">
+              <div class="muted">
+                Seleziona un dataset nella libreria irdb per visualizzare i
+                comandi disponibili.
               </div>
-              <div id="logStream"></div>
             </div>
-          </section>
+          </article>
+
+          <article class="card" id="irManualCard">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title">
+                  <i class="fas fa-keyboard"></i>Inserimento manuale
+                </h3>
+                <p class="card-subtitle">
+                  Aggiungi rapidamente un comando compilando protocollo, valore
+                  e bit.
+                </p>
+              </div>
+            </div>
+            <form id="irManualForm" class="stacked">
+              <div class="form-group">
+                <label for="irManualName">Nome comando</label>
+                <input
+                  type="text"
+                  id="irManualName"
+                  placeholder="Es. power_on"
+                  required
+                />
+              </div>
+              <div class="flex-row stretch">
+                <div class="form-group" style="flex: 1;">
+                  <label for="irManualProtocol">Protocollo</label>
+                  <select id="irManualProtocol" required>
+                    <option value="">Seleziona...</option>
+                    <option value="NEC">NEC</option>
+                    <option value="NECx2">NECx2</option>
+                    <option value="NEC2">NEC2</option>
+                    <option value="SONY">SONY</option>
+                    <option value="SAMSUNG">SAMSUNG</option>
+                    <option value="RC5">RC5</option>
+                    <option value="RAW">RAW</option>
+                  </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                  <label for="irManualBits">Bit</label>
+                  <input
+                    type="number"
+                    id="irManualBits"
+                    value="32"
+                    min="1"
+                    max="64"
+                    required
+                  />
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="irManualValue">Valore HEX (per RAW lascia vuoto)</label>
+                <input
+                  type="text"
+                  id="irManualValue"
+                  placeholder="es. e0e040bf"
+                />
+              </div>
+              <div class="form-group">
+                <label for="irManualRaw">RAW (microsecondi separati da virgola)</label>
+                <textarea
+                  id="irManualRaw"
+                  placeholder="Esempio: 9000,4500,560,560,560,560..."
+                ></textarea>
+              </div>
+              <div class="actions-bar">
+                <button class="primary-btn" type="submit">
+                  <i class="fas fa-plus-circle"></i>Aggiungi al dispositivo selezionato
+                </button>
+              </div>
+            </form>
+            <p class="muted">
+              Suggerimento: puoi sempre usare la
+              <strong>macro IR_SCAN</strong> sul dispositivo per acquisire nuovi
+              comandi e poi assegnare un nome dalla tastiera o dalla gesture.
+            </p>
+          </article>
         </div>
-      </div>
+      </section>
     </div>
 
     <div class="toast" id="toast"></div>
 
     <script>
       (() => {
-        const state = {
-          actions: [],
-          payloadTemplates: {},
-          eventSource: null,
-        };
+        "use strict";
+        try {
+          const IRDB_INDEX_URL = "https://cdn.jsdelivr.net/gh/probonopd/irdb@master/index";
+          const IRDB_CODES_BASE_URL = "https://cdn.jsdelivr.net/gh/probonopd/irdb@master/";
+          const MAX_IRDB_RESULTS = 200;
 
-        const actionContainer = document.getElementById("actionCatalog");
-        const actionsCountEl = document.getElementById("actionsCount");
-        const toastEl = document.getElementById("toast");
-        const endpointBaseEl = document.getElementById("endpointBase");
-        if (endpointBaseEl) {
-          endpointBaseEl.textContent = "/special_action";
-        }
+          const state = {
+            actions: [],
+            payloadTemplates: {},
+            eventSource: null,
+            activeTab: "tab-actions",
+            ir: {
+              devices: {},
+              original: {},
+              selectedDevice: "",
+              dirty: false,
+              initialized: false,
+            },
+            irdb: {
+              index: [],
+              filtered: [],
+              loadingIndex: false,
+              indexError: "",
+              selectedEntry: null,
+              csv: [],
+              csvLoading: false,
+              csvError: "",
+              selection: new Set(),
+            },
+          };
+
+          const dom = {
+            toast: document.getElementById("toast"),
+            actionContainer: document.getElementById("actionCatalog"),
+            actionsCount: document.getElementById("actionsCount"),
+            endpointBase: document.getElementById("endpointBase"),
+            reloadActions: document.getElementById("reloadActions"),
+            logsReconnect: document.getElementById("logsReconnect"),
+            logsClear: document.getElementById("logsClear"),
+            logStream: document.getElementById("logStream"),
+            tabButtons: Array.from(document.querySelectorAll(".tab-button")),
+            panels: Array.from(document.querySelectorAll(".panel")),
+            irDirtyStatus: document.getElementById("irDirtyStatus"),
+            irReloadLocal: document.getElementById("irReloadLocal"),
+            irDeviceSelect: document.getElementById("irDeviceSelect"),
+            irAddDevice: document.getElementById("irAddDevice"),
+            irRenameDevice: document.getElementById("irRenameDevice"),
+            irDeleteDevice: document.getElementById("irDeleteDevice"),
+            irCommandCount: document.getElementById("irCommandCount"),
+            irEstimatedSize: document.getElementById("irEstimatedSize"),
+            irCommandsContainer: document.getElementById("irCommandsContainer"),
+            irSaveChanges: document.getElementById("irSaveChanges"),
+            irdbLoadIndex: document.getElementById("irdbLoadIndex"),
+            irdbSearchInput: document.getElementById("irdbSearchInput"),
+            irdbIndexStatus: document.getElementById("irdbIndexStatus"),
+            irdbResults: document.getElementById("irdbResults"),
+            irdbDatasetBadge: document.getElementById("irdbDatasetBadge"),
+            irdbTargetDevice: document.getElementById("irdbTargetDevice"),
+            irdbNewDevice: document.getElementById("irdbNewDeviceName"),
+            irdbImportSelected: document.getElementById("irdbImportSelected"),
+            irdbSelectionSummary: document.getElementById("irdbSelectionSummary"),
+            irdbCommandsContainer: document.getElementById("irdbCommandsContainer"),
+            irManualForm: document.getElementById("irManualForm"),
+            irManualName: document.getElementById("irManualName"),
+            irManualProtocol: document.getElementById("irManualProtocol"),
+            irManualBits: document.getElementById("irManualBits"),
+            irManualValue: document.getElementById("irManualValue"),
+            irManualRaw: document.getElementById("irManualRaw"),
+          };
+
+          const supportsFetch = typeof window.fetch === "function";
+          const supportsEventSource = typeof window.EventSource === "function";
+
+          if (dom.endpointBase) {
+            dom.endpointBase.textContent = "/special_action";
+          }
 
         function showToast(message, type = "info") {
-          if (!toastEl) return;
-          toastEl.textContent = message;
-          toastEl.className = `toast show ${type}`;
+          if (!dom.toast) return;
+          dom.toast.textContent = message;
+          dom.toast.className = `toast show ${type}`;
           setTimeout(() => {
-            toastEl.className = "toast";
+            dom.toast.className = "toast";
           }, 3200);
         }
 
@@ -121,6 +676,44 @@
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#39;");
+        }
+
+        function deepClone(value) {
+          return value ? JSON.parse(JSON.stringify(value)) : {};
+        }
+
+        function formatBytes(bytes) {
+          if (!bytes || bytes <= 0) return "0 B";
+          const units = ["B", "KB", "MB", "GB"];
+          let idx = 0;
+          let size = bytes;
+          while (size >= 1024 && idx < units.length - 1) {
+            size /= 1024;
+            idx += 1;
+          }
+          return `${size.toFixed(idx === 0 ? 0 : 2)} ${units[idx]}`;
+        }
+
+        function setupTabs() {
+          dom.tabButtons.forEach((button) => {
+            button.addEventListener("click", () => {
+              const target = button.getAttribute("data-tab-target");
+              if (!target || target === state.activeTab) {
+                return;
+              }
+              state.activeTab = target;
+              dom.tabButtons.forEach((btn) => {
+                btn.classList.toggle("active", btn === button);
+              });
+              dom.panels.forEach((panel) => {
+                panel.classList.toggle("active", panel.id === target);
+              });
+              if (target === "tab-ir" && !state.ir.initialized) {
+                state.ir.initialized = true;
+                initializeIrModule();
+              }
+            });
+          });
         }
 
         function assignActionKey(action, index) {
@@ -211,12 +804,12 @@
         function renderActionCatalog(actions) {
           state.payloadTemplates = {};
           if (!Array.isArray(actions) || actions.length === 0) {
-            if (actionContainer) {
-              actionContainer.innerHTML =
+            if (dom.actionContainer) {
+              dom.actionContainer.innerHTML =
                 '<div class="empty-state">Nessuna azione disponibile.</div>';
             }
-            if (actionsCountEl) {
-              actionsCountEl.textContent = "0";
+            if (dom.actionsCount) {
+              dom.actionsCount.textContent = "0";
             }
             return;
           }
@@ -236,11 +829,11 @@
             })
             .join("");
 
-          if (actionContainer) {
-            actionContainer.innerHTML = markup;
+          if (dom.actionContainer) {
+            dom.actionContainer.innerHTML = markup;
           }
-          if (actionsCountEl) {
-            actionsCountEl.textContent = String(sorted.length);
+          if (dom.actionsCount) {
+            dom.actionsCount.textContent = String(sorted.length);
           }
         }
 
@@ -356,18 +949,6 @@
           return `curl -X ${method} "${url}"`;
         }
 
-        async function handleCopyCurl(action, card) {
-          if (!action || !card) return;
-          let payloadText = "";
-          if (action.actionId) {
-            const editor = card.querySelector(".action-editor");
-            payloadText = editor ? editor.value : "";
-          }
-          const command = buildCurlCommand(action, payloadText);
-          await copyToClipboard(command, "Comando cURL copiato.");
-          setActionStatus(card, "Comando cURL copiato.");
-        }
-
         async function copyToClipboard(value, successMessage) {
           if (!value) {
             showToast("Nessun contenuto da copiare.", "error");
@@ -380,6 +961,18 @@
             console.error("Clipboard error:", error);
             showToast("Impossibile copiare negli appunti.", "error");
           }
+        }
+
+        async function handleCopyCurl(action, card) {
+          if (!action || !card) return;
+          let payloadText = "";
+          if (action.actionId) {
+            const editor = card.querySelector(".action-editor");
+            payloadText = editor ? editor.value : "";
+          }
+          const command = buildCurlCommand(action, payloadText);
+          await copyToClipboard(command, "Comando cURL copiato.");
+          setActionStatus(card, "Comando cURL copiato.");
         }
 
         function handleActionContainerClick(event) {
@@ -405,8 +998,12 @@
         }
 
         async function loadActionCatalog(showFeedback = false) {
-          if (actionContainer) {
-            actionContainer.innerHTML =
+          if (!supportsFetch) {
+            showToast("Fetch API non supportata dal browser.", "error");
+            return;
+          }
+          if (dom.actionContainer) {
+            dom.actionContainer.innerHTML =
               '<div class="loading-state">Caricamento azioni...</div>';
           }
           try {
@@ -428,38 +1025,41 @@
             }
           } catch (error) {
             console.error(error);
-            if (actionContainer) {
-              actionContainer.innerHTML =
+            if (dom.actionContainer) {
+              dom.actionContainer.innerHTML =
                 '<div class="empty-state error">Errore nel caricamento delle azioni.</div>';
             }
-            if (actionsCountEl) {
-              actionsCountEl.textContent = "0";
+            if (dom.actionsCount) {
+              dom.actionsCount.textContent = "0";
             }
             showToast("Errore nel caricamento delle azioni.", "error");
           }
         }
 
         function appendLog(message, variant = "info") {
-          const container = document.getElementById("logStream");
-          if (!container) return;
+          if (!dom.logStream) return;
           const entry = document.createElement("div");
           entry.className = `log-entry ${variant}`;
           entry.textContent = message;
-          container.appendChild(entry);
-          while (container.childNodes.length > 400) {
-            container.removeChild(container.firstChild);
+          dom.logStream.appendChild(entry);
+          while (dom.logStream.childNodes.length > 400) {
+            dom.logStream.removeChild(dom.logStream.firstChild);
           }
-          container.scrollTop = container.scrollHeight;
+          dom.logStream.scrollTop = dom.logStream.scrollHeight;
         }
 
         function setupLogs() {
+          if (!supportsEventSource) {
+            appendLog("EventSource non supportato dal browser.", "error");
+            showToast("EventSource non supportato.", "error");
+            return;
+          }
           if (state.eventSource) {
             state.eventSource.close();
             state.eventSource = null;
           }
-          const stream = document.getElementById("logStream");
-          if (stream) {
-            stream.innerHTML = "";
+          if (dom.logStream) {
+            dom.logStream.innerHTML = "";
           }
           try {
             const source = new EventSource("/log");
@@ -479,42 +1079,1020 @@
           }
         }
 
-        function setupEventHandlers() {
-          const reloadBtn = document.getElementById("reloadActions");
-          if (reloadBtn) {
-            reloadBtn.addEventListener("click", () => loadActionCatalog(true));
+        function updateIrDirtyUI() {
+          if (!dom.irDirtyStatus) return;
+          if (state.ir.dirty) {
+            dom.irDirtyStatus.textContent = "Modifiche non salvate";
+            dom.irDirtyStatus.classList.remove("muted");
+          } else {
+            dom.irDirtyStatus.textContent = "Nessuna modifica";
+            dom.irDirtyStatus.classList.add("muted");
           }
-          const logsReconnect = document.getElementById("logsReconnect");
-          if (logsReconnect) {
-            logsReconnect.addEventListener("click", setupLogs);
-          }
-          const logsClear = document.getElementById("logsClear");
-          if (logsClear) {
-            logsClear.addEventListener("click", () => {
-              const stream = document.getElementById("logStream");
-              if (stream) {
-                stream.innerHTML = "";
-              }
-            });
-          }
-          if (actionContainer) {
-            actionContainer.addEventListener("click", handleActionContainerClick);
+          if (dom.irSaveChanges) {
+            dom.irSaveChanges.disabled = !state.ir.dirty;
           }
         }
 
+        function getDeviceNames() {
+          return Object.keys(state.ir.devices || {}).sort((a, b) =>
+            a.localeCompare(b, "it", { sensitivity: "base" })
+          );
+        }
+
+        function syncDeviceSelects() {
+          const names = getDeviceNames();
+          if (names.length === 0) {
+            state.ir.selectedDevice = "";
+          } else if (!names.includes(state.ir.selectedDevice)) {
+            state.ir.selectedDevice = names[0];
+          }
+
+          if (dom.irDeviceSelect) {
+            dom.irDeviceSelect.innerHTML = names.length
+              ? names
+                  .map(
+                    (name) =>
+                      `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`
+                  )
+                  .join("")
+              : '<option value="">Nessun dispositivo</option>';
+            dom.irDeviceSelect.value = state.ir.selectedDevice || "";
+          }
+
+          if (dom.irdbTargetDevice) {
+            const options = [""].concat(names);
+            dom.irdbTargetDevice.innerHTML = options
+              .map((name) =>
+                name
+                  ? `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`
+                  : '<option value="">Seleziona dispositivo</option>'
+              )
+              .join("");
+            dom.irdbTargetDevice.value = state.ir.selectedDevice || "";
+          }
+        }
+
+        function renderLocalCommands() {
+          if (!dom.irCommandsContainer) return;
+          const deviceName = state.ir.selectedDevice;
+          if (!deviceName) {
+            dom.irCommandsContainer.innerHTML =
+              '<div class="muted">Crea o seleziona un dispositivo per vedere i comandi.</div>';
+            if (dom.irCommandCount) dom.irCommandCount.textContent = "0";
+            return;
+          }
+          const commands = state.ir.devices[deviceName] || {};
+          const entries = Object.entries(commands);
+          if (dom.irCommandCount) dom.irCommandCount.textContent = entries.length;
+
+          const approxSize = JSON.stringify({ devices: state.ir.devices || {} }).length;
+          if (dom.irEstimatedSize) {
+            dom.irEstimatedSize.textContent = formatBytes(approxSize);
+          }
+
+          if (entries.length === 0) {
+            dom.irCommandsContainer.innerHTML =
+              '<div class="muted">Nessun comando registrato per questo dispositivo.</div>';
+            return;
+          }
+
+          const rows = entries
+            .map(([name, data]) => {
+              const proto = data && data.protocol ? data.protocol : "-";
+              const bits = data && data.bits ? data.bits : "-";
+              const value = data && data.value ? `0x${String(data.value).toLowerCase()}` : "-";
+              const addressInfo = data && data.address !== undefined
+                ? `<div class=\"muted\">address: ${escapeHtml(String(data.address))}</div>`
+                : "";
+              const commandInfo = data && data.command !== undefined
+                ? `<div class=\"muted\">command: ${escapeHtml(String(data.command))}</div>`
+                : "";
+              const rawInfo = Array.isArray(data?.raw)
+                ? `<div class=\"muted\">RAW len: ${data.raw.length}</div>`
+                : "";
+              const summary = proto === "RAW" && Array.isArray(data?.raw)
+                ? `RAW (${data.raw.length})`
+                : value;
+              return `
+                <tr>
+                  <td><strong>${escapeHtml(name)}</strong></td>
+                  <td>
+                    <div>${escapeHtml(proto)}</div>
+                    <div class="muted">bit: ${escapeHtml(String(bits))}</div>
+                  </td>
+                  <td>
+                    <div>${escapeHtml(summary)}</div>
+                    ${addressInfo}
+                    ${commandInfo}
+                    ${rawInfo}
+                  </td>
+                  <td>
+                    <div class="actions-bar">
+                      <button class="secondary-btn" data-ir-action="send" data-ir-device="${escapeHtml(
+                        deviceName
+                      )}" data-ir-command="${escapeHtml(name)}">
+                        <i class="fas fa-paper-plane"></i>Invia
+                      </button>
+                      <button class="danger-btn" data-ir-action="delete" data-ir-device="${escapeHtml(
+                        deviceName
+                      )}" data-ir-command="${escapeHtml(name)}">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            })
+            .join("");
+
+          dom.irCommandsContainer.innerHTML = `
+            <div class="table-wrapper">
+              <table class="simple-table">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>Protocollo</th>
+                    <th>Dati</th>
+                    <th>Azioni</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows}
+                </tbody>
+              </table>
+            </div>
+          `;
+        }
+
+        function markIrDirty() {
+          if (!state.ir.dirty) {
+            state.ir.dirty = true;
+            updateIrDirtyUI();
+          }
+        }
+
+        function sanitizeDeviceName(name) {
+          if (!name) return "";
+          return name
+            .trim()
+            .replace(/\s+/g, "_")
+            .replace(/[^a-zA-Z0-9_\-]/g, "")
+            .slice(0, 40);
+        }
+
+        function sanitizeCommandName(name, fallback) {
+          const base = (name || "")
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "_")
+            .replace(/^_+|_+$/g, "");
+          if (base) return base.slice(0, 48);
+          return fallback ? fallback.slice(0, 48) : "cmd";
+        }
+
+        async function loadLocalIrData(showFeedback = false) {
+          if (!supportsFetch) {
+            showToast("Fetch API non supportata dal browser.", "error");
+            return;
+          }
+          try {
+            const response = await fetch("/ir_data.json", { cache: "no-cache" });
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+            }
+            const payload = await response.json();
+            const devices = payload && typeof payload === "object" ? payload.devices || {} : {};
+            state.ir.original = deepClone(devices);
+            state.ir.devices = deepClone(devices);
+            state.ir.dirty = false;
+            syncDeviceSelects();
+            renderLocalCommands();
+            updateIrDirtyUI();
+            if (showFeedback) showToast("IR locali aggiornati.", "success");
+          } catch (error) {
+            console.error("IR load error", error);
+            showToast("Errore caricamento ir_data.json", "error");
+          }
+        }
+
+        async function saveIrData() {
+          if (!supportsFetch) {
+            showToast("Fetch API non supportata dal browser.", "error");
+            return;
+          }
+          try {
+            if (!state.ir.dirty) {
+              showToast("Nessuna modifica da salvare.", "info");
+              return;
+            }
+            const body = JSON.stringify({ devices: state.ir.devices }, null, 2);
+            const response = await fetch("/ir_data.json", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body,
+            });
+            if (!response.ok) {
+              const raw = await response.text();
+              throw new Error(raw || `HTTP ${response.status}`);
+            }
+            showToast("IR data salvati con successo.", "success");
+            state.ir.original = deepClone(state.ir.devices);
+            state.ir.dirty = false;
+            updateIrDirtyUI();
+          } catch (error) {
+            console.error("IR save error", error);
+            showToast(`Errore salvataggio: ${error.message || error}`, "error");
+          }
+        }
+
+        async function sendIrCommand(device, command) {
+          if (!supportsFetch) {
+            showToast("Fetch API non supportata dal browser.", "error");
+            return;
+          }
+          try {
+            const payload = {
+              actionId: "send_ir_command",
+              params: { device, command },
+            };
+            const response = await fetch("/special_action", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            const raw = await response.text();
+            if (!response.ok) {
+              throw new Error(raw || `HTTP ${response.status}`);
+            }
+            showToast(`Comando ${command} inviato a ${device}.`, "success");
+          } catch (error) {
+            console.error("IR send error", error);
+            showToast(error.message || "Errore invio IR", "error");
+          }
+        }
+
+        function handleIrCommandClick(event) {
+          const button = event.target.closest("[data-ir-action]");
+          if (!button) return;
+          const action = button.getAttribute("data-ir-action");
+          const device = button.getAttribute("data-ir-device") || "";
+          const command = button.getAttribute("data-ir-command") || "";
+          if (!device || !command) return;
+
+          if (action === "send") {
+            sendIrCommand(device, command);
+          }
+
+          if (action === "delete") {
+            const commands = state.ir.devices[device] || {};
+            if (!commands[command]) return;
+            if (!window.confirm(`Eliminare il comando ${command}?`)) return;
+            delete commands[command];
+            state.ir.devices[device] = commands;
+            markIrDirty();
+            renderLocalCommands();
+            showToast(`Comando ${command} rimosso.`, "success");
+          }
+        }
+
+        function ensureDevice(name) {
+          if (!state.ir.devices[name]) {
+            state.ir.devices[name] = {};
+          }
+          return state.ir.devices[name];
+        }
+
+        function parseRawString(rawText) {
+          return rawText
+            .split(/[,\s]+/)
+            .map((chunk) => chunk.trim())
+            .filter((chunk) => chunk.length > 0)
+            .map((chunk) => parseInt(chunk, 10))
+            .filter((value) => Number.isFinite(value) && value > 0);
+        }
+
+        function handleManualSubmit(event) {
+          event.preventDefault();
+          if (!state.ir.selectedDevice) {
+            showToast("Seleziona un dispositivo prima di aggiungere un comando.", "error");
+            return;
+          }
+          const nameInput = dom.irManualName ? dom.irManualName.value : "";
+          const protocol = dom.irManualProtocol ? dom.irManualProtocol.value.trim() : "";
+          const bitsValue = dom.irManualBits ? Number(dom.irManualBits.value) : 0;
+          const valueHex = dom.irManualValue ? dom.irManualValue.value.trim() : "";
+          const rawText = dom.irManualRaw ? dom.irManualRaw.value.trim() : "";
+
+          const commandName = sanitizeCommandName(nameInput, "cmd");
+          if (!commandName) {
+            showToast("Nome comando non valido.", "error");
+            return;
+          }
+          if (!protocol) {
+            showToast("Seleziona un protocollo.", "error");
+            return;
+          }
+          if (!Number.isFinite(bitsValue) || bitsValue <= 0) {
+            showToast("Numero di bit non valido.", "error");
+            return;
+          }
+
+          const deviceCommands = ensureDevice(state.ir.selectedDevice);
+          if (deviceCommands[commandName]) {
+            showToast("Nome comando già utilizzato.", "error");
+            return;
+          }
+
+          const payload = { protocol, bits: bitsValue };
+          if (protocol.toUpperCase() === "RAW") {
+            const rawArray = parseRawString(rawText);
+            if (!rawArray.length) {
+              showToast("Inserisci almeno un valore RAW.", "error");
+              return;
+            }
+            payload.raw = rawArray;
+          } else {
+            if (!valueHex) {
+              showToast("Inserisci un valore HEX.", "error");
+              return;
+            }
+            const normalized = valueHex.replace(/^0x/i, "").toLowerCase();
+            if (!/^[0-9a-f]+$/.test(normalized)) {
+              showToast("Valore HEX non valido.", "error");
+              return;
+            }
+            payload.value = normalized;
+          }
+
+          deviceCommands[commandName] = payload;
+          markIrDirty();
+          renderLocalCommands();
+          if (dom.irManualForm) dom.irManualForm.reset();
+          showToast(`Comando ${commandName} aggiunto.`, "success");
+        }
+
+        function reverseBits(value, width) {
+          let result = 0;
+          for (let i = 0; i < width; i += 1) {
+            if (value & (1 << i)) {
+              result |= 1 << (width - 1 - i);
+            }
+          }
+          return result >>> 0;
+        }
+
+        function encodeNec(address, command) {
+          let cmd = command & 0xff;
+          cmd = reverseBits(cmd, 8);
+          cmd = (cmd << 8) + (cmd ^ 0xff);
+          if (address > 0xff) {
+            const addr = reverseBits(address & 0xffff, 16);
+            return ((addr << 16) | cmd) >>> 0;
+          }
+          const addr = reverseBits(address & 0xff, 8);
+          return (((addr << 24) | ((addr ^ 0xff) << 16) | cmd) >>> 0);
+        }
+
+        function encodeSony(bits, command, address, extended) {
+          let result = 0;
+          switch (bits) {
+            case 12:
+              result = address & 0x1f;
+              break;
+            case 15:
+              result = address & 0xff;
+              break;
+            case 20:
+              result = address & 0x1f;
+              result |= (extended & 0xff) << 5;
+              break;
+            default:
+              return null;
+          }
+          result = (result << 7) | (command & 0x7f);
+          return reverseBits(result, bits) >>> 0;
+        }
+
+        function convertIrdbRow(row) {
+          const proto = (row.protocol || "").trim().toUpperCase();
+          const device = Number(row.device);
+          const subdeviceRaw = row.subdevice === "" || row.subdevice === undefined ? NaN : Number(row.subdevice);
+          const functionCode = Number(row.functionCode);
+          if (!Number.isInteger(device) || device < 0) {
+            return { ok: false, reason: "Device non valido" };
+          }
+          if (!Number.isInteger(functionCode) || functionCode < 0) {
+            return { ok: false, reason: "Function non valida" };
+          }
+
+          const necVariants = new Set(["NEC", "NEC1", "NEC2", "NECX1", "NECX2", "NEC1-F16", "NEC1-F8", "NEC2-F16"]);
+          const sonyMap = {
+            SONY: 12,
+            SONY12: 12,
+            SONY15: 15,
+            SONY20: 20,
+          };
+
+          if (necVariants.has(proto)) {
+            let sub = Number.isInteger(subdeviceRaw) ? subdeviceRaw : -1;
+            if (sub < 0) {
+              sub = (~device) & 0xff;
+            }
+            const address = ((sub & 0xff) << 8) | (device & 0xff);
+            const value = encodeNec(address, functionCode);
+            if (value === undefined || value === null) {
+              return { ok: false, reason: "Encoding NEC fallito" };
+            }
+            return {
+              ok: true,
+              data: {
+                protocol: "NEC",
+                bits: 32,
+                value: value.toString(16).padStart(8, "0"),
+                address,
+                command: functionCode,
+                device,
+                subdevice: subdeviceRaw,
+              },
+            };
+          }
+
+          if (proto in sonyMap) {
+            const bits = sonyMap[proto];
+            const address = device;
+            const extended = Number.isInteger(subdeviceRaw) && subdeviceRaw >= 0 ? subdeviceRaw : 0;
+            const encoded = encodeSony(bits, functionCode, address, extended);
+            if (encoded === null) {
+              return { ok: false, reason: "Encoding SONY non supportato" };
+            }
+            return {
+              ok: true,
+              data: {
+                protocol: "SONY",
+                bits,
+                value: encoded.toString(16).padStart(Math.ceil(bits / 4), "0"),
+                command: functionCode,
+                address,
+                device,
+                subdevice: subdeviceRaw,
+              },
+            };
+          }
+
+          if (proto === "SAMSUNG" || proto === "SAMSUNG32") {
+            const customer = device & 0xff;
+            const command = functionCode & 0xff;
+            const revcustomer = reverseBits(customer, 8) & 0xff;
+            const revcommand = reverseBits(command, 8) & 0xff;
+            const value =
+              ((revcustomer << 24) |
+                (revcustomer << 16) |
+                (revcommand << 8) |
+                (revcommand ^ 0xff)) >>>
+              0;
+            return {
+              ok: true,
+              data: {
+                protocol: "SAMSUNG",
+                bits: 32,
+                value: value.toString(16).padStart(8, "0"),
+                command: functionCode,
+                address: customer,
+                device,
+                subdevice: subdeviceRaw,
+              },
+            };
+          }
+
+          return { ok: false, reason: `Protocollo ${row.protocol} non supportato` };
+        }
+
+        function parseCsvLine(line) {
+          const values = [];
+          let current = "";
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i += 1) {
+            const char = line[i];
+            if (char === '"') {
+              if (inQuotes && line[i + 1] === '"') {
+                current += '"';
+                i += 1;
+              } else {
+                inQuotes = !inQuotes;
+              }
+              continue;
+            }
+            if (char === "," && !inQuotes) {
+              values.push(current);
+              current = "";
+            } else {
+              current += char;
+            }
+          }
+          values.push(current);
+          return values.map((item) => item.trim());
+        }
+
+        function parseIrdbCsv(text) {
+          const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+          if (lines.length <= 1) {
+            return [];
+          }
+          const header = parseCsvLine(lines[0]);
+          if (header.length < 5) {
+            return [];
+          }
+          const rows = [];
+          for (let i = 1; i < lines.length; i += 1) {
+            const parts = parseCsvLine(lines[i]);
+            if (parts.length < 5) continue;
+            const row = {
+              index: rows.length,
+              name: parts[0],
+              protocol: parts[1],
+              device: parts[2],
+              subdevice: parts[3],
+              functionCode: parts[4],
+            };
+            const conversion = convertIrdbRow({
+              protocol: row.protocol,
+              device: row.device,
+              subdevice: row.subdevice,
+              functionCode: row.functionCode,
+            });
+            row.conversion = conversion;
+            rows.push(row);
+          }
+          return rows;
+        }
+
+        function renderIrdbResults() {
+          if (!dom.irdbResults) return;
+          if (state.irdb.filtered.length === 0) {
+            dom.irdbResults.innerHTML = '<div class="muted">Nessun risultato. Prova con un altro filtro.</div>';
+            return;
+          }
+          const markup = state.irdb.filtered
+            .slice(0, MAX_IRDB_RESULTS)
+            .map((entry) => {
+              const active = state.irdb.selectedEntry && state.irdb.selectedEntry.path === entry.path;
+              return `
+                <div class="list-item${active ? " active" : ""}" data-irdb-path="${escapeHtml(
+                  entry.path
+                )}">
+                  <strong>${escapeHtml(entry.manufacturer)}</strong>
+                  <span class="muted">${escapeHtml(entry.category || "")}</span>
+                  <span class="muted">${escapeHtml(entry.file)}</span>
+                </div>
+              `;
+            })
+            .join("");
+          dom.irdbResults.innerHTML = markup;
+        }
+
+        function updateIrdbIndexStatus(message, type = "info") {
+          if (!dom.irdbIndexStatus) return;
+          dom.irdbIndexStatus.textContent = message;
+          dom.irdbIndexStatus.className = type === "error" ? "badge error" : "muted";
+        }
+
+        function filterIrdbResults(query) {
+          if (!state.irdb.index.length) return;
+          const term = query.trim().toLowerCase();
+          if (!term) {
+            state.irdb.filtered = state.irdb.index.slice(0, MAX_IRDB_RESULTS);
+          } else {
+            state.irdb.filtered = state.irdb.index.filter((entry) => {
+              return [
+                entry.manufacturer,
+                entry.category,
+                entry.file,
+                entry.path,
+              ]
+                .filter(Boolean)
+                .some((value) => value.toLowerCase().includes(term));
+            });
+          }
+          renderIrdbResults();
+        }
+
+        async function loadIrdbIndex(showFeedback = false) {
+          if (!supportsFetch) {
+            showToast("Fetch API non supportata dal browser.", "error");
+            return;
+          }
+          if (state.irdb.index.length) {
+            // Se l'indice è già caricato, mostra i risultati e fornisci feedback
+            state.irdb.filtered = state.irdb.index.slice(0, MAX_IRDB_RESULTS);
+            updateIrdbIndexStatus(
+              `Indice caricato: ${state.irdb.index.length} dataset disponibili.`
+            );
+            renderIrdbResults();
+            if (showFeedback) {
+              showToast("Indice già caricato.", "info");
+            }
+            return;
+          }
+          if (state.irdb.loadingIndex) {
+            if (showFeedback) {
+              showToast("Caricamento già in corso...", "info");
+            }
+            return;
+          }
+
+          state.irdb.loadingIndex = true;
+          updateIrdbIndexStatus("Scaricamento indice irdb in corso...");
+          if (showFeedback) {
+            showToast("Scaricamento indice irdb...", "info");
+          }
+          try {
+            const response = await fetch(IRDB_INDEX_URL, { cache: "no-cache" });
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+            }
+            const text = await response.text();
+            const lines = text.split(/\r?\n/).filter((line) => line.startsWith("codes/"));
+            state.irdb.index = lines
+              .map((line) => {
+                const relative = line.replace(/^codes\//, "");
+                const parts = relative.split("/");
+                if (parts.length < 2) return null;
+                return {
+                  path: line,
+                  manufacturer: parts[0] || "",
+                  category: parts[1] || "",
+                  file: parts.slice(2).join("/") || parts[1] || "",
+                };
+              })
+              .filter(Boolean);
+            state.irdb.filtered = state.irdb.index.slice(0, MAX_IRDB_RESULTS);
+            updateIrdbIndexStatus(
+              `Indice caricato: ${state.irdb.index.length} dataset disponibili.`
+            );
+            renderIrdbResults();
+            if (showFeedback) {
+              showToast("Indice irdb caricato con successo.", "success");
+            }
+          } catch (error) {
+            console.error("IRDB index error", error);
+            state.irdb.index = [];
+            state.irdb.filtered = [];
+            updateIrdbIndexStatus("Errore durante il download dell'indice.", "error");
+            showToast("Impossibile scaricare l'indice irdb.", "error");
+            renderIrdbResults();
+          } finally {
+            state.irdb.loadingIndex = false;
+          }
+        }
+
+        function updateIrdbDatasetBadge(text, type = "info") {
+          if (!dom.irdbDatasetBadge) return;
+          dom.irdbDatasetBadge.textContent = text;
+          dom.irdbDatasetBadge.className = `badge ${type}`;
+        }
+
+        function updateIrdbSelectionSummary() {
+          if (dom.irdbSelectionSummary) {
+            dom.irdbSelectionSummary.textContent = `${state.irdb.selection.size} comandi selezionati.`;
+          }
+        }
+
+        function renderIrdbCommands() {
+          if (!dom.irdbCommandsContainer) return;
+          if (!state.irdb.csv.length) {
+            dom.irdbCommandsContainer.innerHTML =
+              '<div class="muted">Nessun comando da visualizzare.</div>';
+            updateIrdbSelectionSummary();
+            return;
+          }
+          const rows = state.irdb.csv
+            .map((row) => {
+              const supported = row.conversion && row.conversion.ok;
+              const status = supported
+                ? '<span class="badge success">Supportato</span>'
+                : `<span class="badge error">${escapeHtml(row.conversion?.reason || "Non supportato")}</span>`;
+              const checked = state.irdb.selection.has(row.index) && supported ? "checked" : "";
+              const disabled = supported ? "" : "disabled";
+              return `
+                <tr data-irdb-index="${row.index}">
+                  <td>
+                    <input type="checkbox" data-irdb-index="${row.index}" ${checked} ${disabled} />
+                  </td>
+                  <td>
+                    <strong>${escapeHtml(row.name)}</strong>
+                    <div class="muted">fun=${escapeHtml(row.functionCode)}</div>
+                  </td>
+                  <td>
+                    <div>${escapeHtml(row.protocol)}</div>
+                    <div class="muted">device=${escapeHtml(row.device)} sub=${escapeHtml(row.subdevice)}</div>
+                  </td>
+                  <td>${status}</td>
+                </tr>
+              `;
+            })
+            .join("");
+          dom.irdbCommandsContainer.innerHTML = `
+            <div class="table-wrapper">
+              <table class="simple-table">
+                <thead>
+                  <tr>
+                    <th>Sel</th>
+                    <th>Comando</th>
+                    <th>Protocollo</th>
+                    <th>Stato</th>
+                  </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+          `;
+          updateIrdbSelectionSummary();
+        }
+
+        async function loadIrdbDataset(entry) {
+          if (!entry) return;
+          if (!supportsFetch) {
+            showToast("Fetch API non supportata dal browser.", "error");
+            return;
+          }
+          updateIrdbDatasetBadge(`Caricamento ${entry.manufacturer}/${entry.file}...`, "info");
+          state.irdb.csv = [];
+          state.irdb.selection.clear();
+          renderIrdbCommands();
+          try {
+            const response = await fetch(`${IRDB_CODES_BASE_URL}${entry.path}`, {
+              cache: "no-cache",
+            });
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+            }
+            const text = await response.text();
+            state.irdb.csv = parseIrdbCsv(text);
+            if (!state.irdb.csv.length) {
+              updateIrdbDatasetBadge("Dataset vuoto o non compatibile.", "error");
+              dom.irdbCommandsContainer.innerHTML =
+                '<div class="muted">Dataset vuoto o formattazione non supportata.</div>';
+              return;
+            }
+            updateIrdbDatasetBadge(
+              `${entry.manufacturer} · ${entry.file} (${state.irdb.csv.length} comandi)`
+            );
+            renderIrdbCommands();
+          } catch (error) {
+            console.error("IRDB dataset error", error);
+            updateIrdbDatasetBadge("Errore nel caricamento del dataset.", "error");
+            dom.irdbCommandsContainer.innerHTML =
+              '<div class="muted">Impossibile scaricare il dataset selezionato.</div>';
+            showToast("Errore durante il download del dataset irdb.", "error");
+          }
+        }
+
+        function handleIrdbResultClick(event) {
+          const item = event.target.closest("[data-irdb-path]");
+          if (!item) return;
+          const path = item.getAttribute("data-irdb-path");
+          const entry = state.irdb.index.find((it) => it.path === path);
+          if (!entry) return;
+          state.irdb.selectedEntry = entry;
+          renderIrdbResults();
+          loadIrdbDataset(entry);
+        }
+
+        function handleIrdbSelectionChange(event) {
+          const checkbox = event.target.closest("input[type=checkbox][data-irdb-index]");
+          if (!checkbox) return;
+          const index = Number(checkbox.getAttribute("data-irdb-index"));
+          if (!Number.isInteger(index)) return;
+          if (checkbox.checked) {
+            state.irdb.selection.add(index);
+          } else {
+            state.irdb.selection.delete(index);
+          }
+          updateIrdbSelectionSummary();
+        }
+
+        function chooseTargetDevice() {
+          const newDeviceRaw = dom.irdbNewDevice ? dom.irdbNewDevice.value : "";
+          const sanitizedNew = sanitizeDeviceName(newDeviceRaw);
+          if (sanitizedNew) {
+            return sanitizedNew;
+          }
+          const selected = dom.irdbTargetDevice ? dom.irdbTargetDevice.value : "";
+          return sanitizeDeviceName(selected);
+        }
+
+        function generateCommandName(baseName, fallback, existing) {
+          const base = sanitizeCommandName(baseName, fallback);
+          if (!existing[base]) {
+            return base;
+          }
+          let idx = 2;
+          while (existing[`${base}_${idx}`]) {
+            idx += 1;
+          }
+          return `${base}_${idx}`;
+        }
+
+        function importSelectedIrdbCommands() {
+          if (!state.ir.selectedDevice && !dom.irdbNewDevice?.value) {
+            showToast("Seleziona o crea un dispositivo per importare i comandi.", "error");
+            return;
+          }
+          if (!state.irdb.selection.size) {
+            showToast("Seleziona almeno un comando da importare.", "error");
+            return;
+          }
+
+          const targetDevice = chooseTargetDevice();
+          if (!targetDevice) {
+            showToast("Nome dispositivo non valido.", "error");
+            return;
+          }
+
+          const commands = ensureDevice(targetDevice);
+          let imported = 0;
+          const entryPath = state.irdb.selectedEntry ? state.irdb.selectedEntry.path : "";
+          state.irdb.selection.forEach((index) => {
+            const row = state.irdb.csv.find((item) => item.index === index);
+            if (!row || !row.conversion || !row.conversion.ok) {
+              return;
+            }
+            const conversion = row.conversion.data;
+            const commandName = generateCommandName(row.name, `cmd_${row.functionCode}`, commands);
+            commands[commandName] = {
+              protocol: conversion.protocol,
+              value: conversion.value,
+              bits: conversion.bits,
+              address: conversion.address,
+              command: conversion.command,
+              device: conversion.device,
+              subdevice: conversion.subdevice,
+              source: {
+                type: "irdb",
+                path: entryPath,
+                label: row.name,
+              },
+            };
+            imported += 1;
+          });
+
+          if (imported === 0) {
+            showToast("Nessun comando importato (forse non supportati).", "info");
+            return;
+          }
+
+          state.ir.devices[targetDevice] = commands;
+          state.ir.selectedDevice = targetDevice;
+          markIrDirty();
+          syncDeviceSelects();
+          renderLocalCommands();
+          showToast(`${imported} comandi importati in ${targetDevice}.`, "success");
+        }
+
+        function initializeIrModule() {
+          loadLocalIrData();
+          updateIrDirtyUI();
+          if (dom.irCommandsContainer) {
+            dom.irCommandsContainer.addEventListener("click", handleIrCommandClick);
+          }
+          if (dom.irManualForm) {
+            dom.irManualForm.addEventListener("submit", handleManualSubmit);
+          }
+        }
+
+        function setupEventHandlers() {
+          if (dom.actionContainer) {
+            dom.actionContainer.addEventListener("click", handleActionContainerClick);
+          }
+          if (dom.reloadActions) {
+            dom.reloadActions.addEventListener("click", () => loadActionCatalog(true));
+          }
+          if (dom.logsReconnect) {
+            dom.logsReconnect.addEventListener("click", setupLogs);
+          }
+          if (dom.logsClear && dom.logStream) {
+            dom.logsClear.addEventListener("click", () => {
+              dom.logStream.innerHTML = "";
+            });
+          }
+          if (dom.irReloadLocal) {
+            dom.irReloadLocal.addEventListener("click", () => loadLocalIrData(true));
+          }
+          if (dom.irDeviceSelect) {
+            dom.irDeviceSelect.addEventListener("change", (event) => {
+              state.ir.selectedDevice = event.target.value;
+              renderLocalCommands();
+            });
+          }
+          if (dom.irAddDevice) {
+            dom.irAddDevice.addEventListener("click", () => {
+              const name = window.prompt("Nome nuovo dispositivo?");
+              const sanitized = sanitizeDeviceName(name);
+              if (!sanitized) {
+                showToast("Nome dispositivo non valido.", "error");
+                return;
+              }
+              if (state.ir.devices[sanitized]) {
+                showToast("Dispositivo già esistente.", "error");
+                return;
+              }
+              state.ir.devices[sanitized] = {};
+              state.ir.selectedDevice = sanitized;
+              markIrDirty();
+              syncDeviceSelects();
+              renderLocalCommands();
+              showToast(`Dispositivo ${sanitized} creato.`, "success");
+            });
+          }
+          if (dom.irRenameDevice) {
+            dom.irRenameDevice.addEventListener("click", () => {
+              if (!state.ir.selectedDevice) {
+                showToast("Nessun dispositivo selezionato.", "error");
+                return;
+              }
+              const newName = window.prompt("Nuovo nome", state.ir.selectedDevice);
+              const sanitized = sanitizeDeviceName(newName);
+              if (!sanitized) {
+                showToast("Nome dispositivo non valido.", "error");
+                return;
+              }
+              if (state.ir.devices[sanitized]) {
+                showToast("Nome già in uso.", "error");
+                return;
+              }
+              state.ir.devices[sanitized] = state.ir.devices[state.ir.selectedDevice];
+              delete state.ir.devices[state.ir.selectedDevice];
+              state.ir.selectedDevice = sanitized;
+              markIrDirty();
+              syncDeviceSelects();
+              renderLocalCommands();
+              showToast("Dispositivo rinominato.", "success");
+            });
+          }
+          if (dom.irDeleteDevice) {
+            dom.irDeleteDevice.addEventListener("click", () => {
+              if (!state.ir.selectedDevice) {
+                showToast("Nessun dispositivo selezionato.", "error");
+                return;
+              }
+              if (!window.confirm(`Eliminare il dispositivo ${state.ir.selectedDevice}?`)) {
+                return;
+              }
+              delete state.ir.devices[state.ir.selectedDevice];
+              state.ir.selectedDevice = "";
+              markIrDirty();
+              syncDeviceSelects();
+              renderLocalCommands();
+              showToast("Dispositivo eliminato.", "success");
+            });
+          }
+          if (dom.irSaveChanges) {
+            dom.irSaveChanges.addEventListener("click", saveIrData);
+          }
+          if (dom.irdbLoadIndex) {
+            dom.irdbLoadIndex.addEventListener("click", () => loadIrdbIndex(true));
+          }
+          if (dom.irdbSearchInput) {
+            dom.irdbSearchInput.addEventListener("input", (event) => {
+              filterIrdbResults(event.target.value || "");
+            });
+          }
+          if (dom.irdbResults) {
+            dom.irdbResults.addEventListener("click", handleIrdbResultClick);
+          }
+          if (dom.irdbCommandsContainer) {
+            dom.irdbCommandsContainer.addEventListener("change", handleIrdbSelectionChange);
+          }
+          if (dom.irdbImportSelected) {
+            dom.irdbImportSelected.addEventListener("click", importSelectedIrdbCommands);
+          }
+        }
+
+        function init() {
+          if (!supportsFetch) {
+            showToast("Browser non supporta la Fetch API. Aggiorna o prova un altro browser.", "error");
+          }
+          setupTabs();
+          setupEventHandlers();
+          loadActionCatalog();
+          setupLogs();
+          updateIrDirtyUI();
+        }
+
+        document.addEventListener("DOMContentLoaded", init);
         window.addEventListener("beforeunload", () => {
           if (state.eventSource) {
             state.eventSource.close();
           }
         });
-
-        async function init() {
-          setupEventHandlers();
-          await loadActionCatalog();
-          setupLogs();
+        } catch (error) {
+          console.error("[SpecialActions] Fatal error:", error);
+          const toast = document.getElementById("toast");
+          if (toast) {
+            toast.textContent = "Errore di inizializzazione interfaccia.";
+            toast.className = "toast show error";
+          }
         }
-
-        document.addEventListener("DOMContentLoaded", init);
       })();
     </script>
   </body>

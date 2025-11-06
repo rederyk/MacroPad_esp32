@@ -1311,15 +1311,13 @@ void configWebServer::setupRoutes()
     // --- Endpoint per servire la pagina Special Actions (special_actions.html) ---
     server.on("/special_actions.html", HTTP_GET, [](AsyncWebServerRequest *request)
               {
-        File file = LittleFS.open("/special_actions.html", "r");
-        if (!file) {
+        if (!LittleFS.exists("/special_actions.html")) {
             Logger::getInstance().log("❌ special_actions.html not found");
             request->send(404, "text/plain", "❌ special_actions.html not found");
             return;
         }
-        String html = file.readString();
-        file.close();
-        request->send(200, "text/html", html); });
+        // Stream the file directly to avoid large heap allocations on bigger pages.
+        request->send(LittleFS, "/special_actions.html", "text/html"); });
 
     // --- Special Actions Endpoints ---
     server.on("/resetDevice", HTTP_POST, [](AsyncWebServerRequest *request)
