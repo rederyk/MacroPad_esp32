@@ -36,6 +36,7 @@
 #include "powerManager.h"
 #include "InputHub.h"
 #include "GyroMouse.h"
+#include "configWebServer.h"
 
 WIFIManager wifiManager; // Create an instance of WIFIManager
 
@@ -363,6 +364,7 @@ void mainLoopTask(void *parameter)
         bleController.checkConnection();
         macroManager.update();          // Assicurati che non blocchi
         gyroMouse.update();
+        checkIRScanBackground();        // Check per modalità scan IR da web UI
 
         // Check for pending combo switch request (processed outside of action context to avoid stack issues)
         if (macroManager.hasPendingComboSwitch())

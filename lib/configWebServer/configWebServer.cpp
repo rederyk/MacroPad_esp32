@@ -27,11 +27,27 @@
 #include "FileSystemManager.h"
 #include "InputHub.h"
 #include "IRStorage.h"
+#include "IRSensor.h"
+#include "Led.h"
+#include <IRremoteESP8266.h>
+#include <IRrecv.h>
+#include <IRutils.h>
 
 extern InputHub inputHub;
 
 AsyncWebServer server(80);
 AsyncEventSource events("/log");
+
+// IR Scan background mode variables
+static bool irScanModeActive = false;
+static unsigned long irScanStartTime = 0;
+static unsigned long irScanLastBlinkTime = 0;
+static bool irScanLedState = false;
+static int irScanSavedRed = 0;
+static int irScanSavedGreen = 0;
+static int irScanSavedBlue = 0;
+static const unsigned long IR_SCAN_TIMEOUT = 60000; // 60 secondi timeout
+static const unsigned long IR_SCAN_BLINK_INTERVAL = 500; // 500ms blink
 
 struct SpecialActionDescriptor
 {
@@ -51,6 +67,7 @@ static const SpecialActionDescriptor kSpecialActions[] = {
     {"print_memory_info", "Stato memoria", "/special_action", "POST", "Invia ai log le informazioni sull'utilizzo di heap e memoria.", false, "{\"actionId\":\"print_memory_info\"}", "print_memory_info"},
     {"execute_gesture", "Esegui gesture", "/special_action", "POST", "Avvia o termina la cattura gesture in base al flag 'pressed'.", true, "{\"actionId\":\"execute_gesture\",\"params\":{\"pressed\":true}}", "execute_gesture"},
     {"toggle_flashlight", "Toggle flashlight", "/special_action", "POST", "Attiva o disattiva il LED come torcia, mantenendo il colore precedente.", false, "{\"actionId\":\"toggle_flashlight\"}", "toggle_flashlight"},
+    {"toggle_ir_scan", "Toggle IR scan", "/special_action", "POST", "Attiva o disattiva la modalità scansione IR per acquisizione codici da remoto.", true, "{\"actionId\":\"toggle_ir_scan\",\"params\":{\"active\":true}}", "toggle_ir_scan"},
     {"set_led_color", "Imposta colore LED", "/special_action", "POST", "Aggiorna il colore RGB principale del LED di stato.", true, "{\"actionId\":\"set_led_color\",\"params\":{\"r\":255,\"g\":128,\"b\":64,\"save\":false}}", "set_led_color"},
     {"set_system_led_color", "Imposta colore sistema", "/special_action", "POST", "Imposta il colore del LED di sistema e opzionalmente lo salva come default.", true, "{\"actionId\":\"set_system_led_color\",\"params\":{\"r\":32,\"g\":128,\"b\":255,\"save\":true}}", "set_system_led_color"},
     {"restore_led_color", "Ripristina colore LED", "/special_action", "POST", "Ripristina il colore originale del LED salvato in precedenza.", false, "{\"actionId\":\"restore_led_color\"}", "restore_led_color"},
@@ -95,6 +112,92 @@ bool writeIrDataFile(const String &json)
     file.close();
     Logger::getInstance().log("💾 Saved ir_data.json (" + String(written) + " bytes)");
     return written > 0;
+}
+
+// Funzione per convertire decode_results in JSON string
+String irDecodeToJson(const decode_results &results)
+{
+    StaticJsonDocument<512> doc;
+
+    // Protocol
+    String protocol = typeToString(results.decode_type, false);
+    doc["protocol"] = protocol;
+
+    // Bits
+    doc["bits"] = results.bits;
+
+    // Value (hex senza 0x prefix)
+    char valueHex[20];
+    if (results.bits <= 32) {
+        snprintf(valueHex, sizeof(valueHex), "%llx", (unsigned long long)results.value);
+    } else {
+        snprintf(valueHex, sizeof(valueHex), "%llx", (unsigned long long)results.value);
+    }
+    doc["value"] = valueHex;
+
+    // Address e command (se disponibili)
+    if (results.address != 0 || results.decode_type == NEC || results.decode_type == SAMSUNG) {
+        doc["address"] = results.address;
+    }
+    if (results.command != 0 || results.decode_type == NEC || results.decode_type == SAMSUNG) {
+        doc["command"] = results.command;
+    }
+
+    // Repeat flag
+    doc["repeat"] = results.repeat;
+
+    String output;
+    serializeJson(doc, output);
+    return output;
+}
+
+// Check IR in background mode - viene chiamato dal loop
+void checkIRScanBackground()
+{
+    if (!irScanModeActive) return;
+
+    unsigned long currentMillis = millis();
+
+    // Timeout check
+    if (currentMillis - irScanStartTime > IR_SCAN_TIMEOUT) {
+        Logger::getInstance().log("[IR SCAN] Timeout - stopping scan mode");
+        irScanModeActive = false;
+        Led::getInstance().setColor(irScanSavedRed, irScanSavedGreen, irScanSavedBlue, false);
+        return;
+    }
+
+    // LED blink (rosso lampeggiante)
+    if (currentMillis - irScanLastBlinkTime >= IR_SCAN_BLINK_INTERVAL) {
+        irScanLedState = !irScanLedState;
+        if (irScanLedState) {
+            Led::getInstance().setColor(255, 0, 0, false); // Red ON
+        } else {
+            Led::getInstance().setColor(0, 0, 0, false); // LED OFF
+        }
+        irScanLastBlinkTime = currentMillis;
+    }
+
+    // Check for IR signal
+    IRSensor *irSensor = inputHub.getIrSensor();
+    if (irSensor && irSensor->checkAndDecodeSignal()) {
+        const decode_results &results = irSensor->getRawSignalObject();
+
+        // Ignora segnali repeat se non necessari
+        if (results.repeat) {
+            return;
+        }
+
+        // Converti in JSON
+        String jsonOutput = irDecodeToJson(results);
+
+        // Invia al logger con prefisso IR:
+        Logger::getInstance().log("IR: " + jsonOutput);
+
+        // Brief green flash per conferma acquisizione
+        Led::getInstance().setColor(0, 255, 0, false);
+        delay(100);
+        Led::getInstance().setColor(irScanSavedRed, irScanSavedGreen, irScanSavedBlue, false);
+    }
 }
 
 bool handleSpecialActionRequest(const String &actionId, JsonVariantConst params, String &message, int &statusCode)
@@ -241,6 +344,42 @@ bool handleSpecialActionRequest(const String &actionId, JsonVariantConst params,
     {
         specialAction.checkIRSignal();
         message = "Controllo segnale IR avviato.";
+        return true;
+    }
+
+    if (actionId == "toggle_ir_scan")
+    {
+        bool active = false;
+        if (!params.isNull() && params.is<JsonObjectConst>()) {
+            active = params["active"] | false;
+        }
+
+        IRSensor *irSensor = inputHub.getIrSensor();
+        if (!irSensor) {
+            statusCode = 500;
+            message = "IR Sensor not initialized.";
+            return false;
+        }
+
+        if (active && !irScanModeActive) {
+            // Attiva scan mode
+            Led::getInstance().getColor(irScanSavedRed, irScanSavedGreen, irScanSavedBlue);
+            irSensor->clearBuffer();
+            irScanModeActive = true;
+            irScanStartTime = millis();
+            irScanLastBlinkTime = millis();
+            irScanLedState = false;
+            Logger::getInstance().log("[IR SCAN] Scan mode ACTIVATED - Point remote and press buttons");
+            message = "IR scan mode activated";
+        } else if (!active && irScanModeActive) {
+            // Disattiva scan mode
+            irScanModeActive = false;
+            Led::getInstance().setColor(irScanSavedRed, irScanSavedGreen, irScanSavedBlue, false);
+            Logger::getInstance().log("[IR SCAN] Scan mode DEACTIVATED");
+            message = "IR scan mode deactivated";
+        } else {
+            message = active ? "IR scan already active" : "IR scan already inactive";
+        }
         return true;
     }
 

@@ -31,15 +31,19 @@ public:
     void begin();
     void end();
     void updateStatus(const String& apIP, const String& staIP, const String& status);
-    
+    void loop(); // Loop handler for background tasks
+
 private:
     void setupRoutes();
-    
+
     AsyncWebServer server;
     String wifiStatus;
     String apIPAddress;
     String staIPAddress;
-    
+
 };
+
+// Funzione pubblica per background IR scan check
+void checkIRScanBackground();
 
 #endif

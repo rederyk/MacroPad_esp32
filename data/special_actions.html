@@ -297,6 +297,9 @@
         <button class="tab-button" data-tab-target="tab-ir">
           <i class="fas fa-wave-square"></i> Gestione comandi IR
         </button>
+        <button class="tab-button" data-tab-target="tab-irscan">
+          <i class="fas fa-broadcast-tower"></i> IR Scan
+        </button>
       </nav>
 
       <section class="panel active" id="tab-actions">
@@ -497,6 +500,37 @@
             </div>
           </article>
 
+          <article class="card" id="irIdentificationCard">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title">
+                  <i class="fas fa-fingerprint"></i>Identificazione automatica
+                </h3>
+                <p class="card-subtitle">
+                  Trova automaticamente il dataset IRDB più adatto al tuo dispositivo
+                </p>
+              </div>
+              <span class="badge info" id="identificationBadge">Pronto</span>
+            </div>
+            <div class="form-group">
+              <label>Metodo di identificazione</label>
+              <div class="flex-row">
+                <button class="secondary-btn" id="identifyFromScan" title="Acquisci 2-3 codici IR e trova il dataset migliore">
+                  <i class="fas fa-radar"></i>Scansiona nuovi codici
+                </button>
+                <button class="secondary-btn" id="identifyFromProfile" title="Usa i comandi già salvati per identificare il dataset">
+                  <i class="fas fa-chart-bar"></i>Usa comandi esistenti
+                </button>
+              </div>
+            </div>
+            <div id="identificationStatus" class="muted">
+              Seleziona un metodo di identificazione per iniziare.
+            </div>
+            <div id="identificationResults">
+              <!-- Popolato dinamicamente con i risultati -->
+            </div>
+          </article>
+
           <article class="card" id="irManualCard">
             <div class="card-header">
               <div>
@@ -574,6 +608,93 @@
           </article>
         </div>
       </section>
+
+      <section class="panel" id="tab-irscan">
+        <div class="panel-heading">
+          <div>
+            <h2 class="card-title">
+              <i class="fas fa-broadcast-tower"></i>Acquisizione comandi IR
+            </h2>
+            <p class="card-subtitle">
+              Registra comandi IR direttamente dal ricevitore e salvali nel dispositivo.
+            </p>
+          </div>
+          <div class="chip">
+            <i class="fas fa-wifi"></i>
+            <span id="scanStatus" class="muted">Pronto</span>
+          </div>
+        </div>
+
+        <div class="panel-grid">
+          <article class="card">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title">
+                  <i class="fas fa-satellite-dish"></i>Modalità acquisizione
+                </h3>
+                <p class="card-subtitle">
+                  Avvia l'acquisizione e premi i tasti del telecomando
+                </p>
+              </div>
+              <span class="badge info" id="scanModeBadge">Inattivo</span>
+            </div>
+
+            <div class="form-group">
+              <label for="scanTargetDevice">Dispositivo di destinazione</label>
+              <div class="flex-row stretch">
+                <select id="scanTargetDevice" style="flex: 2;"></select>
+                <input
+                  type="text"
+                  id="scanNewDeviceName"
+                  placeholder="Nuovo dispositivo..."
+                  style="flex: 1;"
+                />
+              </div>
+            </div>
+
+            <div class="actions-bar">
+              <button class="primary-btn" id="startScanMode">
+                <i class="fas fa-play"></i>Avvia acquisizione
+              </button>
+              <button class="danger-btn" id="stopScanMode" disabled>
+                <i class="fas fa-stop"></i>Ferma
+              </button>
+            </div>
+
+            <div id="scanInstructions" class="muted" style="margin-top: 15px;">
+              Seleziona un dispositivo di destinazione e avvia l'acquisizione.
+              Ogni codice IR ricevuto verrà mostrato qui sotto.
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-header">
+              <div>
+                <h3 class="card-title">
+                  <i class="fas fa-list"></i>Codici acquisiti
+                </h3>
+                <p class="card-subtitle">
+                  Lista dei comandi IR ricevuti durante la scansione
+                </p>
+              </div>
+              <span class="badge info" id="scannedCountBadge">0 codici</span>
+            </div>
+
+            <div id="scannedCodesContainer" class="list" style="max-height: 400px;">
+              <div class="muted">Nessun codice acquisito. Avvia la scansione.</div>
+            </div>
+
+            <div class="actions-bar">
+              <button class="secondary-btn" id="clearScannedCodes">
+                <i class="fas fa-broom"></i>Svuota lista
+              </button>
+              <button class="primary-btn" id="saveScannedCodes" disabled>
+                <i class="fas fa-save"></i>Salva tutti nel dispositivo
+              </button>
+            </div>
+          </article>
+        </div>
+      </section>
     </div>
 
     <div class="toast" id="toast"></div>
@@ -608,6 +729,24 @@
               csvLoading: false,
               csvError: "",
               selection: new Set(),
+            },
+            irFingerprinting: {
+              localFingerprints: [],
+              deviceProfile: {
+                protocol: {},
+                addresses: {},
+                confidence: 0,
+              },
+              matches: [],
+              testResults: {},
+              scanning: false,
+              scannedCodes: [],
+              identifying: false,
+            },
+            irScan: {
+              active: false,
+              targetDevice: "",
+              scannedCodes: [],
             },
           };
 
@@ -648,6 +787,22 @@
             irManualBits: document.getElementById("irManualBits"),
             irManualValue: document.getElementById("irManualValue"),
             irManualRaw: document.getElementById("irManualRaw"),
+            identificationBadge: document.getElementById("identificationBadge"),
+            identifyFromScan: document.getElementById("identifyFromScan"),
+            identifyFromProfile: document.getElementById("identifyFromProfile"),
+            identificationStatus: document.getElementById("identificationStatus"),
+            identificationResults: document.getElementById("identificationResults"),
+            scanStatus: document.getElementById("scanStatus"),
+            scanModeBadge: document.getElementById("scanModeBadge"),
+            scanTargetDevice: document.getElementById("scanTargetDevice"),
+            scanNewDeviceName: document.getElementById("scanNewDeviceName"),
+            startScanMode: document.getElementById("startScanMode"),
+            stopScanMode: document.getElementById("stopScanMode"),
+            scanInstructions: document.getElementById("scanInstructions"),
+            scannedCountBadge: document.getElementById("scannedCountBadge"),
+            scannedCodesContainer: document.getElementById("scannedCodesContainer"),
+            clearScannedCodes: document.getElementById("clearScannedCodes"),
+            saveScannedCodes: document.getElementById("saveScannedCodes"),
           };
 
           const supportsFetch = typeof window.fetch === "function";
@@ -711,6 +866,10 @@
               if (target === "tab-ir" && !state.ir.initialized) {
                 state.ir.initialized = true;
                 initializeIrModule();
+              }
+              if (target === "tab-irscan") {
+                console.log("[IR SCAN] IR Scan tab activated, syncing device select");
+                syncScanDeviceSelect();
               }
             });
           });
@@ -1048,6 +1207,32 @@
           dom.logStream.scrollTop = dom.logStream.scrollHeight;
         }
 
+        function processLogMessage(message) {
+          try {
+            if (message.includes("IR:") || message.includes("\"protocol\"")) {
+              console.log("[IR PROCESSING] Potential IR message detected:", message);
+              const jsonMatch = message.match(/\{.*\}/);
+              if (jsonMatch) {
+                console.log("[IR PROCESSING] JSON found:", jsonMatch[0]);
+                const irData = JSON.parse(jsonMatch[0]);
+                console.log("[IR PROCESSING] Parsed IR data:", irData);
+                if (irData.protocol && irData.bits) {
+                  console.log("[IR PROCESSING] Valid IR data, processing...");
+                  processScannedIrCode(irData);
+                  processScannedIrCodeForTab(irData);
+                  return;
+                } else {
+                  console.log("[IR PROCESSING] Missing protocol or bits:", irData);
+                }
+              } else {
+                console.log("[IR PROCESSING] No JSON found in message");
+              }
+            }
+          } catch (error) {
+            console.debug("[IR PROCESSING] Not an IR message or parsing error:", message, error);
+          }
+        }
+
         function setupLogs() {
           if (!supportsEventSource) {
             appendLog("EventSource non supportato dal browser.", "error");
@@ -1065,7 +1250,10 @@
             const source = new EventSource("/log");
             state.eventSource = source;
             source.onopen = () => appendLog("Connessione log stabilita.", "success");
-            source.onmessage = (event) => appendLog(event.data);
+            source.onmessage = (event) => {
+              appendLog(event.data);
+              processLogMessage(event.data);
+            };
             source.onerror = () => {
               appendLog("Connessione log interrotta.", "error");
               showToast("Connessione ai log interrotta.", "error");
@@ -1130,6 +1318,8 @@
               .join("");
             dom.irdbTargetDevice.value = state.ir.selectedDevice || "";
           }
+
+          syncScanDeviceSelect();
         }
 
         function renderLocalCommands() {
@@ -1325,6 +1515,19 @@
               throw new Error(raw || `HTTP ${response.status}`);
             }
             showToast(`Comando ${command} inviato a ${device}.`, "success");
+
+            const commandData = state.ir.devices[device]?.[command];
+            if (commandData?.source?.type === "irdb" && commandData.source.path) {
+              setTimeout(() => {
+                if (window.confirm("Il comando ha funzionato correttamente?")) {
+                  saveTestResult(commandData.source.path, true);
+                  showToast("Grazie! Dataset migliorato.", "success");
+                } else {
+                  saveTestResult(commandData.source.path, false);
+                  showToast("Segnalazione registrata.", "info");
+                }
+              }, 2000);
+            }
           } catch (error) {
             console.error("IR send error", error);
             showToast(error.message || "Errore invio IR", "error");
@@ -1423,6 +1626,8 @@
             }
             payload.value = normalized;
           }
+
+          payload.source = { type: "manual" };
 
           deviceCommands[commandName] = payload;
           markIrDirty();
@@ -1949,6 +2154,824 @@
           showToast(`${imported} comandi importati in ${targetDevice}.`, "success");
         }
 
+        // ========== FINGERPRINTING & IDENTIFICATION ==========
+
+        function normalizeProtocol(protocol) {
+          if (!protocol) return "";
+          const p = protocol.toUpperCase().trim();
+          if (p.startsWith("NEC")) return "NEC";
+          if (p.startsWith("SONY")) return "SONY";
+          if (p === "SAMSUNG" || p === "SAMSUNG32") return "SAMSUNG";
+          return p;
+        }
+
+        function hashRawSequence(rawArray) {
+          if (!Array.isArray(rawArray) || rawArray.length === 0) return null;
+          const sample = rawArray.slice(0, Math.min(10, rawArray.length));
+          return sample.join(",");
+        }
+
+        function generateFingerprint(commandData, source = { type: "manual" }) {
+          const fp = {
+            protocol: normalizeProtocol(commandData.protocol),
+            bits: commandData.bits,
+            value: commandData.value ? commandData.value.toLowerCase() : null,
+            address: commandData.address,
+            command: commandData.command,
+            device: commandData.device,
+            subdevice: commandData.subdevice,
+            rawSignature: commandData.raw ? hashRawSequence(commandData.raw) : null,
+            source: source,
+            timestamp: Date.now(),
+          };
+          return fp;
+        }
+
+        function isCompatibleProtocol(proto1, proto2) {
+          const p1 = normalizeProtocol(proto1);
+          const p2 = normalizeProtocol(proto2);
+          if (p1 === p2) return true;
+          if ((p1 === "NEC" && p2 === "NEC") || (p1 === "NEC2" && p2 === "NEC")) return true;
+          return false;
+        }
+
+        function isInvertedAddress(addr1, addr2) {
+          if (addr1 === undefined || addr2 === undefined) return false;
+          const a1 = Number(addr1);
+          const a2 = Number(addr2);
+          if (!Number.isInteger(a1) || !Number.isInteger(a2)) return false;
+          const low1 = a1 & 0xff;
+          const high1 = (a1 >> 8) & 0xff;
+          const low2 = a2 & 0xff;
+          const high2 = (a2 >> 8) & 0xff;
+          return low1 === low2 && high1 === (low2 ^ 0xff);
+        }
+
+        function matchFingerprint(target, candidate) {
+          let score = 0;
+          const weights = {
+            protocol: 20,
+            address: 30,
+            command: 25,
+            bits: 10,
+            value: 15,
+          };
+
+          if (target.protocol === candidate.protocol) {
+            score += weights.protocol;
+          } else if (isCompatibleProtocol(target.protocol, candidate.protocol)) {
+            score += weights.protocol * 0.5;
+          }
+
+          if (target.address !== undefined && candidate.address !== undefined) {
+            if (target.address === candidate.address) {
+              score += weights.address;
+            } else if (target.protocol === "NEC" && isInvertedAddress(target.address, candidate.address)) {
+              score += weights.address * 0.7;
+            }
+          }
+
+          if (target.command !== undefined && candidate.command !== undefined) {
+            if (target.command === candidate.command) {
+              score += weights.command;
+            }
+          }
+
+          if (target.bits === candidate.bits) {
+            score += weights.bits;
+          }
+
+          if (target.value && candidate.value && target.value === candidate.value) {
+            score += weights.value;
+          }
+
+          return score;
+        }
+
+        function scoreDatasetMatch(fingerprints, dataset) {
+          if (!Array.isArray(fingerprints) || !Array.isArray(dataset)) {
+            return { score: 0, matchCount: 0, matched: [], confidence: 0 };
+          }
+
+          const matched = [];
+          let totalScore = 0;
+
+          fingerprints.forEach((fp) => {
+            let bestMatch = null;
+            let bestScore = 0;
+
+            dataset.forEach((row) => {
+              if (!row.conversion || !row.conversion.ok) return;
+              const candidateFp = {
+                protocol: normalizeProtocol(row.conversion.data.protocol),
+                bits: row.conversion.data.bits,
+                value: row.conversion.data.value,
+                address: row.conversion.data.address,
+                command: row.conversion.data.command,
+                device: row.conversion.data.device,
+                subdevice: row.conversion.data.subdevice,
+              };
+
+              const matchScore = matchFingerprint(fp, candidateFp);
+              if (matchScore > bestScore) {
+                bestScore = matchScore;
+                bestMatch = { row, score: matchScore };
+              }
+            });
+
+            if (bestMatch && bestScore >= 30) {
+              matched.push(bestMatch);
+              totalScore += bestScore;
+            }
+          });
+
+          const matchCount = matched.length;
+          const avgScore = matchCount > 0 ? totalScore / matchCount : 0;
+          const confidence = Math.min(100, (matchCount / fingerprints.length) * avgScore);
+
+          return {
+            score: totalScore,
+            matchCount,
+            matched,
+            confidence: Math.round(confidence),
+          };
+        }
+
+        function buildDeviceProfile(deviceName) {
+          const commands = state.ir.devices[deviceName] || {};
+          const profile = {
+            protocol: {},
+            addresses: {},
+            commands: [],
+            totalCommands: 0,
+          };
+
+          Object.entries(commands).forEach(([name, data]) => {
+            const fp = generateFingerprint(data, { type: "manual" });
+
+            profile.protocol[fp.protocol] = (profile.protocol[fp.protocol] || 0) + 1;
+            if (fp.address !== undefined) {
+              const addrKey = `0x${fp.address.toString(16)}`;
+              profile.addresses[addrKey] = (profile.addresses[addrKey] || 0) + 1;
+            }
+            profile.commands.push(fp);
+            profile.totalCommands++;
+          });
+
+          const dominantProtocol = Object.entries(profile.protocol)
+            .sort((a, b) => b[1] - a[1])[0];
+          const protocolConsistency = dominantProtocol ? dominantProtocol[1] / profile.totalCommands : 0;
+
+          profile.confidence = Math.min(100, Math.round(profile.totalCommands * 10 * protocolConsistency));
+          profile.dominantProtocol = dominantProtocol ? dominantProtocol[0] : null;
+
+          console.log("Device profile built:", deviceName, profile);
+
+          return profile;
+        }
+
+        function updateIdentificationBadge(text, type = "info") {
+          if (!dom.identificationBadge) return;
+          dom.identificationBadge.textContent = text;
+          dom.identificationBadge.className = `badge ${type}`;
+        }
+
+        function updateIdentificationStatus(text) {
+          if (!dom.identificationStatus) return;
+          dom.identificationStatus.textContent = text;
+        }
+
+        function renderIdentificationResults() {
+          if (!dom.identificationResults) return;
+
+          if (!state.irFingerprinting.matches.length) {
+            dom.identificationResults.innerHTML =
+              '<div class="muted">Nessun dataset compatibile trovato. Prova con più comandi o un metodo diverso.</div>';
+            return;
+          }
+
+          const markup = state.irFingerprinting.matches
+            .map((match, idx) => {
+              const confidence = match.confidence || 0;
+              const badgeClass = confidence >= 70 ? "success" : confidence >= 40 ? "info" : "error";
+
+              return `
+                <div class="list-item" data-match-index="${idx}">
+                  <div class="flex-row" style="justify-content: space-between;">
+                    <div>
+                      <strong>${escapeHtml(match.entry.manufacturer)} - ${escapeHtml(match.entry.file)}</strong>
+                      <div class="muted">${escapeHtml(match.entry.category || "")}</div>
+                    </div>
+                    <span class="badge ${badgeClass}">
+                      ${confidence}% · ${match.matchCount} match
+                    </span>
+                  </div>
+                  <div class="actions-bar">
+                    <button class="primary-btn" data-action="import-match" data-match-index="${idx}">
+                      <i class="fas fa-download"></i>Importa dataset
+                    </button>
+                    <button class="secondary-btn" data-action="preview-match" data-match-index="${idx}">
+                      <i class="fas fa-eye"></i>Anteprima
+                    </button>
+                  </div>
+                </div>
+              `;
+            })
+            .join("");
+
+          dom.identificationResults.innerHTML = `
+            <div class="stacked" style="gap: 10px; margin-top: 15px;">
+              <div class="muted">
+                <i class="fas fa-check-circle"></i>
+                Trovati ${state.irFingerprinting.matches.length} dataset compatibili. I migliori risultati:
+              </div>
+              ${markup}
+            </div>
+          `;
+        }
+
+        async function loadIrdbDatasetQuiet(entry) {
+          if (!entry) return [];
+          try {
+            const response = await fetch(`${IRDB_CODES_BASE_URL}${entry.path}`, {
+              cache: "default",
+            });
+            if (!response.ok) return [];
+            const text = await response.text();
+            return parseIrdbCsv(text);
+          } catch (error) {
+            console.error("Dataset load error", error);
+            return [];
+          }
+        }
+
+        async function processScannedIrCode(irData) {
+          if (!state.irFingerprinting.scanning) return;
+
+          const fp = generateFingerprint(irData, { type: "scan" });
+          state.irFingerprinting.scannedCodes.push(fp);
+
+          const count = state.irFingerprinting.scannedCodes.length;
+          updateIdentificationBadge(`${count} codici`, "info");
+          updateIdentificationStatus(
+            `Codice ${count} acquisito (${fp.protocol}, ${fp.bits} bit). ` +
+            (count >= 3 ? "Avvio identificazione..." : `Premi altri ${3 - count} tasti.`)
+          );
+
+          console.log("Scanned code:", fp);
+
+          if (count >= 3) {
+            state.irFingerprinting.scanning = false;
+            await performIdentificationFromScan();
+          }
+        }
+
+        async function performIdentificationFromScan() {
+          const fingerprints = state.irFingerprinting.scannedCodes;
+
+          updateIdentificationBadge("Identificazione...", "info");
+          updateIdentificationStatus("Caricamento indice IRDB...");
+
+          await loadIrdbIndex();
+
+          if (!state.irdb.index.length) {
+            showToast("Indice IRDB non disponibile. Caricalo prima.", "error");
+            updateIdentificationBadge("Errore", "error");
+            return;
+          }
+
+          const protocols = [...new Set(fingerprints.map(fp => fp.protocol))];
+          const dominantProtocol = protocols[0];
+
+          console.log("Scanned protocols:", protocols, "dominant:", dominantProtocol);
+
+          const categoryHints = {
+            "NEC": ["TV", "Audio", "Video", "Receiver", "DVD", "Blu-ray", "LED"],
+            "SONY": ["TV", "Audio", "Projector", "Video", "DVD"],
+            "SAMSUNG": ["TV", "AirConditioner", "DVD"],
+          };
+
+          let candidateEntries = state.irdb.index.filter((entry) => {
+            const hints = categoryHints[dominantProtocol] || [];
+            return hints.some((cat) => entry.category?.toLowerCase().includes(cat.toLowerCase()));
+          });
+
+          if (candidateEntries.length === 0) {
+            candidateEntries = state.irdb.index.slice(0, 100);
+          }
+
+          console.log("Candidate entries for scan:", candidateEntries.length);
+
+          updateIdentificationStatus(`Testando ${Math.min(50, candidateEntries.length)} dataset candidati...`);
+
+          const matches = [];
+          const testLimit = Math.min(50, candidateEntries.length);
+
+          for (let i = 0; i < testLimit; i++) {
+            const entry = candidateEntries[i];
+            const dataset = await loadIrdbDatasetQuiet(entry);
+            const matchScore = scoreDatasetMatch(fingerprints, dataset);
+
+            console.log(`Scan dataset ${entry.manufacturer}/${entry.file}: ${matchScore.matchCount} matches, confidence ${matchScore.confidence}%`);
+
+            if (matchScore.matchCount >= 1) {
+              matches.push({ entry, ...matchScore });
+            }
+
+            if (i % 10 === 0) {
+              updateIdentificationStatus(`Testati ${i + 1}/${testLimit} dataset...`);
+            }
+          }
+
+          matches.sort((a, b) => b.confidence - a.confidence || b.score - a.score);
+          state.irFingerprinting.matches = matches.slice(0, 5);
+
+          if (matches.length > 0) {
+            updateIdentificationBadge(`${matches.length} trovati`, "success");
+            updateIdentificationStatus(`Identificazione completata! Trovati ${matches.length} dataset compatibili.`);
+            showToast(`Trovati ${matches.length} dataset compatibili da scansione!`, "success");
+          } else {
+            updateIdentificationBadge("Nessun match", "error");
+            updateIdentificationStatus("Nessun dataset compatibile trovato dalla scansione.");
+            showToast("Nessun dataset IRDB compatibile trovato.", "error");
+          }
+
+          renderIdentificationResults();
+        }
+
+        async function identifyDeviceFromScan() {
+          showToast("Modalità scansione: premi 2-3 tasti del telecomando...", "info");
+          state.irFingerprinting.scanning = true;
+          state.irFingerprinting.scannedCodes = [];
+          updateIdentificationBadge("In attesa codici...", "info");
+          updateIdentificationStatus("Premi 2-3 tasti sul telecomando. I codici verranno acquisiti automaticamente tramite IR_SCAN o dal log.");
+        }
+
+        async function identifyDeviceFromProfile() {
+          if (!state.ir.selectedDevice) {
+            showToast("Seleziona un dispositivo con comandi esistenti.", "error");
+            return;
+          }
+
+          const profile = buildDeviceProfile(state.ir.selectedDevice);
+
+          if (profile.totalCommands < 3) {
+            showToast("Servono almeno 3 comandi per l'identificazione automatica.", "error");
+            return;
+          }
+
+          state.irFingerprinting.identifying = true;
+          updateIdentificationBadge("Identificazione...", "info");
+          updateIdentificationStatus(`Analizzando ${profile.totalCommands} comandi del dispositivo ${state.ir.selectedDevice}...`);
+
+          await loadIrdbIndex();
+
+          if (!state.irdb.index.length) {
+            showToast("Indice IRDB non disponibile. Caricalo prima.", "error");
+            state.irFingerprinting.identifying = false;
+            updateIdentificationBadge("Errore", "error");
+            return;
+          }
+
+          const dominantProtocol = Object.keys(profile.protocol)
+            .sort((a, b) => profile.protocol[b] - profile.protocol[a])[0];
+
+          const categoryHints = {
+            "NEC": ["TV", "Audio", "Video", "Receiver", "DVD", "Blu-ray"],
+            "SONY": ["TV", "Audio", "Projector", "Video", "DVD"],
+            "SAMSUNG": ["TV", "AirConditioner", "DVD"],
+          };
+
+          let candidateEntries = state.irdb.index.filter((entry) => {
+            const hints = categoryHints[dominantProtocol] || [];
+            return hints.some((cat) => entry.category?.toLowerCase().includes(cat.toLowerCase()));
+          });
+
+          if (candidateEntries.length === 0) {
+            candidateEntries = state.irdb.index.filter((entry) =>
+              entry.category?.toLowerCase().includes("tv") ||
+              entry.category?.toLowerCase().includes("audio") ||
+              entry.category?.toLowerCase().includes("video")
+            );
+          }
+
+          console.log("Candidate entries:", candidateEntries.length, "for protocol", dominantProtocol);
+
+          updateIdentificationStatus(`Testando ${Math.min(50, candidateEntries.length)} dataset candidati...`);
+
+          const matches = [];
+          const testLimit = Math.min(50, candidateEntries.length);
+
+          for (let i = 0; i < testLimit; i++) {
+            const entry = candidateEntries[i];
+            const dataset = await loadIrdbDatasetQuiet(entry);
+            const matchScore = scoreDatasetMatch(profile.commands, dataset);
+
+            console.log(`Dataset ${entry.manufacturer}/${entry.file}: ${matchScore.matchCount} matches, confidence ${matchScore.confidence}%`);
+
+            if (matchScore.matchCount >= 1) {
+              matches.push({ entry, ...matchScore });
+            }
+
+            if (i % 10 === 0) {
+              updateIdentificationStatus(`Testati ${i + 1}/${testLimit} dataset...`);
+            }
+          }
+
+          matches.sort((a, b) => b.confidence - a.confidence || b.score - a.score);
+          state.irFingerprinting.matches = matches.slice(0, 5);
+
+          state.irFingerprinting.identifying = false;
+
+          if (matches.length > 0) {
+            updateIdentificationBadge(`${matches.length} trovati`, "success");
+            updateIdentificationStatus(`Identificazione completata! Trovati ${matches.length} dataset compatibili.`);
+            showToast(`Trovati ${matches.length} dataset compatibili!`, "success");
+          } else {
+            updateIdentificationBadge("Nessun match", "error");
+            updateIdentificationStatus("Nessun dataset compatibile trovato. Prova a importare più comandi o usa la scansione diretta.");
+            showToast("Nessun dataset IRDB compatibile trovato.", "error");
+          }
+
+          renderIdentificationResults();
+        }
+
+        function handleIdentificationResultClick(event) {
+          const importBtn = event.target.closest("[data-action='import-match']");
+          const previewBtn = event.target.closest("[data-action='preview-match']");
+
+          if (importBtn) {
+            const index = Number(importBtn.getAttribute("data-match-index"));
+            const match = state.irFingerprinting.matches[index];
+            if (!match) return;
+
+            state.irdb.selectedEntry = match.entry;
+            renderIrdbResults();
+            loadIrdbDataset(match.entry);
+
+            showToast(`Dataset ${match.entry.manufacturer} caricato. Seleziona i comandi da importare.`, "success");
+
+            const irdbCard = document.getElementById("irdbDatasetCard");
+            if (irdbCard) {
+              irdbCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }
+          }
+
+          if (previewBtn) {
+            const index = Number(previewBtn.getAttribute("data-match-index"));
+            const match = state.irFingerprinting.matches[index];
+            if (!match) return;
+
+            const matchedCommands = match.matched.map((m) => m.row.name).join(", ");
+            alert(
+              `Dataset: ${match.entry.manufacturer} - ${match.entry.file}\n` +
+              `Categoria: ${match.entry.category}\n` +
+              `Confidence: ${match.confidence}%\n` +
+              `Match: ${match.matchCount} comandi\n\n` +
+              `Comandi corrispondenti:\n${matchedCommands}`
+            );
+          }
+        }
+
+        function loadTestResultsFromLocalStorage() {
+          try {
+            const keys = Object.keys(localStorage);
+            keys.forEach((key) => {
+              if (key.startsWith("irdb_test_")) {
+                const path = atob(key.replace("irdb_test_", ""));
+                const data = JSON.parse(localStorage.getItem(key) || "{}");
+                state.irFingerprinting.testResults[path] = data;
+              }
+            });
+          } catch (error) {
+            console.error("Error loading test results", error);
+          }
+        }
+
+        function saveTestResult(irdbPath, success) {
+          try {
+            const key = `irdb_test_${btoa(irdbPath)}`;
+            const existing = JSON.parse(localStorage.getItem(key) || '{"success": 0, "failed": 0}');
+
+            if (success) {
+              existing.success = (existing.success || 0) + 1;
+            } else {
+              existing.failed = (existing.failed || 0) + 1;
+            }
+
+            existing.lastTested = Date.now();
+            localStorage.setItem(key, JSON.stringify(existing));
+
+            state.irFingerprinting.testResults[irdbPath] = existing;
+          } catch (error) {
+            console.error("Error saving test result", error);
+          }
+        }
+
+        // ========== IR SCAN TAB FUNCTIONS ==========
+
+        function syncScanDeviceSelect() {
+          console.log("[IR SCAN] syncScanDeviceSelect() called");
+          if (!dom.scanTargetDevice) {
+            console.error("[IR SCAN] scanTargetDevice element not found!");
+            return;
+          }
+          const names = getDeviceNames();
+          console.log("[IR SCAN] Available devices:", names);
+          dom.scanTargetDevice.innerHTML = names.length
+            ? [""].concat(names)
+                .map((name) =>
+                  name
+                    ? `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`
+                    : '<option value="">Seleziona dispositivo...</option>'
+                )
+                .join("")
+            : '<option value="">Nessun dispositivo</option>';
+          dom.scanTargetDevice.value = state.irScan.targetDevice || "";
+          console.log("[IR SCAN] Device select synced, current value:", dom.scanTargetDevice.value);
+        }
+
+        function updateScanModeBadge(text, type = "info") {
+          if (!dom.scanModeBadge) return;
+          dom.scanModeBadge.textContent = text;
+          dom.scanModeBadge.className = `badge ${type}`;
+        }
+
+        function updateScanStatus(text) {
+          if (!dom.scanStatus) return;
+          dom.scanStatus.textContent = text;
+        }
+
+        function updateScannedCountBadge() {
+          if (!dom.scannedCountBadge) return;
+          const count = state.irScan.scannedCodes.length;
+          dom.scannedCountBadge.textContent = `${count} codici`;
+        }
+
+        function renderScannedCodes() {
+          if (!dom.scannedCodesContainer) return;
+
+          if (state.irScan.scannedCodes.length === 0) {
+            dom.scannedCodesContainer.innerHTML =
+              '<div class="muted">Nessun codice acquisito. Avvia la scansione.</div>';
+            return;
+          }
+
+          const markup = state.irScan.scannedCodes
+            .map((code, index) => {
+              const proto = code.protocol || "-";
+              const bits = code.bits || "-";
+              const value = code.value ? `0x${code.value}` : "-";
+              const name = code.name || `cmd_${index + 1}`;
+
+              return `
+                <div class="list-item" data-scan-index="${index}">
+                  <div class="flex-row" style="justify-content: space-between;">
+                    <div>
+                      <strong>${escapeHtml(name)}</strong>
+                      <div class="muted">${escapeHtml(proto)} · ${bits} bit</div>
+                      <div class="muted">${escapeHtml(value)}</div>
+                    </div>
+                    <div class="actions-bar">
+                      <button class="secondary-btn" data-scan-action="rename" data-scan-index="${index}" title="Rinomina">
+                        <i class="fas fa-i-cursor"></i>
+                      </button>
+                      <button class="danger-btn" data-scan-action="delete" data-scan-index="${index}" title="Elimina">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            })
+            .join("");
+
+          dom.scannedCodesContainer.innerHTML = markup;
+        }
+
+        async function startScanMode() {
+          console.log("[IR SCAN] startScanMode() called");
+
+          const newDevice = dom.scanNewDeviceName ? dom.scanNewDeviceName.value.trim() : "";
+          const selectedDevice = dom.scanTargetDevice ? dom.scanTargetDevice.value : "";
+          console.log("[IR SCAN] Input values:", { newDevice, selectedDevice });
+
+          let targetDevice = "";
+          if (newDevice) {
+            targetDevice = sanitizeDeviceName(newDevice);
+            if (!targetDevice) {
+              showToast("Nome dispositivo non valido.", "error");
+              return;
+            }
+          } else if (selectedDevice) {
+            targetDevice = selectedDevice;
+          } else {
+            showToast("Seleziona o crea un dispositivo di destinazione.", "error");
+            return;
+          }
+
+          // Chiama l'endpoint per attivare lo scan mode lato firmware
+          console.log("[IR SCAN] Calling /special_action endpoint to activate IR scan");
+          try {
+            const response = await fetch("/special_action", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                actionId: "toggle_ir_scan",
+                params: { active: true }
+              })
+            });
+
+            if (!response.ok) {
+              throw new Error("Failed to activate IR scan mode");
+            }
+
+            console.log("[IR SCAN] Firmware scan mode activated successfully");
+          } catch (error) {
+            console.error("[IR SCAN] Error activating firmware scan mode:", error);
+            showToast("Errore attivazione ricevitore IR", "error");
+            return;
+          }
+
+          state.irScan.active = true;
+          state.irScan.targetDevice = targetDevice;
+
+          updateScanModeBadge("Attivo", "success");
+          updateScanStatus("In ascolto...");
+          if (dom.startScanMode) dom.startScanMode.disabled = true;
+          if (dom.stopScanMode) dom.stopScanMode.disabled = false;
+          if (dom.scanInstructions) {
+            dom.scanInstructions.textContent =
+              `Modalità acquisizione attiva per "${targetDevice}". Premi i tasti del telecomando!`;
+          }
+
+          showToast(`Acquisizione avviata per ${targetDevice}`, "success");
+        }
+
+        async function stopScanMode() {
+          // Chiama l'endpoint per disattivare lo scan mode lato firmware
+          console.log("[IR SCAN] Calling /special_action endpoint to deactivate IR scan");
+          try {
+            const response = await fetch("/special_action", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                actionId: "toggle_ir_scan",
+                params: { active: false }
+              })
+            });
+
+            if (!response.ok) {
+              throw new Error("Failed to deactivate IR scan mode");
+            }
+
+            console.log("[IR SCAN] Firmware scan mode deactivated successfully");
+          } catch (error) {
+            console.error("[IR SCAN] Error deactivating firmware scan mode:", error);
+          }
+
+          state.irScan.active = false;
+
+          updateScanModeBadge("Inattivo", "info");
+          updateScanStatus("Pronto");
+          if (dom.startScanMode) dom.startScanMode.disabled = false;
+          if (dom.stopScanMode) dom.stopScanMode.disabled = true;
+          if (dom.scanInstructions) {
+            dom.scanInstructions.textContent =
+              "Seleziona un dispositivo di destinazione e avvia l'acquisizione.";
+          }
+
+          showToast("Acquisizione fermata.", "info");
+        }
+
+        function clearScannedCodes() {
+          if (!window.confirm("Eliminare tutti i codici acquisiti?")) return;
+          state.irScan.scannedCodes = [];
+          renderScannedCodes();
+          updateScannedCountBadge();
+          if (dom.saveScannedCodes) dom.saveScannedCodes.disabled = true;
+          showToast("Lista svuotata.", "success");
+        }
+
+        function saveScannedCodes() {
+          if (!state.irScan.targetDevice) {
+            showToast("Nessun dispositivo di destinazione.", "error");
+            return;
+          }
+
+          if (state.irScan.scannedCodes.length === 0) {
+            showToast("Nessun codice da salvare.", "error");
+            return;
+          }
+
+          const deviceCommands = ensureDevice(state.irScan.targetDevice);
+          let saved = 0;
+
+          state.irScan.scannedCodes.forEach((code) => {
+            const commandName = code.name || `scanned_${Date.now()}_${saved}`;
+            const sanitized = sanitizeCommandName(commandName);
+
+            if (deviceCommands[sanitized]) {
+              console.log(`Command ${sanitized} already exists, skipping`);
+              return;
+            }
+
+            const payload = {
+              protocol: code.protocol,
+              bits: code.bits,
+              value: code.value,
+              address: code.address,
+              command: code.command,
+              device: code.device,
+              subdevice: code.subdevice,
+              source: { type: "scan" },
+            };
+
+            if (code.raw) {
+              payload.raw = code.raw;
+            }
+
+            deviceCommands[sanitized] = payload;
+            saved++;
+          });
+
+          markIrDirty();
+          state.ir.selectedDevice = state.irScan.targetDevice;
+          syncDeviceSelects();
+          renderLocalCommands();
+
+          showToast(`${saved} comandi salvati in ${state.irScan.targetDevice}.`, "success");
+
+          state.irScan.scannedCodes = [];
+          renderScannedCodes();
+          updateScannedCountBadge();
+          if (dom.saveScannedCodes) dom.saveScannedCodes.disabled = true;
+        }
+
+        function handleScannedCodeAction(event) {
+          const button = event.target.closest("[data-scan-action]");
+          if (!button) return;
+
+          const action = button.getAttribute("data-scan-action");
+          const index = Number(button.getAttribute("data-scan-index"));
+          const code = state.irScan.scannedCodes[index];
+
+          if (!code) return;
+
+          if (action === "rename") {
+            const newName = window.prompt("Nuovo nome comando:", code.name || `cmd_${index + 1}`);
+            if (newName && newName.trim()) {
+              code.name = sanitizeCommandName(newName);
+              renderScannedCodes();
+            }
+          }
+
+          if (action === "delete") {
+            if (!window.confirm(`Eliminare il comando ${code.name || index + 1}?`)) return;
+            state.irScan.scannedCodes.splice(index, 1);
+            renderScannedCodes();
+            updateScannedCountBadge();
+            if (state.irScan.scannedCodes.length === 0 && dom.saveScannedCodes) {
+              dom.saveScannedCodes.disabled = true;
+            }
+          }
+        }
+
+        function processScannedIrCodeForTab(irData) {
+          console.log("[IR SCAN] processScannedIrCodeForTab() called with:", irData);
+          console.log("[IR SCAN] state.irScan.active:", state.irScan.active);
+
+          if (!state.irScan.active) {
+            console.log("[IR SCAN] Scan mode not active, ignoring IR code");
+            return;
+          }
+
+          const code = {
+            protocol: irData.protocol,
+            bits: irData.bits,
+            value: irData.value,
+            address: irData.address,
+            command: irData.command,
+            device: irData.device,
+            subdevice: irData.subdevice,
+            raw: irData.raw,
+            name: `cmd_${state.irScan.scannedCodes.length + 1}`,
+            timestamp: Date.now(),
+          };
+
+          console.log("[IR SCAN] Created code object:", code);
+          state.irScan.scannedCodes.push(code);
+          console.log("[IR SCAN] Total scanned codes:", state.irScan.scannedCodes.length);
+
+          renderScannedCodes();
+          updateScannedCountBadge();
+          updateScanStatus(`${state.irScan.scannedCodes.length} codici acquisiti`);
+
+          if (dom.saveScannedCodes) dom.saveScannedCodes.disabled = false;
+
+          console.log("[IR SCAN] IR code added to scan tab:", code);
+        }
+
         function initializeIrModule() {
           loadLocalIrData();
           updateIrDirtyUI();
@@ -2066,6 +3089,54 @@
           if (dom.irdbImportSelected) {
             dom.irdbImportSelected.addEventListener("click", importSelectedIrdbCommands);
           }
+          if (dom.identifyFromScan) {
+            dom.identifyFromScan.addEventListener("click", identifyDeviceFromScan);
+          }
+          if (dom.identifyFromProfile) {
+            dom.identifyFromProfile.addEventListener("click", identifyDeviceFromProfile);
+          }
+          if (dom.identificationResults) {
+            dom.identificationResults.addEventListener("click", handleIdentificationResultClick);
+          }
+          if (dom.startScanMode) {
+            console.log("[IR SCAN] Attaching event listener to startScanMode button");
+            dom.startScanMode.addEventListener("click", startScanMode);
+          } else {
+            console.error("[IR SCAN] startScanMode button not found in DOM!");
+          }
+          if (dom.stopScanMode) {
+            console.log("[IR SCAN] Attaching event listener to stopScanMode button");
+            dom.stopScanMode.addEventListener("click", stopScanMode);
+          } else {
+            console.error("[IR SCAN] stopScanMode button not found in DOM!");
+          }
+          if (dom.clearScannedCodes) {
+            console.log("[IR SCAN] Attaching event listener to clearScannedCodes button");
+            dom.clearScannedCodes.addEventListener("click", clearScannedCodes);
+          } else {
+            console.error("[IR SCAN] clearScannedCodes button not found in DOM!");
+          }
+          if (dom.saveScannedCodes) {
+            console.log("[IR SCAN] Attaching event listener to saveScannedCodes button");
+            dom.saveScannedCodes.addEventListener("click", saveScannedCodes);
+          } else {
+            console.error("[IR SCAN] saveScannedCodes button not found in DOM!");
+          }
+          if (dom.scannedCodesContainer) {
+            console.log("[IR SCAN] Attaching event listener to scannedCodesContainer");
+            dom.scannedCodesContainer.addEventListener("click", handleScannedCodeAction);
+          } else {
+            console.error("[IR SCAN] scannedCodesContainer not found in DOM!");
+          }
+          if (dom.scanTargetDevice) {
+            console.log("[IR SCAN] Attaching event listener to scanTargetDevice select");
+            dom.scanTargetDevice.addEventListener("change", (event) => {
+              console.log("[IR SCAN] Device selection changed:", event.target.value);
+              state.irScan.targetDevice = event.target.value;
+            });
+          } else {
+            console.error("[IR SCAN] scanTargetDevice select not found in DOM!");
+          }
         }
 
         function init() {
@@ -2077,6 +3148,7 @@
           loadActionCatalog();
           setupLogs();
           updateIrDirtyUI();
+          loadTestResultsFromLocalStorage();
         }
 
         document.addEventListener("DOMContentLoaded", init);
