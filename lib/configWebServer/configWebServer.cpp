@@ -25,6 +25,10 @@
 #include <vector>
 #include "Logger.h"
 #include "FileSystemManager.h"
+#include "InputHub.h"
+#include "IRStorage.h"
+
+extern InputHub inputHub;
 
 AsyncWebServer server(80);
 AsyncEventSource events("/log");
@@ -694,6 +698,23 @@ void configWebServer::setupRoutes()
                 payload = "";
                 request->send(500, "text/plain", "❌ Failed to save ir_data.json.");
                 return;
+            }
+
+            IRStorage *storage = inputHub.getIrStorage();
+            if (storage)
+            {
+                if (storage->loadIRData())
+                {
+                    Logger::getInstance().log("🔄 IR storage reloaded after web update.");
+                }
+                else
+                {
+                    Logger::getInstance().log("⚠️ Failed to reload IR storage after web update.");
+                }
+            }
+            else
+            {
+                Logger::getInstance().log("⚠️ IR storage not available to reload after web update.");
             }
 
             payload = "";
