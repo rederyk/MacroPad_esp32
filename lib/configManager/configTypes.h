@@ -21,6 +21,7 @@
 
 #include <Arduino.h>
 #include <vector>
+#include <time.h>
 
 struct KeypadConfig
 {
@@ -137,11 +138,65 @@ struct SystemConfig
     int combo_timeout;
     String BleName;
     // Nuovi campi per la gestione del power
-    bool sleep_enabled;             // Abilitare il sleep mode
-    unsigned long sleep_timeout_ms; // Timeout di inattività in millisecondi
+    bool sleep_enabled;                   // Abilitare il sleep mode
+    unsigned long sleep_timeout_ms;       // Timeout di inattività in millisecondi
     unsigned long sleep_timeout_mouse_ms; // Timeout dedicato per modalità mouse
     unsigned long sleep_timeout_ir_ms;    // Timeout dedicato per modalità IR
-    gpio_num_t wakeup_pin;                 // Pin GPIO per il wakeup
+    gpio_num_t wakeup_pin;                // Pin GPIO per il wakeup
 };
-// TODO add config for ir from json in all class
+
+enum class ScheduleTriggerType : uint8_t
+{
+    NONE = 0,
+    TIME_OF_DAY,
+    INTERVAL,
+    ABSOLUTE_TIME,
+    INPUT_EVENT
+};
+
+struct ScheduleTriggerConfig
+{
+    ScheduleTriggerType type{ScheduleTriggerType::NONE};
+    uint32_t intervalMs{0};        // For interval triggers
+    uint32_t jitterMs{0};          // Optional random jitter
+    time_t absoluteEpoch{0};       // For absolute triggers
+    uint8_t hour{0};               // For time-of-day triggers
+    uint8_t minute{0};
+    uint8_t second{0};
+    uint8_t daysMask{0x7F};        // 7 bits -> Sun=0
+    bool useUtc{false};            // Whether to ignore timezone offset
+    String inputSource;            // For input/sensor triggers
+    String inputType;              // e.g. KEY_PRESS/ROTATION/gesture id
+    int inputValue{-1};
+    int8_t inputState{-1};         // -1 = ignore, 0 = false, 1 = true
+    String inputText;              // Optional textual match
+};
+
+struct ScheduledActionConfig
+{
+    String id;
+    bool enabled{false};
+    bool wakeFromSleep{false};
+    bool preventSleep{false};
+    bool runOnBoot{false};
+    bool oneShot{false};
+    bool allowOverlap{false};
+    ScheduleTriggerConfig trigger;
+    String actionType;
+    String actionId;
+    String actionParams; // Serialized JSON
+    String description;
+};
+
+struct SchedulerConfig
+{
+    bool enabled{false};
+    bool preventSleepIfPending{true};
+    uint32_t sleepGuardSeconds{60};
+    uint32_t wakeAheadSeconds{900};
+    int timezoneOffsetMinutes{0};
+    uint32_t pollIntervalMs{250};
+    std::vector<ScheduledActionConfig> events;
+};
+
 #endif

@@ -20,8 +20,142 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <Arduino.h>
+#include <algorithm>
 #include "Logger.h"
 #include "FileSystemManager.h"
+
+namespace
+{
+int dayNameToIndex(String name)
+{
+    name.toLowerCase();
+    name.trim();
+    if (name == "sun" || name == "sunday" || name == "dom" || name == "domenica" || name == "0")
+        return 0;
+    if (name == "mon" || name == "monday" || name == "lun" || name == "lunedi" || name == "1")
+        return 1;
+    if (name == "tue" || name == "tuesday" || name == "mar" || name == "martedi" || name == "2")
+        return 2;
+    if (name == "wed" || name == "wednesday" || name == "mer" || name == "mercoledi" || name == "3")
+        return 3;
+    if (name == "thu" || name == "thursday" || name == "gio" || name == "giovedi" || name == "4")
+        return 4;
+    if (name == "fri" || name == "friday" || name == "ven" || name == "venerdi" || name == "5")
+        return 5;
+    if (name == "sat" || name == "saturday" || name == "sab" || name == "sabato" || name == "6")
+        return 6;
+    if (name == "all" || name == "daily" || name == "*" || name == "everyday")
+        return 7;
+    if (name == "weekdays")
+        return 8;
+    if (name == "weekend")
+        return 9;
+    return -1;
+}
+
+void addDayTokenMask(const String &token, uint8_t &mask)
+{
+    int idx = dayNameToIndex(token);
+    if (idx >= 0 && idx < 7)
+    {
+        mask |= (1 << idx);
+    }
+    else if (idx == 7)
+    {
+        mask = 0x7F;
+    }
+    else if (idx == 8)
+    {
+        mask |= (0b0111110); // Monday-Friday bits 1-5
+    }
+    else if (idx == 9)
+    {
+        mask |= (1 << 0) | (1 << 6);
+    }
+}
+
+uint8_t parseDaysMask(JsonVariantConst variant)
+{
+    uint8_t mask = 0;
+
+    if (variant.is<JsonArrayConst>())
+    {
+        for (JsonVariantConst entry : variant.as<JsonArrayConst>())
+        {
+            if (entry.is<int>())
+            {
+                int idx = entry.as<int>();
+                if (idx >= 0 && idx < 7)
+                {
+                    mask |= (1 << idx);
+                }
+            }
+            else if (entry.is<const char *>())
+            {
+                addDayTokenMask(String(entry.as<const char *>()), mask);
+            }
+        }
+    }
+    else if (variant.is<const char *>())
+    {
+        String text = variant.as<const char *>();
+        int start = 0;
+        while (start < text.length())
+        {
+            int end = text.indexOf(',', start);
+            if (end == -1)
+            {
+                end = text.length();
+            }
+            String token = text.substring(start, end);
+            token.trim();
+            if (token.length() > 0)
+            {
+                addDayTokenMask(token, mask);
+            }
+            start = end + 1;
+        }
+    }
+    else if (variant.is<int>())
+    {
+        int idx = variant.as<int>();
+        if (idx >= 0 && idx < 7)
+        {
+            mask |= (1 << idx);
+        }
+    }
+
+    if (mask == 0)
+    {
+        mask = 0x7F;
+    }
+    return mask;
+}
+
+ScheduleTriggerType parseTriggerType(const String &typeStr)
+{
+    String lowered = typeStr;
+    lowered.toLowerCase();
+    lowered.trim();
+    if (lowered == "time" || lowered == "time_of_day" || lowered == "daily" || lowered == "clock")
+    {
+        return ScheduleTriggerType::TIME_OF_DAY;
+    }
+    if (lowered == "interval" || lowered == "every" || lowered == "loop")
+    {
+        return ScheduleTriggerType::INTERVAL;
+    }
+    if (lowered == "absolute" || lowered == "once" || lowered == "epoch")
+    {
+        return ScheduleTriggerType::ABSOLUTE_TIME;
+    }
+    if (lowered == "input" || lowered == "sensor" || lowered == "event")
+    {
+        return ScheduleTriggerType::INPUT_EVENT;
+    }
+    return ScheduleTriggerType::NONE;
+}
+} // namespace
 
 ConfigurationManager::ConfigurationManager() : systemConfig() {}
 
@@ -51,6 +185,7 @@ bool ConfigurationManager::loadConfig()
     filter["irSensor"] = true;
     filter["irLed"] = true;
     filter["gyromouse"] = true;
+    filter["scheduler"] = true;
 
     // Increase buffer size and add error handling
     StaticJsonDocument<4096> doc;
@@ -110,6 +245,14 @@ bool ConfigurationManager::loadConfig()
     systemConfig.sleep_timeout_ms = 300000;
     systemConfig.sleep_timeout_mouse_ms = 0;
     systemConfig.sleep_timeout_ir_ms = 0;
+
+    schedulerConfig = SchedulerConfig();
+    schedulerConfig.enabled = false;
+    schedulerConfig.preventSleepIfPending = true;
+    schedulerConfig.sleepGuardSeconds = 60;
+    schedulerConfig.wakeAheadSeconds = 900;
+    schedulerConfig.pollIntervalMs = 250;
+    schedulerConfig.events.clear();
 
     // Load wifi configuration if it exists
     JsonVariant wifiConfigJson = doc["wifi"];
@@ -512,6 +655,90 @@ bool ConfigurationManager::loadConfig()
         this->gyroMouseConfig.smoothing = constrain(this->gyroMouseConfig.smoothing, 0.0f, 1.0f);
     }
 
+    JsonVariant schedulerJson = doc["scheduler"];
+    schedulerConfig.events.clear();
+    if (schedulerJson.is<JsonObject>())
+    {
+        JsonObject schedulerObj = schedulerJson.as<JsonObject>();
+        schedulerConfig.enabled = schedulerObj["enabled"] | schedulerConfig.enabled;
+        schedulerConfig.preventSleepIfPending = schedulerObj["prevent_sleep_if_pending"] | schedulerConfig.preventSleepIfPending;
+        schedulerConfig.sleepGuardSeconds = schedulerObj["sleep_guard_seconds"] | schedulerConfig.sleepGuardSeconds;
+        schedulerConfig.wakeAheadSeconds = schedulerObj["wake_ahead_seconds"] | schedulerConfig.wakeAheadSeconds;
+        schedulerConfig.timezoneOffsetMinutes = schedulerObj["timezone_minutes"] | schedulerConfig.timezoneOffsetMinutes;
+        schedulerConfig.pollIntervalMs = schedulerObj["poll_interval_ms"] | schedulerConfig.pollIntervalMs;
+
+        JsonArray eventsArray = schedulerObj["events"].as<JsonArray>();
+        if (!eventsArray.isNull())
+        {
+            schedulerConfig.events.reserve(eventsArray.size());
+            for (JsonObject eventObj : eventsArray)
+            {
+                ScheduledActionConfig eventConfig;
+                eventConfig.id = eventObj["id"] | "";
+                if (eventConfig.id.isEmpty())
+                {
+                    continue;
+                }
+
+                eventConfig.description = eventObj["description"] | "";
+                eventConfig.enabled = eventObj["enabled"] | true;
+                eventConfig.wakeFromSleep = eventObj["wake_from_sleep"] | false;
+                eventConfig.preventSleep = eventObj["prevent_sleep"] | false;
+                eventConfig.runOnBoot = eventObj["run_on_boot"] | false;
+                eventConfig.oneShot = eventObj["one_shot"] | false;
+                eventConfig.allowOverlap = eventObj["allow_overlap"] | false;
+
+                JsonObject triggerObj = eventObj["trigger"].as<JsonObject>();
+                if (triggerObj.isNull())
+                {
+                    continue;
+                }
+
+                eventConfig.trigger.type = parseTriggerType(triggerObj["type"] | "interval");
+                eventConfig.trigger.intervalMs = triggerObj["interval_ms"] | 0;
+                eventConfig.trigger.jitterMs = triggerObj["jitter_ms"] | 0;
+                eventConfig.trigger.absoluteEpoch = triggerObj["epoch"] | (time_t)0;
+                eventConfig.trigger.hour = triggerObj["hour"] | 0;
+                eventConfig.trigger.minute = triggerObj["minute"] | 0;
+                eventConfig.trigger.second = triggerObj["second"] | 0;
+                eventConfig.trigger.daysMask = parseDaysMask(triggerObj["days"]);
+                eventConfig.trigger.useUtc = triggerObj["use_utc"] | false;
+                eventConfig.trigger.inputSource = triggerObj["source"] | "";
+                eventConfig.trigger.inputType = triggerObj["event"] | "";
+                eventConfig.trigger.inputValue = triggerObj["value"] | -1;
+                if (triggerObj.containsKey("state"))
+                {
+                    eventConfig.trigger.inputState = triggerObj["state"].as<bool>() ? 1 : 0;
+                }
+                else
+                {
+                    eventConfig.trigger.inputState = -1;
+                }
+                eventConfig.trigger.inputText = triggerObj["text"] | "";
+
+                JsonObject actionObj = eventObj["action"].as<JsonObject>();
+                if (actionObj.isNull())
+                {
+                    continue;
+                }
+                eventConfig.actionType = actionObj["type"] | "special_action";
+                eventConfig.actionId = actionObj["id"] | "";
+                if (actionObj.containsKey("params"))
+                {
+                    String paramsJson;
+                    serializeJson(actionObj["params"], paramsJson);
+                    eventConfig.actionParams = paramsJson;
+                }
+                else
+                {
+                    eventConfig.actionParams = "";
+                }
+
+                schedulerConfig.events.push_back(eventConfig);
+            }
+        }
+    }
+
     configFile.close();
     return true;
 }
@@ -600,6 +827,11 @@ const IRSensorConfig &ConfigurationManager::getIrSensorConfig() const
 const IRLedConfig &ConfigurationManager::getIrLedConfig() const
 {
     return irLedConfig;
+}
+
+const SchedulerConfig &ConfigurationManager::getSchedulerConfig() const
+{
+    return schedulerConfig;
 }
 
 const SystemConfig &ConfigurationManager::getSystemConfig() const

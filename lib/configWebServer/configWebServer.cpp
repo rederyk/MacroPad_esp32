@@ -17,6 +17,8 @@
  */
 
 #include "configWebServer.h"
+#include "SpecialActionRouter.h"
+#include "EventScheduler.h"
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
@@ -32,8 +34,10 @@
 #include <IRremoteESP8266.h>
 #include <IRrecv.h>
 #include <IRutils.h>
+#include <time.h>
 
 extern InputHub inputHub;
+extern EventScheduler eventScheduler;
 
 AsyncWebServer server(80);
 AsyncEventSource events("/log");
@@ -814,6 +818,101 @@ void configWebServer::setupRoutes()
             request->send(500, "text/plain", "❌ Failed to save configuration.");
         } });
 
+    server.on("/scheduler/state", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+                  request->send(200, "application/json", eventScheduler.buildStatusJson());
+              });
+
+    server.on("/scheduler/run", HTTP_POST, [](AsyncWebServerRequest *request) {}, nullptr,
+              [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+              {
+                  static String payload;
+                  if (index == 0)
+                  {
+                      payload = "";
+                      payload.reserve(total);
+                  }
+                  for (size_t i = 0; i < len; ++i)
+                  {
+                      payload += static_cast<char>(data[i]);
+                  }
+                  if (index + len < total)
+                  {
+                      return;
+                  }
+
+                  StaticJsonDocument<256> doc;
+                  DeserializationError err = deserializeJson(doc, payload);
+                  payload = "";
+                  if (err)
+                  {
+                      request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+                      return;
+                  }
+
+                  String id = doc["id"] | "";
+                  String reason = doc["reason"] | "manual";
+                  if (id.isEmpty())
+                  {
+                      request->send(400, "application/json", "{\"error\":\"Missing id\"}");
+                      return;
+                  }
+
+                  if (eventScheduler.triggerEventById(id, reason.c_str()))
+                  {
+                      request->send(200, "application/json", "{\"status\":\"ok\"}");
+                  }
+                  else
+                  {
+                      request->send(404, "application/json", "{\"error\":\"Event not found or disabled\"}");
+                  }
+              });
+
+    server.on("/scheduler/time", HTTP_POST, [](AsyncWebServerRequest *request) {}, nullptr,
+              [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+              {
+                  static String payload;
+                  if (index == 0)
+                  {
+                      payload = "";
+                      payload.reserve(total);
+                  }
+                  for (size_t i = 0; i < len; ++i)
+                  {
+                      payload += static_cast<char>(data[i]);
+                  }
+                  if (index + len < total)
+                  {
+                      return;
+                  }
+
+                  StaticJsonDocument<256> doc;
+                  DeserializationError err = deserializeJson(doc, payload);
+                  payload = "";
+                  if (err)
+                  {
+                      request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+                      return;
+                  }
+
+                  time_t epoch = doc["epoch"] | 0;
+                  int tzMinutes = doc["timezone_minutes"] | 0;
+                  if (epoch <= 0)
+                  {
+                      request->send(400, "application/json", "{\"error\":\"Invalid epoch\"}");
+                      return;
+                  }
+
+                  if (eventScheduler.setManualTime(epoch, tzMinutes))
+                  {
+                      request->send(200, "application/json", "{\"status\":\"ok\"}");
+                  }
+                  else
+                  {
+                      request->send(500, "application/json", "{\"error\":\"Failed to set time\"}");
+                  }
+              });
+
     // --- Endpoint per la gestione dei dati IR ---
     server.on("/ir_data.json", HTTP_GET, [](AsyncWebServerRequest *request)
               { request->send(200, "application/json", readIrDataFile()); });
@@ -1508,6 +1607,16 @@ void configWebServer::setupRoutes()
         }
         // Stream the file directly to avoid large heap allocations on bigger pages.
         request->send(LittleFS, "/special_actions.html", "text/html"); });
+
+    server.on("/scheduler.html", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+        if (!LittleFS.exists("/scheduler.html")) {
+            Logger::getInstance().log("❌ scheduler.html not found");
+            request->send(404, "text/plain", "❌ scheduler.html not found");
+            return;
+        }
+        request->send(LittleFS, "/scheduler.html", "text/html");
+              });
 
     // --- Special Actions Endpoints ---
     server.on("/resetDevice", HTTP_POST, [](AsyncWebServerRequest *request)

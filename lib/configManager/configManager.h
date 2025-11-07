@@ -42,6 +42,7 @@ private:
     AccelerometerConfig accelerometerConfig;
     SystemConfig systemConfig;
     GyroMouseConfig gyroMouseConfig;
+    SchedulerConfig schedulerConfig;
 
 public:
     ConfigurationManager();
@@ -55,6 +56,7 @@ public:
     const LedConfig &getLedConfig() const;
     const IRSensorConfig &getIrSensorConfig() const;
     const IRLedConfig &getIrLedConfig() const;
+    const SchedulerConfig &getSchedulerConfig() const;
     bool setLedBrightness(uint8_t brightness);
 
 private:

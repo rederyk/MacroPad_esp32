@@ -37,6 +37,7 @@
 #include "InputHub.h"
 #include "GyroMouse.h"
 #include "configWebServer.h"
+#include "EventScheduler.h"
 
 WIFIManager wifiManager; // Create an instance of WIFIManager
 
@@ -51,6 +52,7 @@ BLEController bleController;
 MacroManager macroManager;
 InputHub inputHub;
 GyroMouse gyroMouse;
+EventScheduler eventScheduler;
 
 // Task function prototype
 void mainLoopTask(void *parameter);
@@ -95,6 +97,10 @@ void initLed() {
 
 void initPowerManager() {
     powerManager.begin(configManager.getSystemConfig(), configManager.getKeypadConfig(), configManager.getEncoderConfig());
+}
+
+void initScheduler() {
+    eventScheduler.begin(configManager.getSchedulerConfig());
 }
 
 void initMacroManagerAndCombos() {
@@ -312,6 +318,7 @@ void setup()
     initSerial();
     initLed();
     initPowerManager();
+    initScheduler();
     initMacroManagerAndCombos();
     initPeripherals();
     startMainLoopTask();
@@ -357,6 +364,7 @@ void mainLoopTask(void *parameter)
         {
             macroManager.handleInputEvent(nextEvent);
             powerManager.registerActivity();
+            eventScheduler.handleInputEvent(nextEvent);
         }
 
 
@@ -364,6 +372,7 @@ void mainLoopTask(void *parameter)
         bleController.checkConnection();
         macroManager.update();          // Assicurati che non blocchi
         gyroMouse.update();
+        eventScheduler.update();
         checkIRScanBackground();        // Check per modalità scan IR da web UI
 
         // Check for pending combo switch request (processed outside of action context to avoid stack issues)
@@ -421,7 +430,13 @@ void mainLoopTask(void *parameter)
         }
 
         // Controlla inattività per sleep mode
-        if (powerManager.checkInactivity())
+        bool inactivityDetected = powerManager.checkInactivity();
+        if (inactivityDetected && eventScheduler.shouldPreventSleep())
+        {
+            inactivityDetected = false;
+        }
+
+        if (inactivityDetected)
         {
             Logger::getInstance().log("Inactivity detected, entering sleep mode...");
             Logger::getInstance().processBuffer(); // Svuota prima di dormire

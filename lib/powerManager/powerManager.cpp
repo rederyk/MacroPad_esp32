@@ -23,9 +23,11 @@
 #include "specialAction.h"
 #include "GyroMouse.h"
 #include <driver/rtc_io.h>
+#include "EventScheduler.h"
 
 extern SpecialAction specialAction;
 extern GyroMouse gyroMouse;
+extern EventScheduler eventScheduler;
 
 PowerManager::PowerManager() : lastActivityTime(0),
                                inactivityTimeout(300000), // Default 5 minutes
@@ -232,7 +234,21 @@ void PowerManager::enterDeepSleep(bool force)
     }
 
     // Configure wakeup sources first (before animation)
-    esp_sleep_enable_timer_wakeup(28800000000ULL); // 8h backup
+    uint64_t schedulerWakeUs = eventScheduler.getNextWakeDelayUs();
+    if (schedulerWakeUs > 0)
+    {
+        const uint64_t minWakeUs = 1000000ULL; // 1s
+        if (schedulerWakeUs < minWakeUs)
+        {
+            schedulerWakeUs = minWakeUs;
+        }
+        esp_sleep_enable_timer_wakeup(schedulerWakeUs);
+        Logger::getInstance().log("Scheduler wake timer set: " + String(schedulerWakeUs / 1000000ULL) + "s");
+    }
+    else
+    {
+        esp_sleep_enable_timer_wakeup(28800000000ULL); // 8h backup
+    }
     // Comprehensive sleep parameters table
     const unsigned long timeoutForLog = lastEffectiveTimeout > 0 ? lastEffectiveTimeout : inactivityTimeout;
     const String timeoutStr = String(timeoutForLog / 1000);
