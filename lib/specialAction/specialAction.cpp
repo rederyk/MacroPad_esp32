@@ -1061,11 +1061,7 @@ void SpecialAction::toggleSendIR(int deviceId, const String &exitCombo)
             vTaskDelay(pdMS_TO_TICKS(10));
         }
 
-        if (irSender->sendCommand(commandObj))
-        {
-            Logger::getInstance().log("Sent: " + deviceName + "/" + commandName);
-        }
-        else
+        if (!irSender->sendCommand(commandObj))
         {
             Logger::getInstance().log("Failed to send IR");
         }
@@ -1083,23 +1079,12 @@ void SpecialAction::toggleSendIR(int deviceId, const String &exitCombo)
 
 void SpecialAction::sendIRCommand(const String &deviceName, const String &commandName)
 {
-    IRSender *irSender = inputHub.getIrSender();
     IRStorage *irStorage = inputHub.getIrStorage();
-
-    if (!irSender || !irStorage)
+    if (!irStorage)
     {
-        Logger::getInstance().log("IR Sender or Storage not initialized");
+        Logger::getInstance().log("IR Storage not initialized");
         return;
     }
-
-    if (!irSender->isEnabled())
-    {
-        Logger::getInstance().log("IR Sender disabled");
-        return;
-    }
-
-    // Power management: register activity
-    powerManager.registerActivity();
 
     JsonObject commandObj = irStorage->getCommand(deviceName, commandName);
     if (commandObj.isNull())
@@ -1108,6 +1093,79 @@ void SpecialAction::sendIRCommand(const String &deviceName, const String &comman
         return;
     }
 
+    // DEBUG: Log del comando che stiamo per inviare
+    Logger::getInstance().log("Sending IR: " + deviceName + "/" + commandName);
+    String debugInfo = "Protocol: ";
+    if (commandObj.containsKey("protocol")) debugInfo += commandObj["protocol"].as<String>();
+    debugInfo += " | Bits: ";
+    if (commandObj.containsKey("bits")) debugInfo += String(commandObj["bits"].as<int>());
+    debugInfo += " | Value: ";
+    if (commandObj.containsKey("value")) debugInfo += commandObj["value"].as<String>();
+    Logger::getInstance().log(debugInfo);
+
+    sendIrJsonCommand(commandObj, deviceName + "/" + commandName);
+}
+
+bool SpecialAction::sendIRPayload(JsonVariantConst commandData, const String &label)
+{
+    if (commandData.isNull() || !commandData.is<JsonObjectConst>())
+    {
+        Logger::getInstance().log("IR payload non valido");
+        return false;
+    }
+
+    JsonObjectConst obj = commandData.as<JsonObjectConst>();
+    bool hasRaw = obj.containsKey("raw");
+    bool hasProtocol = obj.containsKey("protocol");
+
+    if (hasRaw)
+    {
+        JsonArrayConst raw = obj["raw"].as<JsonArrayConst>();
+        if (raw.isNull() || raw.size() == 0)
+        {
+            Logger::getInstance().log("IR payload RAW vuoto");
+            return false;
+        }
+    }
+    else if (!(hasProtocol && obj.containsKey("value") && obj.containsKey("bits")))
+    {
+        Logger::getInstance().log("IR payload incompleto");
+        return false;
+    }
+
+    bool result = sendIrJsonCommand(commandData, label);
+    if (!result)
+    {
+        Logger::getInstance().log("Invio IR fallito per payload: " + label);
+    }
+    return result;
+}
+
+bool SpecialAction::sendIrJsonCommand(JsonVariantConst commandData, const String &label)
+{
+    IRSender *irSender = inputHub.getIrSender();
+
+    if (!irSender)
+    {
+        Logger::getInstance().log("IR Sender not initialized");
+        return false;
+    }
+
+    if (!irSender->isEnabled())
+    {
+        Logger::getInstance().log("IR Sender disabled");
+        return false;
+    }
+
+    if (commandData.isNull())
+    {
+        Logger::getInstance().log("IR command data mancante");
+        return false;
+    }
+
+    // Power management: register activity
+    powerManager.registerActivity();
+
     // Save current LED state
     int savedRed, savedGreen, savedBlue;
     Led::getInstance().getColor(savedRed, savedGreen, savedBlue);
@@ -1115,10 +1173,11 @@ void SpecialAction::sendIRCommand(const String &deviceName, const String &comman
     // Fast blink during IR send
     unsigned long sendStartTime = millis();
     const unsigned long fastBlinkInterval = 100; // Fast blink: 100ms
-    const unsigned long blinkDuration = 200; // Blink for 200ms total
+    const unsigned long blinkDuration = 200;     // Blink for 200ms total
 
-    // Send command with fast blink effect
     bool commandSent = false;
+    bool sendResult = false;
+
     while (millis() - sendStartTime < blinkDuration)
     {
         if ((millis() - sendStartTime) % fastBlinkInterval < (fastBlinkInterval / 2))
@@ -1130,16 +1189,15 @@ void SpecialAction::sendIRCommand(const String &deviceName, const String &comman
             Led::getInstance().setColor(0, 0, 0, false); // LED OFF
         }
 
-        // Send command at the beginning
         if (!commandSent)
         {
-            if (irSender->sendCommand(commandObj))
+            if (irSender->sendCommand(commandData))
             {
-                Logger::getInstance().log("IR sent: " + deviceName + "/" + commandName);
+                sendResult = true;
             }
             else
             {
-                Logger::getInstance().log("Failed to send IR: " + deviceName + "/" + commandName);
+                Logger::getInstance().log("Failed to send IR: " + label);
             }
             commandSent = true;
         }
@@ -1147,8 +1205,8 @@ void SpecialAction::sendIRCommand(const String &deviceName, const String &comman
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 
-    // Restore LED color
     Led::getInstance().setColor(savedRed, savedGreen, savedBlue, false);
+    return sendResult;
 }
 
 void SpecialAction::checkIRSignal()

@@ -64,26 +64,46 @@ bool IRSender::sendRaw(const uint16_t *rawData, size_t length)
 }
 
 
-bool IRSender::sendCommand(JsonObject cmd) {
-    if (!cmd.containsKey("protocol"))
+bool IRSender::sendCommand(JsonVariantConst cmdVariant) {
+    if (cmdVariant.isNull() || !cmdVariant.is<JsonObjectConst>()) {
         return false;
+    }
 
-    String protocol = cmd["protocol"];
+    JsonObjectConst cmd = cmdVariant.as<JsonObjectConst>();
+
+    if (!cmd.containsKey("protocol")) {
+        return false;
+    }
+
+    String protocol = cmd["protocol"].as<String>();
 
     if (protocol == "RAW") {
-        JsonArray raw = cmd["raw"];
+        if (!cmd.containsKey("raw")) {
+            return false;
+        }
+        JsonArrayConst raw = cmd["raw"].as<JsonArrayConst>();
         size_t len = raw.size();
         if (len == 0 || len > 128) return false;
 
         uint16_t rawData[128];
-        for (size_t i = 0; i < len; i++)
-            rawData[i] = raw[i];
+        for (size_t i = 0; i < len; i++) {
+            rawData[i] = raw[i].as<uint16_t>();
+        }
 
         return sendRaw(rawData, len);
     }
 
-    uint64_t value = strtoull(cmd["value"], nullptr, 16);
-    uint16_t bits = cmd["bits"];
+    if (!cmd.containsKey("value") || !cmd.containsKey("bits")) {
+        return false;
+    }
+
+    const char *valueStr = cmd["value"];
+    if (!valueStr) {
+        return false;
+    }
+
+    uint64_t value = strtoull(valueStr, nullptr, 16);
+    uint16_t bits = cmd["bits"].as<uint16_t>();
 
     decode_type_t protoType = strToDecodeType(protocol.c_str());
     if (protoType == decode_type_t::UNKNOWN)
