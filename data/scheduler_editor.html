@@ -1,0 +1,1663 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MacroPad · Editor Pianificatore</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMwZTYzOWMiLz48dGV4dCB4PSI1MCUiIHk9IjU1JSIgZm9udC1zaXplPSIzMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZmZmZiIgZm9udC1mYW1pbHk9IlNlZ29lIFVJLCBBcmlhbCwgc2Fucy1zZXJpZiI+TTwvdGV4dD48L3N2Zz4="
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="stylesheet" href="/ui/app.css" />
+    <style>
+      :root {
+        --block-border: #2a3f5f;
+        --block-bg: rgba(255, 255, 255, 0.03);
+        --block-hover: rgba(14, 99, 156, 0.1);
+        --connector-color: #4a9eff;
+      }
+
+      .editor-container {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 20px;
+        height: calc(100vh - 180px);
+      }
+
+      .palette {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 16px;
+        overflow-y: auto;
+      }
+
+      .palette-section {
+        margin-bottom: 20px;
+      }
+
+      .palette-section h3 {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        margin-bottom: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .palette-block {
+        background: var(--block-bg);
+        border: 1px solid var(--block-border);
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 8px;
+        cursor: grab;
+        transition: all 0.2s;
+      }
+
+      .palette-block:hover {
+        background: var(--block-hover);
+        border-color: var(--connector-color);
+        transform: translateX(4px);
+      }
+
+      .palette-block:active {
+        cursor: grabbing;
+      }
+
+      .palette-block i {
+        margin-right: 8px;
+        color: var(--connector-color);
+      }
+
+      .canvas {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 20px;
+        overflow-y: auto;
+        position: relative;
+      }
+
+      .canvas-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--text-secondary);
+      }
+
+      .canvas-empty i {
+        font-size: 3rem;
+        margin-bottom: 16px;
+        opacity: 0.3;
+      }
+
+      .event-block {
+        background: linear-gradient(135deg, rgba(14, 99, 156, 0.1) 0%, rgba(14, 122, 58, 0.05) 100%);
+        border: 2px solid var(--block-border);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        position: relative;
+        transition: all 0.2s;
+      }
+
+      .event-block:hover {
+        border-color: var(--connector-color);
+        box-shadow: 0 4px 12px rgba(14, 99, 156, 0.2);
+      }
+
+      .event-block.collapsed .block-content {
+        display: none;
+      }
+
+      .block-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .block-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex: 1;
+      }
+
+      .block-title input {
+        flex: 1;
+        background: transparent;
+        border: 1px solid transparent;
+        color: #fff;
+        font-size: 1.1rem;
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 4px;
+      }
+
+      .block-title input:hover,
+      .block-title input:focus {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: var(--connector-color);
+      }
+
+      .block-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .block-actions button {
+        background: transparent;
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        padding: 6px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .block-actions button:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: #fff;
+        border-color: var(--connector-color);
+      }
+
+      .block-content {
+        display: grid;
+        gap: 16px;
+      }
+
+      .block-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .form-group label {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        font-weight: 500;
+      }
+
+      .form-group input,
+      .form-group select,
+      .form-group textarea {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-color);
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 0.9rem;
+      }
+
+      .form-group input:focus,
+      .form-group select:focus,
+      .form-group textarea:focus {
+        outline: none;
+        border-color: var(--connector-color);
+        background: rgba(14, 99, 156, 0.1);
+      }
+
+      .checkbox-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 6px;
+      }
+
+      .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+      }
+
+      .checkbox-label input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+      }
+
+      .checkbox-label:has(input:checked) {
+        color: #fff;
+      }
+
+      .trigger-selector {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      .trigger-option {
+        background: rgba(255, 255, 255, 0.03);
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        padding: 12px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .trigger-option:hover {
+        background: var(--block-hover);
+        border-color: var(--connector-color);
+      }
+
+      .trigger-option.active {
+        background: rgba(14, 99, 156, 0.2);
+        border-color: var(--connector-color);
+        box-shadow: 0 0 12px rgba(74, 158, 255, 0.3);
+      }
+
+      .trigger-option i {
+        display: block;
+        font-size: 1.5rem;
+        margin-bottom: 6px;
+        color: var(--connector-color);
+      }
+
+      .trigger-option span {
+        display: block;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+      }
+
+      .trigger-option.active span {
+        color: #fff;
+      }
+
+      .days-selector {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 6px;
+      }
+
+      .day-btn {
+        aspect-ratio: 1;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border-color);
+        border-radius: 50%;
+        color: var(--text-secondary);
+        cursor: pointer;
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+      }
+
+      .day-btn:hover {
+        background: var(--block-hover);
+        border-color: var(--connector-color);
+      }
+
+      .day-btn.active {
+        background: rgba(14, 99, 156, 0.3);
+        border-color: var(--connector-color);
+        color: #fff;
+      }
+
+      .action-selector {
+        display: grid;
+        gap: 12px;
+      }
+      .action-suggestions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+        margin-top: 8px;
+      }
+      .action-suggestions select {
+        min-height: 38px;
+      }
+      .macro-panel {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 12px;
+      }
+      .macro-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+      }
+      .macro-header strong {
+        font-size: 1rem;
+      }
+      .macro-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 12px;
+      }
+      .macro-actions code {
+        background: rgba(0, 0, 0, 0.25);
+        padding: 4px 6px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+      }
+      .action-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: 999px;
+        padding: 2px 8px;
+        margin-left: 6px;
+      }
+      .macro-count {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+      }
+      .stacked-select {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding: 16px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+      }
+
+      .toolbar-left {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .toolbar-right {
+        display: flex;
+        gap: 8px;
+      }
+
+      .toast {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        min-width: 280px;
+        padding: 14px 18px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-secondary);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        animation: slideIn 0.3s ease;
+        z-index: 1000;
+      }
+
+      .toast.success {
+        border-color: rgba(14, 122, 58, 0.5);
+      }
+
+      .toast.error {
+        border-color: rgba(161, 38, 13, 0.5);
+      }
+
+      .toast.info {
+        border-color: rgba(14, 99, 156, 0.5);
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 0.75rem;
+        border: 1px solid transparent;
+      }
+
+      .badge.success {
+        background: rgba(14, 122, 58, 0.15);
+        color: #4fe49c;
+        border-color: rgba(14, 122, 58, 0.4);
+      }
+
+      .badge.info {
+        background: rgba(14, 99, 156, 0.15);
+        color: #7bc6ff;
+        border-color: rgba(14, 99, 156, 0.4);
+      }
+
+      @media (max-width: 1024px) {
+        .editor-container {
+          grid-template-columns: 1fr;
+          height: auto;
+        }
+
+        .palette {
+          max-height: 300px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-container">
+      <header class="app-header">
+        <div class="branding">
+          <i class="fas fa-puzzle-piece"></i>
+          <span>Editor Pianificatore</span>
+        </div>
+        <div class="actions-bar">
+          <a class="secondary-btn" href="/scheduler.html">
+            <i class="fas fa-eye"></i> Visualizza stato
+          </a>
+          <a class="secondary-btn" href="/config.html">
+            <i class="fas fa-sliders-h"></i> Configurazione
+          </a>
+        </div>
+      </header>
+
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <h3 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+            <i class="fas fa-calendar-alt"></i>
+            Eventi Programmati
+          </h3>
+          <span class="badge info" id="eventCount">0 eventi</span>
+        </div>
+        <div class="toolbar-right">
+          <button class="secondary-btn" id="importBtn">
+            <i class="fas fa-file-import"></i> Importa JSON
+          </button>
+          <button class="secondary-btn" id="exportBtn">
+            <i class="fas fa-file-export"></i> Esporta JSON
+          </button>
+          <button class="primary-btn" id="saveBtn">
+            <i class="fas fa-save"></i> Salva configurazione
+          </button>
+        </div>
+      </div>
+
+      <div class="editor-container">
+        <aside class="palette">
+          <div class="palette-section">
+            <h3>
+              <i class="fas fa-plus-circle"></i> Aggiungi Evento
+            </h3>
+            <div class="palette-block" data-block-type="event">
+              <i class="fas fa-calendar-plus"></i>
+              <strong>Nuovo Evento</strong>
+              <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary)">
+                Crea un nuovo evento programmato
+              </p>
+            </div>
+          </div>
+
+          <div class="palette-section">
+            <h3>
+              <i class="fas fa-info-circle"></i> Guida Rapida
+            </h3>
+            <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6">
+              <p><strong>Trigger disponibili:</strong></p>
+              <ul style="margin: 8px 0; padding-left: 20px;">
+                <li><strong>Orario:</strong> Esegui a ore specifiche</li>
+                <li><strong>Intervallo:</strong> Esegui periodicamente</li>
+                <li><strong>Assoluto:</strong> Esegui una volta</li>
+                <li><strong>Input:</strong> Esegui su evento</li>
+              </ul>
+              <p style="margin-top: 12px;"><strong>Azioni disponibili:</strong></p>
+              <ul style="margin: 8px 0; padding-left: 20px;">
+                <li>Special Action</li>
+                <li>Log Message</li>
+                <li>Enter Sleep</li>
+              </ul>
+            </div>
+          </div>
+        </aside>
+
+        <main class="canvas" id="canvas">
+          <div class="canvas-empty">
+            <i class="fas fa-calendar-alt"></i>
+            <p>Clicca su "Nuovo Evento" per iniziare</p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary)">
+              oppure importa una configurazione esistente
+            </p>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <input type="file" id="fileInput" accept=".json" style="display: none" />
+
+    <script>
+      const state = {
+        events: [],
+        config: {
+          enabled: false,
+          prevent_sleep_if_pending: true,
+          sleep_guard_seconds: 45,
+          wake_ahead_seconds: 900,
+          timezone_minutes: 0,
+          poll_interval_ms: 250
+        },
+        irDevices: {},
+        comboSuggestions: [],
+        comboSources: [],
+        irSuggestions: []
+      };
+      const comboPickerState = {};
+
+      const triggerTypes = {
+        time_of_day: { icon: 'fa-clock', label: 'Orario', value: 'time_of_day' },
+        interval: { icon: 'fa-repeat', label: 'Intervallo', value: 'interval' },
+        absolute: { icon: 'fa-calendar-day', label: 'Assoluto', value: 'absolute' },
+        input: { icon: 'fa-hand-pointer', label: 'Input', value: 'input' }
+      };
+
+      const actionTypes = {
+        macro: { label: 'Macro / Combo', value: 'macro' },
+        special_action: { label: 'Special Action', value: 'special_action' },
+        log: { label: 'Log Message', value: 'log' },
+        sleep: { label: 'Enter Sleep', value: 'sleep' }
+      };
+
+      const days = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+
+      function prettifyComboFileLabel(name, type) {
+        if (name === 'combo_common.json') {
+          return 'combo_common.json (Shared)';
+        }
+        if (name === 'combo.json') {
+          return 'combo.json (Legacy multi-set)';
+        }
+        if (name === 'combinations.json') {
+          return 'combinations.json (Legacy config)';
+        }
+        if (type === 'combo') {
+          const match = name.match(/combo_(\d+)\.json/);
+          if (match) {
+            return `combo_${match[1]}.json`;
+          }
+        }
+        if (type === 'custom') {
+          const match = name.match(/my_combo_(\d+)\.json/);
+          if (match) {
+            return `my_combo_${match[1]}.json`;
+          }
+        }
+        return name;
+      }
+
+      function generateId() {
+        return 'event_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      }
+
+      function createEvent() {
+        return {
+          id: generateId(),
+          description: 'Nuovo evento',
+          enabled: true,
+          prevent_sleep: false,
+          wake_from_sleep: false,
+          run_on_boot: false,
+          one_shot: false,
+          trigger: {
+            type: 'interval',
+            interval_ms: 60000,
+            jitter_ms: 0,
+            hour: 0,
+            minute: 0,
+            second: 0,
+            days_mask: 0x7F,
+            use_utc: false,
+            input_source: '',
+            input_type: '',
+            input_value: -1,
+            input_state: -1,
+            input_text: ''
+          },
+          action: {
+            type: 'macro',
+            id: 'Nuova macro',
+            params: {
+              actions: [],
+              release_delay_ms: 30
+            }
+          }
+        };
+      }
+
+      function showToast(message, type = 'info') {
+        const existing = document.querySelectorAll('.toast');
+        existing.forEach(t => t.remove());
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        const icon = type === 'success' ? 'fa-check-circle' :
+                     type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+        toast.innerHTML = `<i class="fas ${icon}"></i><span>${message}</span>`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+      }
+
+      function updateEventCount() {
+        const count = state.events.length;
+        document.getElementById('eventCount').textContent =
+          count === 0 ? 'Nessun evento' :
+          count === 1 ? '1 evento' :
+          `${count} eventi`;
+      }
+
+      function renderDaysSelector(event, container) {
+        const daysDiv = document.createElement('div');
+        daysDiv.className = 'days-selector';
+
+        days.forEach((day, index) => {
+          const btn = document.createElement('div');
+          btn.className = 'day-btn';
+          btn.textContent = day;
+          const mask = event.trigger.days_mask || 0x7F;
+          if (mask & (1 << index)) {
+            btn.classList.add('active');
+          }
+          btn.addEventListener('click', () => {
+            btn.classList.toggle('active');
+            const newMask = btn.classList.contains('active')
+              ? (mask | (1 << index))
+              : (mask & ~(1 << index));
+            event.trigger.days_mask = newMask;
+          });
+          daysDiv.appendChild(btn);
+        });
+
+        container.appendChild(daysDiv);
+      }
+
+      function renderTriggerFields(event, container) {
+        container.innerHTML = '';
+        const type = event.trigger.type;
+
+        if (type === 'time_of_day') {
+          const row = document.createElement('div');
+          row.className = 'block-row';
+          row.innerHTML = `
+            <div class="form-group">
+              <label>Ora</label>
+              <input type="number" min="0" max="23" value="${event.trigger.hour || 0}"
+                     onchange="updateTriggerField('${event.id}', 'hour', parseInt(this.value))">
+            </div>
+            <div class="form-group">
+              <label>Minuto</label>
+              <input type="number" min="0" max="59" value="${event.trigger.minute || 0}"
+                     onchange="updateTriggerField('${event.id}', 'minute', parseInt(this.value))">
+            </div>
+            <div class="form-group">
+              <label>Secondo</label>
+              <input type="number" min="0" max="59" value="${event.trigger.second || 0}"
+                     onchange="updateTriggerField('${event.id}', 'second', parseInt(this.value))">
+            </div>
+          `;
+          container.appendChild(row);
+
+          const daysGroup = document.createElement('div');
+          daysGroup.className = 'form-group';
+          daysGroup.innerHTML = '<label>Giorni della settimana</label>';
+          renderDaysSelector(event, daysGroup);
+          container.appendChild(daysGroup);
+
+          const utcGroup = document.createElement('div');
+          utcGroup.className = 'checkbox-group';
+          utcGroup.innerHTML = `
+            <label class="checkbox-label">
+              <input type="checkbox" ${event.trigger.use_utc ? 'checked' : ''}
+                     onchange="updateTriggerField('${event.id}', 'use_utc', this.checked)">
+              Usa UTC (ignora timezone)
+            </label>
+          `;
+          container.appendChild(utcGroup);
+        } else if (type === 'interval') {
+          const row = document.createElement('div');
+          row.className = 'block-row';
+          row.innerHTML = `
+            <div class="form-group">
+              <label>Intervallo (ms)</label>
+              <input type="number" min="1000" step="1000" value="${event.trigger.interval_ms || 60000}"
+                     onchange="updateTriggerField('${event.id}', 'interval_ms', parseInt(this.value))">
+            </div>
+            <div class="form-group">
+              <label>Jitter (ms)</label>
+              <input type="number" min="0" step="100" value="${event.trigger.jitter_ms || 0}"
+                     onchange="updateTriggerField('${event.id}', 'jitter_ms', parseInt(this.value))">
+            </div>
+          `;
+          container.appendChild(row);
+        } else if (type === 'absolute') {
+          const row = document.createElement('div');
+          row.className = 'form-group';
+          row.innerHTML = `
+            <label>Data e ora (epoch seconds)</label>
+            <input type="number" value="${event.trigger.absolute_epoch || 0}"
+                   onchange="updateTriggerField('${event.id}', 'absolute_epoch', parseInt(this.value))">
+            <small style="color: var(--text-secondary); margin-top: 4px;">
+              Usa un convertitore epoch per ottenere il timestamp
+            </small>
+          `;
+          container.appendChild(row);
+        } else if (type === 'input') {
+          const row = document.createElement('div');
+          row.className = 'block-row';
+          row.innerHTML = `
+            <div class="form-group">
+              <label>Sorgente Input</label>
+              <input type="text" placeholder="es: keypad, encoder" value="${event.trigger.input_source || ''}"
+                     onchange="updateTriggerField('${event.id}', 'input_source', this.value)">
+            </div>
+            <div class="form-group">
+              <label>Tipo Input</label>
+              <input type="text" placeholder="es: key, rotation, button" value="${event.trigger.input_type || ''}"
+                     onchange="updateTriggerField('${event.id}', 'input_type', this.value)">
+            </div>
+          `;
+          container.appendChild(row);
+
+          const row2 = document.createElement('div');
+          row2.className = 'block-row';
+          row2.innerHTML = `
+            <div class="form-group">
+              <label>Valore (-1 = ignora)</label>
+              <input type="number" value="${event.trigger.input_value || -1}"
+                     onchange="updateTriggerField('${event.id}', 'input_value', parseInt(this.value))">
+            </div>
+            <div class="form-group">
+              <label>Stato (-1 = ignora, 0 = false, 1 = true)</label>
+              <input type="number" min="-1" max="1" value="${event.trigger.input_state || -1}"
+                     onchange="updateTriggerField('${event.id}', 'input_state', parseInt(this.value))">
+            </div>
+          `;
+          container.appendChild(row2);
+
+          const textGroup = document.createElement('div');
+          textGroup.className = 'form-group';
+          textGroup.innerHTML = `
+            <label>Testo (opzionale)</label>
+            <input type="text" value="${event.trigger.input_text || ''}"
+                   onchange="updateTriggerField('${event.id}', 'input_text', this.value)">
+          `;
+          container.appendChild(textGroup);
+        }
+      }
+
+      function updateTriggerField(eventId, field, value) {
+        const event = state.events.find(e => e.id === eventId);
+        if (event) {
+          event.trigger[field] = value;
+        }
+      }
+
+      function updateActionField(eventId, field, value) {
+        const event = state.events.find(e => e.id === eventId);
+        if (event) {
+          if (field === 'params' && typeof value === 'string') {
+            const trimmed = value.trim();
+            if (!trimmed) {
+              event.action.params = '';
+              return;
+            }
+            try {
+              event.action.params = JSON.parse(trimmed);
+            } catch (error) {
+              showToast('Parametri non validi: JSON non parsabile', 'error');
+            }
+            return;
+          }
+          event.action[field] = value;
+        }
+      }
+
+      function parseActionParams(action) {
+        if (!action || !action.params) {
+          return {};
+        }
+        if (typeof action.params === 'object') {
+          return { ...action.params };
+        }
+        if (typeof action.params === 'string') {
+          try {
+            return JSON.parse(action.params);
+          } catch (error) {
+            console.warn('Parametri azione non validi per', action.id, error);
+          }
+        }
+        return {};
+      }
+
+      function formatActionParamsValue(params) {
+        if (!params) {
+          return '';
+        }
+        if (typeof params === 'string') {
+          return params;
+        }
+        try {
+          return JSON.stringify(params, null, 2);
+        } catch (error) {
+          console.warn('Impossibile serializzare i parametri azione', error);
+          return '';
+        }
+      }
+
+      function buildComboSources(list) {
+        const map = {};
+        list.forEach(item => {
+          const name = item.source || 'combo';
+          if (!map[name]) {
+            map[name] = {
+              name,
+              type: item.fileType || 'custom',
+              label: prettifyComboFileLabel(name, item.fileType || 'custom'),
+              combos: []
+            };
+          }
+          map[name].combos.push({
+            id: item.id,
+            combo: item.combo,
+            actions: item.actions,
+            display: `${item.combo} (${item.actions.length})`
+          });
+        });
+        return Object.values(map)
+          .map(group => {
+            group.combos.sort((a, b) => a.combo.localeCompare(b.combo, 'it', { numeric: true }));
+            return group;
+          })
+          .sort((a, b) => a.label.localeCompare(b.label, 'it', { numeric: true }));
+      }
+
+      function getComboOptionsForFile(fileName) {
+        if (!fileName) {
+          return [];
+        }
+        const source = state.comboSources.find(src => src.name === fileName);
+        return source ? source.combos : [];
+      }
+
+      function handleComboFileSelection(eventId, fileName) {
+        comboPickerState[eventId] = comboPickerState[eventId] || { file: '', combo: '' };
+        comboPickerState[eventId].file = fileName;
+        comboPickerState[eventId].combo = '';
+        renderCanvas();
+      }
+
+      function handleComboChoice(eventId, comboId) {
+        if (!comboId) {
+          return;
+        }
+        applyComboSuggestion(eventId, comboId);
+        const prev = comboPickerState[eventId] || { file: '', combo: '' };
+        comboPickerState[eventId] = { file: prev.file || '', combo: '' };
+        renderCanvas();
+      }
+
+      function pruneComboPickerState() {
+        const valid = new Set((state.comboSources || []).map(src => src.name));
+        Object.keys(comboPickerState).forEach(key => {
+          const picker = comboPickerState[key];
+          if (!picker || !picker.file) {
+            if (!picker) {
+              delete comboPickerState[key];
+            }
+            return;
+          }
+          if (!valid.has(picker.file)) {
+            comboPickerState[key] = { file: '', combo: '' };
+          }
+        });
+      }
+
+      function updateIRDevice(eventId, device) {
+        const event = state.events.find(e => e.id === eventId);
+        if (!event) {
+          return;
+        }
+        const params = parseActionParams(event.action);
+        if (device) {
+          params.device = device;
+          if (params.command && (!state.irDevices[device] || !state.irDevices[device][params.command])) {
+            delete params.command;
+          }
+        } else {
+          delete params.device;
+          delete params.command;
+        }
+        event.action.params = params;
+        renderCanvas();
+      }
+
+      function updateIRCommand(eventId, command) {
+        const event = state.events.find(e => e.id === eventId);
+        if (!event) {
+          return;
+        }
+        const params = parseActionParams(event.action);
+        if (command) {
+          params.command = command;
+        } else {
+          delete params.command;
+        }
+        event.action.params = params;
+      }
+
+      function ensureActionParamsObject(event, defaults = {}) {
+        let params = parseActionParams(event.action);
+        if (!params || typeof params !== 'object' || Array.isArray(params)) {
+          params = {};
+        }
+        Object.keys(defaults).forEach((key) => {
+          if (params[key] === undefined) {
+            params[key] = Array.isArray(defaults[key]) ? [...defaults[key]] : defaults[key];
+          }
+        });
+        event.action.params = params;
+        return params;
+      }
+
+      function rebuildIrSuggestions() {
+        const suggestions = [];
+        Object.entries(state.irDevices || {}).forEach(([device, commands]) => {
+          if (!commands || typeof commands !== 'object') {
+            return;
+          }
+          Object.keys(commands).forEach(command => {
+            suggestions.push({
+              id: `${device}::${command}`,
+              label: `${device} \u00b7 ${command}`
+            });
+          });
+        });
+        suggestions.sort((a, b) => a.label.localeCompare(b.label, 'it', { sensitivity: 'base' }));
+        state.irSuggestions = suggestions;
+      }
+
+      function applyComboSuggestion(eventId, suggestionId) {
+        if (!suggestionId) {
+          return;
+        }
+        const suggestion = state.comboSuggestions.find(item => item.id === suggestionId);
+        const event = state.events.find(e => e.id === eventId);
+        if (!suggestion || !event) {
+          return;
+        }
+        event.action.type = 'macro';
+        event.action.id = suggestion.label;
+        event.action.params = {
+          actions: suggestion.actions.slice(),
+          label: suggestion.label,
+          source: suggestion.source,
+          combo: suggestion.combo,
+          release_delay_ms: 30
+        };
+        renderCanvas();
+        showToast('Macro impostata dal catalogo', 'success');
+      }
+
+      function applyIrSuggestion(eventId, optionValue) {
+        if (!optionValue) {
+          return;
+        }
+        const event = state.events.find(e => e.id === eventId);
+        if (!event) {
+          return;
+        }
+        const [device, command] = optionValue.split('::');
+        if (!device || !command) {
+          return;
+        }
+        event.action.type = 'special_action';
+        event.action.id = 'send_ir_command';
+        event.action.params = { device, command };
+        renderCanvas();
+        showToast('Comando IR selezionato', 'success');
+      }
+
+      function updateMacroDelay(eventId, delayValue) {
+        const event = state.events.find(e => e.id === eventId);
+        if (!event) {
+          return;
+        }
+        const params = ensureActionParamsObject(event, { actions: [] });
+        const sanitized = isNaN(delayValue) ? 0 : Math.max(0, delayValue);
+        params.release_delay_ms = sanitized;
+      }
+
+      function updateMacroParamsJson(eventId, rawValue) {
+        const event = state.events.find(e => e.id === eventId);
+        if (!event) {
+          return;
+        }
+        if (!rawValue.trim()) {
+          event.action.params = {};
+          renderCanvas();
+          return;
+        }
+        try {
+          const parsed = JSON.parse(rawValue);
+          event.action.params = parsed;
+          renderCanvas();
+        } catch (error) {
+          showToast('JSON parametri non valido', 'error');
+        }
+      }
+
+      function renderEventBlock(event) {
+        const block = document.createElement('article');
+        block.className = 'event-block';
+        block.dataset.eventId = event.id;
+
+        const header = document.createElement('div');
+        header.className = 'block-header';
+        header.innerHTML = `
+          <div class="block-title">
+            <i class="fas fa-calendar-check"></i>
+            <input type="text" value="${event.description}"
+                   onchange="updateEventField('${event.id}', 'description', this.value)">
+          </div>
+          <div class="block-actions">
+            <button onclick="toggleEventBlock('${event.id}')" title="Comprimi/Espandi">
+              <i class="fas fa-chevron-up"></i>
+            </button>
+            <button onclick="duplicateEvent('${event.id}')" title="Duplica">
+              <i class="fas fa-copy"></i>
+            </button>
+            <button onclick="deleteEvent('${event.id}')" title="Elimina">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        `;
+        block.appendChild(header);
+
+        const content = document.createElement('div');
+        content.className = 'block-content';
+
+        // Options
+        const optionsDiv = document.createElement('div');
+        optionsDiv.className = 'checkbox-group';
+        optionsDiv.innerHTML = `
+          <label class="checkbox-label">
+            <input type="checkbox" ${event.enabled ? 'checked' : ''}
+                   onchange="updateEventField('${event.id}', 'enabled', this.checked)">
+            Abilitato
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" ${event.prevent_sleep ? 'checked' : ''}
+                   onchange="updateEventField('${event.id}', 'prevent_sleep', this.checked)">
+            Previeni Sleep
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" ${event.wake_from_sleep ? 'checked' : ''}
+                   onchange="updateEventField('${event.id}', 'wake_from_sleep', this.checked)">
+            Risveglio
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" ${event.run_on_boot ? 'checked' : ''}
+                   onchange="updateEventField('${event.id}', 'run_on_boot', this.checked)">
+            Esegui all'avvio
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" ${event.one_shot ? 'checked' : ''}
+                   onchange="updateEventField('${event.id}', 'one_shot', this.checked)">
+            Una sola volta
+          </label>
+        `;
+        content.appendChild(optionsDiv);
+
+        // Trigger selector
+        const triggerSection = document.createElement('div');
+        triggerSection.innerHTML = '<label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; margin-bottom: 8px; display: block;">Tipo di Trigger</label>';
+        const triggerSelector = document.createElement('div');
+        triggerSelector.className = 'trigger-selector';
+
+        Object.values(triggerTypes).forEach(trigger => {
+          const option = document.createElement('div');
+          option.className = 'trigger-option';
+          if (event.trigger.type === trigger.value) {
+            option.classList.add('active');
+          }
+          option.innerHTML = `
+            <i class="fas ${trigger.icon}"></i>
+            <span>${trigger.label}</span>
+          `;
+          option.addEventListener('click', () => {
+            event.trigger.type = trigger.value;
+            renderCanvas();
+          });
+          triggerSelector.appendChild(option);
+        });
+        triggerSection.appendChild(triggerSelector);
+        content.appendChild(triggerSection);
+
+        // Trigger fields
+        const triggerFields = document.createElement('div');
+        renderTriggerFields(event, triggerFields);
+        content.appendChild(triggerFields);
+
+        // Action section
+        const actionSection = document.createElement('div');
+        actionSection.className = 'action-selector';
+
+        const parsedActionParams = parseActionParams(event.action);
+        let paramsHtml = '';
+        if (event.action.type === 'macro') {
+          const macroActions = Array.isArray(parsedActionParams.actions) ? parsedActionParams.actions : [];
+          const releaseDelay = parsedActionParams.release_delay_ms !== undefined ? parsedActionParams.release_delay_ms : 30;
+          const macroLabel = parsedActionParams.label || event.action.id || 'Sequenza personalizzata';
+          const sourceInfo = parsedActionParams.source ? `<span class="action-pill">File: ${parsedActionParams.source}</span>` : '';
+          const comboInfo = parsedActionParams.combo ? `<span class="action-pill">Combo: ${parsedActionParams.combo}</span>` : '';
+          paramsHtml = `
+            <div class="macro-panel">
+              <div class="macro-header">
+                <div>
+                  <strong>${macroLabel}</strong>
+                  ${sourceInfo}
+                  ${comboInfo}
+                </div>
+                <span class="macro-count">${macroActions.length} azioni</span>
+              </div>
+              <div class="macro-actions">
+                ${macroActions.length
+                  ? macroActions.map(action => `<code>${action}</code>`).join('')
+                  : '<span class="muted">Aggiungi azioni selezionando una combo o modificando il JSON.</span>'}
+              </div>
+              <div class="block-row">
+                <div class="form-group">
+                  <label>Delay tra press/release (ms)</label>
+                  <input type="number" min="0" value="${releaseDelay}"
+                         onchange="updateMacroDelay('${event.id}', parseInt(this.value))">
+                </div>
+                <div class="form-group">
+                  <label>Parametri (JSON)</label>
+                  <textarea rows="4" onchange="updateMacroParamsJson('${event.id}', this.value)">${formatActionParamsValue(event.action.params)}</textarea>
+                </div>
+              </div>
+            </div>
+          `;
+        } else if (event.action.type === 'special_action') {
+          const isSendIRCommand = event.action.id === 'send_ir_command';
+
+          if (isSendIRCommand && Object.keys(state.irDevices).length > 0) {
+            const selectedDevice = parsedActionParams.device || '';
+            const selectedCommand = parsedActionParams.command || '';
+            const devices = Object.keys(state.irDevices);
+            const commands = selectedDevice && state.irDevices[selectedDevice] ? Object.keys(state.irDevices[selectedDevice]) : [];
+
+            paramsHtml = `
+              <div class="block-row">
+                <div class="form-group">
+                  <label>Dispositivo IR</label>
+                  <select id="ir-device-${event.id}" onchange="updateIRDevice('${event.id}', this.value)">
+                    <option value="">-- Seleziona dispositivo --</option>
+                    ${devices.map(dev => `<option value="${dev}" ${dev === selectedDevice ? 'selected' : ''}>${dev}</option>`).join('')}
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Comando IR</label>
+                  <select id="ir-command-${event.id}" onchange="updateIRCommand('${event.id}', this.value)" ${!selectedDevice ? 'disabled' : ''}>
+                    <option value="">-- Seleziona comando --</option>
+                    ${commands.map(cmd => `<option value="${cmd}" ${cmd === selectedCommand ? 'selected' : ''}>${cmd}</option>`).join('')}
+                  </select>
+                </div>
+              </div>
+            `;
+          } else {
+            paramsHtml = `
+              <div class="form-group">
+                <label>Parametri (JSON)</label>
+                <textarea rows="3" onchange="updateActionField('${event.id}', 'params', this.value)">${formatActionParamsValue(event.action.params)}</textarea>
+              </div>
+            `;
+          }
+        } else {
+          paramsHtml = `
+            <div class="form-group">
+              <label>Parametri (JSON)</label>
+              <textarea rows="3" onchange="updateActionField('${event.id}', 'params', this.value)">${formatActionParamsValue(event.action.params)}</textarea>
+            </div>
+          `;
+        }
+
+        const pickerState = comboPickerState[event.id] || { file: '', combo: '' };
+        const comboSources = state.comboSources || [];
+        const comboOptions = pickerState.file ? getComboOptionsForFile(pickerState.file) : [];
+        const comboSuggestionControl = comboSources.length
+          ? `<div class="stacked-select">
+               <select onchange="handleComboFileSelection('${event.id}', this.value)">
+                 <option value="">-- Scegli file combo --</option>
+                 ${comboSources
+                   .map(src => `<option value="${src.name}" ${src.name === pickerState.file ? 'selected' : ''}>${src.label}</option>`)
+                   .join('')}
+               </select>
+               <select onchange="handleComboChoice('${event.id}', this.value)" ${comboOptions.length ? '' : 'disabled'}>
+                 <option value="">-- Scegli combinazione --</option>
+                 ${comboOptions
+                   .map(opt => `<option value="${opt.id}" ${opt.id === pickerState.combo ? 'selected' : ''}>${opt.display}</option>`)
+                   .join('')}
+               </select>
+             </div>`
+          : '<div class="muted">Combo in caricamento o non disponibili.</div>';
+
+        const irSuggestionControl = state.irSuggestions.length
+          ? `<select onchange="applyIrSuggestion('${event.id}', this.value); this.value='';">
+               <option value="">-- Applica comando IR --</option>
+               ${state.irSuggestions.map(item => `<option value="${item.id}">${item.label}</option>`).join('')}
+             </select>`
+          : '<div class="muted">Nessun comando IR disponibile.</div>';
+
+        const suggestionHtml = `
+          <div class="action-suggestions">
+            <div class="form-group">
+              <label>Catalogo combo</label>
+              ${comboSuggestionControl}
+              <small>Scegli tra le azioni salvate nei file combo_*.json</small>
+            </div>
+            <div class="form-group">
+              <label>Catalogo IR</label>
+              ${irSuggestionControl}
+              <small>Riutilizza i comandi salvati in ir_data.json</small>
+            </div>
+          </div>
+        `;
+
+        actionSection.innerHTML = `
+          <label style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">Azione da eseguire</label>
+          <div class="block-row">
+            <div class="form-group">
+              <label>Tipo Azione</label>
+              <select onchange="updateActionField('${event.id}', 'type', this.value); renderCanvas()">
+                ${Object.values(actionTypes).map(action =>
+                  `<option value="${action.value}" ${event.action.type === action.value ? 'selected' : ''}>${action.label}</option>`
+                ).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>${event.action.type === 'special_action' ? 'Action ID' : event.action.type === 'log' ? 'Messaggio' : event.action.type === 'macro' ? 'Etichetta' : 'Valore'}</label>
+              <input type="text" value="${event.action.id || ''}"
+                     onchange="updateActionField('${event.id}', 'id', this.value); renderCanvas()">
+            </div>
+          </div>
+          ${paramsHtml}
+          ${suggestionHtml}
+        `;
+        content.appendChild(actionSection);
+
+        block.appendChild(content);
+        return block;
+      }
+
+      function updateEventField(eventId, field, value) {
+        const event = state.events.find(e => e.id === eventId);
+        if (event) {
+          event[field] = value;
+        }
+      }
+
+      function toggleEventBlock(eventId) {
+        const block = document.querySelector(`[data-event-id="${eventId}"]`);
+        if (block) {
+          block.classList.toggle('collapsed');
+          const icon = block.querySelector('.block-actions button i');
+          icon.className = block.classList.contains('collapsed') ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
+        }
+      }
+
+      function duplicateEvent(eventId) {
+        const event = state.events.find(e => e.id === eventId);
+        if (event) {
+          const copy = JSON.parse(JSON.stringify(event));
+          copy.id = generateId();
+          copy.description = event.description + ' (copia)';
+          state.events.push(copy);
+          renderCanvas();
+          showToast('Evento duplicato', 'success');
+        }
+      }
+
+      function deleteEvent(eventId) {
+        if (confirm('Eliminare questo evento?')) {
+          state.events = state.events.filter(e => e.id !== eventId);
+          renderCanvas();
+          showToast('Evento eliminato', 'info');
+        }
+      }
+
+      function renderCanvas() {
+        const canvas = document.getElementById('canvas');
+        if (state.events.length === 0) {
+          canvas.innerHTML = `
+            <div class="canvas-empty">
+              <i class="fas fa-calendar-alt"></i>
+              <p>Clicca su "Nuovo Evento" per iniziare</p>
+              <p style="font-size: 0.85rem; color: var(--text-secondary)">
+                oppure importa una configurazione esistente
+              </p>
+            </div>
+          `;
+        } else {
+          canvas.innerHTML = '';
+          state.events.forEach(event => {
+            canvas.appendChild(renderEventBlock(event));
+          });
+        }
+        updateEventCount();
+      }
+
+      function addNewEvent() {
+        const event = createEvent();
+        state.events.push(event);
+        renderCanvas();
+        showToast('Nuovo evento aggiunto', 'success');
+      }
+
+      function exportToJson() {
+        const output = {
+          enabled: state.config.enabled,
+          prevent_sleep_if_pending: state.config.prevent_sleep_if_pending,
+          sleep_guard_seconds: state.config.sleep_guard_seconds,
+          wake_ahead_seconds: state.config.wake_ahead_seconds,
+          timezone_minutes: state.config.timezone_minutes,
+          poll_interval_ms: state.config.poll_interval_ms,
+          events: state.events
+        };
+
+        const blob = new Blob([JSON.stringify(output, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'scheduler_config.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Configurazione esportata', 'success');
+      }
+
+      function importFromJson() {
+        document.getElementById('fileInput').click();
+      }
+
+      async function saveConfiguration() {
+        try {
+          const payload = {
+            enabled: state.config.enabled,
+            prevent_sleep_if_pending: state.config.prevent_sleep_if_pending,
+            sleep_guard_seconds: state.config.sleep_guard_seconds,
+            wake_ahead_seconds: state.config.wake_ahead_seconds,
+            timezone_minutes: state.config.timezone_minutes,
+            poll_interval_ms: state.config.poll_interval_ms,
+            events: state.events
+          };
+
+          const response = await fetch('/scheduler.json', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (response.ok) {
+            showToast('Configurazione salvata! Il dispositivo si riavvierà.', 'success');
+          } else {
+            throw new Error('Errore durante il salvataggio');
+          }
+        } catch (error) {
+          showToast('Errore: ' + error.message, 'error');
+        }
+      }
+
+      async function loadConfiguration() {
+        try {
+          const scheduler = await fetch('/scheduler.json').then(r => r.json());
+          if (scheduler) {
+            state.config = {
+              enabled: scheduler.enabled || false,
+              prevent_sleep_if_pending: scheduler.prevent_sleep_if_pending !== false,
+              sleep_guard_seconds: scheduler.sleep_guard_seconds || 45,
+              wake_ahead_seconds: scheduler.wake_ahead_seconds || 900,
+              timezone_minutes: scheduler.timezone_minutes || 0,
+              poll_interval_ms: scheduler.poll_interval_ms || 250
+            };
+            state.events = Array.isArray(scheduler.events) ? scheduler.events : [];
+          } else {
+            state.config = {
+              enabled: false,
+              prevent_sleep_if_pending: true,
+              sleep_guard_seconds: 45,
+              wake_ahead_seconds: 900,
+              timezone_minutes: 0,
+              poll_interval_ms: 250
+            };
+            state.events = [];
+          }
+          renderCanvas();
+        } catch (error) {
+          console.error('Error loading scheduler:', error);
+          showToast('Impossibile caricare la configurazione', 'error');
+        }
+      }
+
+      async function loadIrData() {
+        try {
+          const response = await fetch('/ir_data.json');
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const data = await response.json();
+          const devices = data && typeof data === 'object' ? (data.devices || data) : {};
+          state.irDevices = devices && typeof devices === 'object' ? devices : {};
+          rebuildIrSuggestions();
+          renderCanvas();
+        } catch (error) {
+          console.warn('Impossibile caricare i dati IR:', error);
+        }
+      }
+
+      function buildComboSuggestionsFromFiles(files) {
+        const combos = [];
+        if (!Array.isArray(files)) {
+          return combos;
+        }
+        files.forEach(file => {
+          if (!file || !file.content) {
+            return;
+          }
+          const fileType = file.type || 'custom';
+          try {
+            const parsed = JSON.parse(file.content);
+            Object.entries(parsed).forEach(([key, value]) => {
+              if (key === '_settings' || !Array.isArray(value)) {
+                return;
+              }
+              const actions = value.filter(item => typeof item === 'string');
+              if (actions.length === 0) {
+                return;
+              }
+              combos.push({
+                id: `${file.name}::${key}`,
+                label: `${file.name.replace('.json', '')} · ${key}`,
+                actions,
+                source: file.name,
+                combo: key,
+                fileType
+              });
+            });
+          } catch (error) {
+            console.warn('Combo file non valido:', file?.name || 'sconosciuto', error);
+          }
+        });
+        return combos;
+      }
+
+      function buildComboSuggestionsFromLegacy(payload) {
+        const combos = [];
+        if (!payload || typeof payload !== 'object') {
+          return combos;
+        }
+        Object.entries(payload).forEach(([key, value]) => {
+          if (!key.startsWith('combinations_') || typeof value !== 'object') {
+            return;
+          }
+          const source = key;
+          Object.entries(value).forEach(([comboKey, actions]) => {
+            if (comboKey === '_settings' || !Array.isArray(actions)) {
+              return;
+            }
+            const sanitized = actions.filter(item => typeof item === 'string');
+            if (!sanitized.length) {
+              return;
+            }
+            combos.push({
+              id: `${source}::${comboKey}`,
+              label: `${source} · ${comboKey}`,
+              actions: sanitized,
+              source,
+              combo: comboKey,
+              fileType: 'legacy'
+            });
+          });
+        });
+        return combos;
+      }
+
+      async function loadComboLibrary() {
+        const applySuggestions = (list) => {
+          const flat = list.slice().sort((a, b) => a.label.localeCompare(b.label, 'it', { sensitivity: 'base' }));
+          state.comboSuggestions = flat;
+          state.comboSources = buildComboSources(flat);
+          pruneComboPickerState();
+          renderCanvas();
+        };
+
+        try {
+          const response = await fetch('/combo_files.json');
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const raw = await response.text();
+          if (!raw || !raw.trim()) {
+            console.warn('Combo library vuota (payload vuoto), uso fallback legacy');
+            await loadComboLibraryFallback(applySuggestions);
+            return;
+          }
+          let payload;
+          try {
+            payload = JSON.parse(raw);
+          } catch (error) {
+            console.warn('Impossibile parse combo_files.json, uso fallback legacy:', error);
+            await loadComboLibraryFallback(applySuggestions);
+            return;
+          }
+          const combos = buildComboSuggestionsFromFiles(payload.files);
+          if (combos.length === 0) {
+            console.warn('Nessuna combo estratta dal catalogo, uso fallback legacy');
+            await loadComboLibraryFallback(applySuggestions);
+          } else {
+            applySuggestions(combos);
+          }
+        } catch (error) {
+          console.warn('Impossibile caricare combo_files.json, uso fallback legacy:', error);
+          await loadComboLibraryFallback(applySuggestions);
+        }
+      }
+
+      async function loadComboLibraryFallback(applySuggestions) {
+        try {
+          const response = await fetch('/combo.json');
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const raw = await response.text();
+          if (!raw || !raw.trim()) {
+            console.warn('Payload /combo.json vuoto');
+            applySuggestions([]);
+            return;
+          }
+          const payload = JSON.parse(raw);
+          const combos = buildComboSuggestionsFromLegacy(payload);
+          applySuggestions(combos);
+        } catch (error) {
+          console.warn('Fallback /combo.json fallito:', error);
+          applySuggestions([]);
+        }
+      }
+
+      // Event listeners
+      document.querySelector('[data-block-type="event"]').addEventListener('click', addNewEvent);
+      document.getElementById('exportBtn').addEventListener('click', exportToJson);
+      document.getElementById('importBtn').addEventListener('click', importFromJson);
+      document.getElementById('saveBtn').addEventListener('click', saveConfiguration);
+
+      document.getElementById('fileInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            try {
+              const data = JSON.parse(event.target.result);
+              if (data.events) {
+                state.events = data.events;
+                if (data.enabled !== undefined) state.config.enabled = data.enabled;
+                if (data.prevent_sleep_if_pending !== undefined) state.config.prevent_sleep_if_pending = data.prevent_sleep_if_pending;
+                if (data.sleep_guard_seconds !== undefined) state.config.sleep_guard_seconds = data.sleep_guard_seconds;
+                if (data.wake_ahead_seconds !== undefined) state.config.wake_ahead_seconds = data.wake_ahead_seconds;
+                if (data.timezone_minutes !== undefined) state.config.timezone_minutes = data.timezone_minutes;
+                if (data.poll_interval_ms !== undefined) state.config.poll_interval_ms = data.poll_interval_ms;
+                renderCanvas();
+                showToast('Configurazione importata', 'success');
+              }
+            } catch (error) {
+              showToast('File JSON non valido', 'error');
+            }
+          };
+          reader.readAsText(file);
+        }
+      });
+
+      // Initialize
+      loadConfiguration();
+      loadIrData();
+      loadComboLibrary();
+    </script>
+  </body>
+</html>

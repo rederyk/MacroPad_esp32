@@ -1,0 +1,27 @@
+{
+  "enabled": false,
+  "prevent_sleep_if_pending": true,
+  "sleep_guard_seconds": 45,
+  "wake_ahead_seconds": 900,
+  "timezone_minutes": 0,
+  "poll_interval_ms": 250,
+  "events": [
+    {
+      "id": "sample_memory_ping",
+      "description": "Example interval event that dumps heap usage every 10 minutes",
+      "enabled": false,
+      "prevent_sleep": false,
+      "wake_from_sleep": false,
+      "run_on_boot": false,
+      "one_shot": false,
+      "trigger": {
+        "type": "interval",
+        "interval_ms": 600000
+      },
+      "action": {
+        "type": "special_action",
+        "id": "print_memory_info"
+      }
+    }
+  ]
+}

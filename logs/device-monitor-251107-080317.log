@@ -1,0 +1,116 @@
+ets Jun  8 2016 00:22:57
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:2
+load:0x3fff0030,len:1184
+load:0x40078000,len:13232
+load:0x40080400,len:3028
+entry 0x400805e4
+E (820) esp_core_dump_flash: No core dum���ѥѥ���found!
+E (820) esp_core_dump_flash: No core dump partition found!
+  4: S_B:LEFT_ARROW 
+  5: S_B:RETURN 
+  6: S_B:RIGHT_ARROW 
+  7: S_B:BACKSPACE 
+  8: S_B:DOWN_ARROW 
+  9: S_B:  
+
+ESP32 Keypad and Encoder Test
+Loaded 42 combinations
+Using default interactive colors (9 keys)
+Initialising accelerometer type: mpu6050 (0x68)
+I2C probe mpu6050 @ 0x68(ACK), 0x69(--)
+Detected accelerometer at 0x68
+MPU6050 WHO_AM_I = 0x70 (MPU clone detected)
+Using MPU6050 clone driver for WHO_AM_I 0x70
+[MPU6050Clone] setRange(4.0g) -> configValue=0x8, scale=8192.00
+[MPU6050Clone] ACCEL_CONFIG readback: 0x8 (expected: 0x8)
+[MPU6050Clone] _scale updated to 8192.00
+Accelerometer initialised: MPU6050-Clone
+Auto-calibration is DISABLED. Use manual calibration command.
+Motion wakeup armed (thr=5, dur=2)
+Accelerometer initialised successfully.
+=== CALIBRATION STARTED ===
+IMPORTANT: Position the device as you normally use it
+  (e.g., flat on desk, or vertical/tilted if that's your normal usage)
+Keep the device VERY STILL
+Collecting 5 samples...
+[MPU6050Clone] First update - RAW values:
+  rawX=-1516 rawY=-400 rawZ=8006
+  _scale=8192.00 (should be 8192.00 for ±4g)
+  Expected: accelX=-0.1851g
+  Actual:   accelX=-0.1851g
+Sample 0: accel=[-0.1851,-0.0488,0.9773] mag=0.9959g
+Sample 1: accel=[-0.1914,-0.0464,0.9670] mag=0.9869g
+Sample 2: accel=[-0.1895,-0.0459,0.9790] mag=0.9982g
+Sample 3: accel=[-0.1909,-0.0427,0.9692] mag=0.9888g
+Sample 4: accel=[-0.1882,-0.0447,0.9836] mag=1.0025g
+Collected 5/5 valid samples
+=== CALIBRATION COMPLETE ===
+Calibration offset: [-0.1890,-0.0457,0.9752]
+Magnitude: 0.9944g (should be ~1.0g)
+Sensor type: MPU6050-Clone
+NOTE: MPU6050 uses gyroscope for orientation - axis mapping ignored
+================================
+Gyro average: [-0.0072,0.0612,0.0025]
+Gyro magnitude: 0.0617 rad/s (should be ~0.00 if still)
+Axis breakdown:
+  X: 0.1890g 
+  Y: 0.0457g 
+  Z: 0.9752g <-- VERTICAL AXIS
+Accelerometer calibration completed at startup.
+Gesture analyzer is ready.
+GyroMouse: Initialized with 3 sensitivity modes
+GyroMouse config loaded (enabled=true, sensitivities=3)
+Gesture device registered
+IR Sensor Config: pin=14, active=true
+Initializing IR Sensor on pin 14
+IR Sensor initialized successfully
+IR LED Config: pin=33, active=true, anodeGpio=true
+Initializing IR Sender on pin 33
+IR Sender initialized successfully
+Initializing IR Storage
+IR data loaded from file
+Free heap after IR initialization: 160368 bytes
+mainLoopTask started. Target interval: 5 ms. Logging max execution time every 5000 ms.
+Free RAM memory: 143480 bytes
+Free sketch memory: 3145728 bytes
+Starting STA mode...
+🔄 Modalità WiFi aggiornata.
+✅ Routes set up successfully.
+✅ Web server started on port 80.
+✅ WebServer avviato.
+🌐 Connessione alla rete WiFi in corso...
+.....
+✅ WiFi connesso con successo.IP Adress: 3489769664
+✅ Status updated: AP IP = 192.168.4.1, STA IP = WiFi Mode: STA
+📡 Stato WiFi aggiornato: WiFi Mode: STA
+LED set to RGB(0,255,0) @ 15/255 brightness [system]
+LED acceso: GRIGIO-SCURO ⚫
+connesso a FASTWEB-2
+Free heap before webserver start: 70360 bytes
+Hardware initialized with name 
+Press keys or rotate encoder to test...
+size 
+3494
+✓ Found combo file: /combo_0.json
+✓ Found combo file: /combo_1.json
+✓ Found combo file: /combo_2.json
+✓ Found combo file: /combo_3.json
+✓ Found combo file: /combo_common.json
+✓ Found combo file: /combo_gyromouse_0.json
+✓ Found combo file: /my_combo_0.json
+✓ Found combo file: /my_combo_1.json
+📂 Found 8 combo files in total
+  → Added: combo_0.json (290 bytes)
+  → Added: combo_1.json (858 bytes)
+  → Added: combo_2.json (1387 bytes)
+  → Added: combo_3.json (1441 bytes)
+  → Added: combo_common.json (1366 bytes)
+  → Added: combo_gyromouse_0.json (683 bytes)
+  → Added: my_combo_0.json (891 bytes)
+  → Added: my_combo_1.json (400 bytes)
+📊 JSON size: 9044 bytes
+📤 Sending combo_files.json payload, size: 9044 bytes

@@ -80,8 +80,7 @@ static const SpecialActionDescriptor kSpecialActions[] = {
     {"show_led_info", "Mostra info LED", "/special_action", "POST", "Scrive nei log il colore corrente e la luminosità del LED.", false, "{\"actionId\":\"show_led_info\"}", "show_led_info"},
     {"show_brightness_info", "Mostra luminosità", "/special_action", "POST", "Scrive nei log il livello di luminosità corrente del LED.", false, "{\"actionId\":\"show_brightness_info\"}", "show_brightness_info"},
     {"check_ir_signal", "Verifica segnale IR", "/special_action", "POST", "Verifica rapidamente la presenza di un segnale IR e lo riporta nei log.", false, "{\"actionId\":\"check_ir_signal\"}", "check_ir_signal"},
-    {"send_ir_command", "Invia comando IR", "/special_action", "POST", "Invia un comando IR memorizzato specificando dispositivo e comando.", true, "{\"actionId\":\"send_ir_command\",\"params\":{\"device\":\"tv\",\"command\":\"off\"}}", "send_ir_command"},
-    {"send_ir_payload", "Invia IR da payload", "/special_action", "POST", "Invia immediatamente un comando IR specificando direttamente protocollo/valore (utile per test irdb).", true, "{\"actionId\":\"send_ir_payload\",\"params\":{\"label\":\"irdb_test\",\"command\":{\"protocol\":\"NEC\",\"bits\":32,\"value\":\"20df10ef\"}}}", "send_ir_payload"}};
+    {"send_ir_command", "Invia comando IR", "/special_action", "POST", "Invia un comando IR memorizzato specificando dispositivo e comando.", true, "{\"actionId\":\"send_ir_command\",\"params\":{\"device\":\"tv\",\"command\":\"off\"}}", "send_ir_command"}};
 
 String readIrDataFile()
 {
@@ -408,35 +407,6 @@ bool handleSpecialActionRequest(const String &actionId, JsonVariantConst params,
         specialAction.sendIRCommand(device, command);
         message = "Comando IR inviato a " + device + ":" + command;
         return true;
-    }
-
-    if (actionId == "send_ir_payload")
-    {
-        if (!params.is<JsonObjectConst>())
-        {
-            statusCode = 400;
-            message = "Parametro 'command' richiesto.";
-            return false;
-        }
-
-        JsonVariantConst commandObj = params["command"];
-        if (commandObj.isNull())
-        {
-            statusCode = 400;
-            message = "Dati comando IR mancanti.";
-            return false;
-        }
-
-        String label = params["label"] | "payload";
-        if (specialAction.sendIRPayload(commandObj, label))
-        {
-            message = "Comando IR inviato (" + label + ")";
-            return true;
-        }
-
-        statusCode = 400;
-        message = "Invio IR fallito per il payload specificato.";
-        return false;
     }
 
     statusCode = 404;

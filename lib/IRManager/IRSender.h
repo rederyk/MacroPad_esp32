@@ -18,7 +18,7 @@ public:
     bool sendIR(decode_type_t protocol, uint64_t value, uint16_t bits);
     bool sendRaw(const uint16_t *rawData, size_t length);
 
-    bool sendCommand(JsonVariantConst cmd); // metodo più semplice
+    bool sendCommand(JsonObject cmd); // metodo più semplice
 
 private:
     int _pin;
