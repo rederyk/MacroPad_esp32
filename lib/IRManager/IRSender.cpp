@@ -53,37 +53,122 @@ bool IRSender::sendIR(decode_type_t protocol, uint64_t value, uint16_t bits)
     return true;
 }
 
-bool IRSender::sendRaw(const uint16_t *rawData, size_t length)
+bool IRSender::sendRaw(const uint16_t *rawData, size_t length, uint16_t frequency)
 {
     if (!_enabled || !_irsend)
         return false;
 
-    const uint16_t kFrequency = 38000; // default IR frequency in Hz (38kHz)
-    _irsend->sendRaw(rawData, length, kFrequency);
+    _irsend->sendRaw(rawData, length, frequency);
     return true;
 }
 
 
-bool IRSender::sendCommand(JsonObject cmd) {
-    if (!cmd.containsKey("protocol"))
+bool IRSender::sendCommand(JsonVariantConst cmdVariant)
+{
+    if (!_enabled || !_irsend)
         return false;
 
-    String protocol = cmd["protocol"];
+    if (cmdVariant.isNull() || !cmdVariant.is<JsonObjectConst>())
+        return false;
 
-    if (protocol == "RAW") {
-        JsonArray raw = cmd["raw"];
+    JsonObjectConst cmd = cmdVariant.as<JsonObjectConst>();
+
+    JsonVariantConst protocolField = cmd["protocol"];
+    if (protocolField.isNull())
+        return false;
+
+    const char *protocolCStr = protocolField.as<const char *>();
+    if (!protocolCStr)
+        return false;
+
+    String protocol = protocolCStr;
+    protocol.trim();
+    protocol.toUpperCase();
+
+    if (protocol == "RAW")
+    {
+        JsonArrayConst raw = cmd["raw"].as<JsonArrayConst>();
+        if (raw.isNull())
+            return false;
+
         size_t len = raw.size();
-        if (len == 0 || len > 128) return false;
+        if (len == 0 || len > 128)
+            return false;
 
         uint16_t rawData[128];
-        for (size_t i = 0; i < len; i++)
-            rawData[i] = raw[i];
+        size_t index = 0;
+        for (JsonVariantConst value : raw)
+        {
+            int rawValue = value.as<int>();
+            if (rawValue <= 0)
+                return false;
+            rawData[index++] = static_cast<uint16_t>(rawValue);
+        }
 
-        return sendRaw(rawData, len);
+        uint16_t frequency = 38000;
+        JsonVariantConst freqField = cmd["frequency"];
+        if (freqField.isNull())
+        {
+            freqField = cmd["freq"];
+        }
+        if (!freqField.isNull())
+        {
+            int freqValue = freqField.as<int>();
+            if (freqValue > 0)
+            {
+                frequency = static_cast<uint16_t>(freqValue);
+            }
+        }
+
+        return sendRaw(rawData, len, frequency);
     }
 
-    uint64_t value = strtoull(cmd["value"], nullptr, 16);
-    uint16_t bits = cmd["bits"];
+    JsonVariantConst bitsField = cmd["bits"];
+    if (bitsField.isNull())
+        return false;
+
+    int bitsValue = bitsField.as<int>();
+    if (bitsValue <= 0)
+        return false;
+    uint16_t bits = static_cast<uint16_t>(bitsValue);
+
+    JsonVariantConst valueField = cmd["value"];
+    if (valueField.isNull())
+        return false;
+
+    uint64_t value = 0;
+    if (valueField.is<const char *>())
+    {
+        String valueStr = valueField.as<const char *>();
+        valueStr.trim();
+        if (valueStr.startsWith("0x") || valueStr.startsWith("0X"))
+        {
+            valueStr = valueStr.substring(2);
+        }
+        if (valueStr.length() == 0)
+            return false;
+        value = strtoull(valueStr.c_str(), nullptr, 16);
+    }
+    else if (valueField.is<uint64_t>())
+    {
+        value = valueField.as<uint64_t>();
+    }
+    else if (valueField.is<unsigned long>())
+    {
+        value = static_cast<uint64_t>(valueField.as<unsigned long>());
+    }
+    else if (valueField.is<int>())
+    {
+        value = static_cast<uint64_t>(valueField.as<int>());
+    }
+    else if (valueField.is<double>())
+    {
+        value = static_cast<uint64_t>(valueField.as<double>());
+    }
+    else
+    {
+        return false;
+    }
 
     decode_type_t protoType = strToDecodeType(protocol.c_str());
     if (protoType == decode_type_t::UNKNOWN)

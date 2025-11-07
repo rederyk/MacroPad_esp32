@@ -1151,6 +1151,88 @@ void SpecialAction::sendIRCommand(const String &deviceName, const String &comman
     Led::getInstance().setColor(savedRed, savedGreen, savedBlue, false);
 }
 
+bool SpecialAction::sendIRPayload(JsonVariantConst commandPayload, const String &label)
+{
+    IRSender *irSender = inputHub.getIrSender();
+
+    if (!irSender)
+    {
+        Logger::getInstance().log("IR Sender not initialized");
+        return false;
+    }
+
+    if (!irSender->isEnabled())
+    {
+        Logger::getInstance().log("IR Sender disabled");
+        return false;
+    }
+
+    if (commandPayload.isNull() || !commandPayload.is<JsonObjectConst>())
+    {
+        Logger::getInstance().log("Invalid IR payload (missing command object)");
+        return false;
+    }
+
+    JsonObjectConst cmd = commandPayload.as<JsonObjectConst>();
+    if (!cmd.containsKey("protocol"))
+    {
+        Logger::getInstance().log("Invalid IR payload (missing protocol)");
+        return false;
+    }
+
+    // Power management: register activity
+    powerManager.registerActivity();
+
+    int savedRed, savedGreen, savedBlue;
+    Led::getInstance().getColor(savedRed, savedGreen, savedBlue);
+
+    unsigned long sendStartTime = millis();
+    const unsigned long fastBlinkInterval = 100;
+    const unsigned long blinkDuration = 200;
+    bool commandSent = false;
+    bool sendOk = false;
+
+    while (millis() - sendStartTime < blinkDuration)
+    {
+        if ((millis() - sendStartTime) % fastBlinkInterval < (fastBlinkInterval / 2))
+        {
+            Led::getInstance().setColor(255, 0, 0, false);
+        }
+        else
+        {
+            Led::getInstance().setColor(0, 0, 0, false);
+        }
+
+        if (!commandSent)
+        {
+            sendOk = irSender->sendCommand(commandPayload);
+            commandSent = true;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    Led::getInstance().setColor(savedRed, savedGreen, savedBlue, false);
+
+    String labelInfo = label;
+    if (labelInfo.isEmpty())
+    {
+        const char *proto = cmd["protocol"] | "UNKNOWN";
+        labelInfo = "protocol=" + String(proto);
+    }
+
+    if (sendOk)
+    {
+        Logger::getInstance().log("IR payload sent: " + labelInfo);
+    }
+    else
+    {
+        Logger::getInstance().log("Failed to send IR payload: " + labelInfo);
+    }
+
+    return sendOk;
+}
+
 void SpecialAction::checkIRSignal()
 {
     IRSensor *irSensor = inputHub.getIrSensor();

@@ -22,6 +22,7 @@
 #define SPECIAL_ACTION_H
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 
 class SpecialAction
 {
@@ -55,6 +56,7 @@ public:
     void toggleScanIR(int deviceId, const String &exitCombo = "");             // Toggle IR scan mode (auto-switches between devices)
     void toggleSendIR(int deviceId, const String &exitCombo = "");             // Toggle IR send mode (auto-switches between devices)
     void sendIRCommand(const String &deviceName, const String &commandName); // Send specific IR command immediately (supports any device/command names)
+    bool sendIRPayload(JsonVariantConst commandPayload, const String &label); // Send ad-hoc IR payload without persisting
     void checkIRSignal();                        // Check current IR signal (for debugging)
 
     /// LED RGB control

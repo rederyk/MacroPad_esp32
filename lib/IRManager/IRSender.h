@@ -16,9 +16,9 @@ public:
     bool isEnabled() const;
 
     bool sendIR(decode_type_t protocol, uint64_t value, uint16_t bits);
-    bool sendRaw(const uint16_t *rawData, size_t length);
+    bool sendRaw(const uint16_t *rawData, size_t length, uint16_t frequency = 38000);
 
-    bool sendCommand(JsonObject cmd); // metodo più semplice
+    bool sendCommand(JsonVariantConst cmd); // metodo più semplice
 
 private:
     int _pin;
