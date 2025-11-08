@@ -186,6 +186,7 @@ bool ConfigurationManager::loadConfig()
     filter["irLed"] = true;
     filter["gyromouse"] = true;
     filter["scheduler"] = true;
+    filter["scheduler"] = true;
 
     // Increase buffer size and add error handling
     StaticJsonDocument<4096> doc;
@@ -245,6 +246,14 @@ bool ConfigurationManager::loadConfig()
     systemConfig.sleep_timeout_ms = 300000;
     systemConfig.sleep_timeout_mouse_ms = 0;
     systemConfig.sleep_timeout_ir_ms = 0;
+
+    schedulerConfig = SchedulerConfig();
+    schedulerConfig.enabled = false;
+    schedulerConfig.preventSleepIfPending = true;
+    schedulerConfig.sleepGuardSeconds = 60;
+    schedulerConfig.wakeAheadSeconds = 900;
+    schedulerConfig.pollIntervalMs = 250;
+    schedulerConfig.events.clear();
 
     schedulerConfig = SchedulerConfig();
     schedulerConfig.enabled = false;
@@ -666,77 +675,6 @@ bool ConfigurationManager::loadConfig()
         schedulerConfig.wakeAheadSeconds = schedulerObj["wake_ahead_seconds"] | schedulerConfig.wakeAheadSeconds;
         schedulerConfig.timezoneOffsetMinutes = schedulerObj["timezone_minutes"] | schedulerConfig.timezoneOffsetMinutes;
         schedulerConfig.pollIntervalMs = schedulerObj["poll_interval_ms"] | schedulerConfig.pollIntervalMs;
-
-        JsonArray eventsArray = schedulerObj["events"].as<JsonArray>();
-        if (!eventsArray.isNull())
-        {
-            schedulerConfig.events.reserve(eventsArray.size());
-            for (JsonObject eventObj : eventsArray)
-            {
-                ScheduledActionConfig eventConfig;
-                eventConfig.id = eventObj["id"] | "";
-                if (eventConfig.id.isEmpty())
-                {
-                    continue;
-                }
-
-                eventConfig.description = eventObj["description"] | "";
-                eventConfig.enabled = eventObj["enabled"] | true;
-                eventConfig.wakeFromSleep = eventObj["wake_from_sleep"] | false;
-                eventConfig.preventSleep = eventObj["prevent_sleep"] | false;
-                eventConfig.runOnBoot = eventObj["run_on_boot"] | false;
-                eventConfig.oneShot = eventObj["one_shot"] | false;
-                eventConfig.allowOverlap = eventObj["allow_overlap"] | false;
-
-                JsonObject triggerObj = eventObj["trigger"].as<JsonObject>();
-                if (triggerObj.isNull())
-                {
-                    continue;
-                }
-
-                eventConfig.trigger.type = parseTriggerType(triggerObj["type"] | "interval");
-                eventConfig.trigger.intervalMs = triggerObj["interval_ms"] | 0;
-                eventConfig.trigger.jitterMs = triggerObj["jitter_ms"] | 0;
-                eventConfig.trigger.absoluteEpoch = triggerObj["epoch"] | (time_t)0;
-                eventConfig.trigger.hour = triggerObj["hour"] | 0;
-                eventConfig.trigger.minute = triggerObj["minute"] | 0;
-                eventConfig.trigger.second = triggerObj["second"] | 0;
-                eventConfig.trigger.daysMask = parseDaysMask(triggerObj["days"]);
-                eventConfig.trigger.useUtc = triggerObj["use_utc"] | false;
-                eventConfig.trigger.inputSource = triggerObj["source"] | "";
-                eventConfig.trigger.inputType = triggerObj["event"] | "";
-                eventConfig.trigger.inputValue = triggerObj["value"] | -1;
-                if (triggerObj.containsKey("state"))
-                {
-                    eventConfig.trigger.inputState = triggerObj["state"].as<bool>() ? 1 : 0;
-                }
-                else
-                {
-                    eventConfig.trigger.inputState = -1;
-                }
-                eventConfig.trigger.inputText = triggerObj["text"] | "";
-
-                JsonObject actionObj = eventObj["action"].as<JsonObject>();
-                if (actionObj.isNull())
-                {
-                    continue;
-                }
-                eventConfig.actionType = actionObj["type"] | "special_action";
-                eventConfig.actionId = actionObj["id"] | "";
-                if (actionObj.containsKey("params"))
-                {
-                    String paramsJson;
-                    serializeJson(actionObj["params"], paramsJson);
-                    eventConfig.actionParams = paramsJson;
-                }
-                else
-                {
-                    eventConfig.actionParams = "";
-                }
-
-                schedulerConfig.events.push_back(eventConfig);
-            }
-        }
     }
 
     configFile.close();

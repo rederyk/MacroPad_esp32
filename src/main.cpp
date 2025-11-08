@@ -38,6 +38,7 @@
 #include "GyroMouse.h"
 #include "configWebServer.h"
 #include "EventScheduler.h"
+#include "SchedulerStorage.h"
 
 WIFIManager wifiManager; // Create an instance of WIFIManager
 
@@ -100,7 +101,10 @@ void initPowerManager() {
 }
 
 void initScheduler() {
-    eventScheduler.begin(configManager.getSchedulerConfig());
+    SchedulerConfig schedulerConfig = configManager.getSchedulerConfig();
+    SchedulerStorage schedulerStorage;
+    schedulerStorage.loadConfig(&schedulerConfig);
+    eventScheduler.begin(schedulerConfig);
 }
 
 void initMacroManagerAndCombos() {
