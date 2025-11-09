@@ -29,12 +29,9 @@
 #include "InputHub.h"
 #include "GyroMouse.h"
 #include "combinationManager.h"
-
-extern WIFIManager wifiManager;
-extern BLEController bleController;
-extern InputHub inputHub;
-extern GyroMouse gyroMouse;
-extern CombinationManager comboManager;
+#include "specialAction.h"
+#include "CommandFactory.h"
+#include "Command.h"
 
 // Bitmask helper functions
 inline void setKeyState(uint16_t &mask, uint8_t key, bool state)
@@ -55,39 +52,47 @@ inline bool getKeyState(uint16_t mask, uint8_t key)
 }
 
 MacroManager::MacroManager()
-    : activeKeysMask(0),
-      previousKeysMask(0),
-      lastCombinationTime(0),
-      pendingCombination(""),
+    : wifiManager(nullptr),
+      bleController(nullptr),
+      inputHub(nullptr),
+      gyroMouse(nullptr),
+      comboManager(nullptr),
+      specialAction(nullptr),
+      commandFactory(nullptr),
       keypadConfig(nullptr),
       wifiConfig(nullptr),
-      newKeyPressed(false),
-      encoderReleaseScheduled(false),
-      useKeyPressOrder(false), // Di default usa il metodo originale
-      processingCommandQueue(false)
-{
-    lastActionTime = millis();
-}
-
-void MacroManager::init(const KeypadConfig *config, const WifiConfig *wifiConfig)
-{
-    this->keypadConfig = config;
-    this->wifiConfig = wifiConfig;
-}
-
-MacroManager::MacroManager(const KeypadConfig *config, const WifiConfig *wifiConfig)
-    : activeKeysMask(0),
+      activeKeysMask(0),
       previousKeysMask(0),
       lastCombinationTime(0),
       pendingCombination(""),
-      keypadConfig(config),
-      wifiConfig(wifiConfig),
       newKeyPressed(false),
       encoderReleaseScheduled(false),
       useKeyPressOrder(false), // Di default usa il metodo originale
       processingCommandQueue(false)
 {
     lastActionTime = millis();
+}
+
+void MacroManager::begin(
+    WIFIManager* wifiManager,
+    BLEController* bleController,
+    InputHub* inputHub,
+    GyroMouse* gyroMouse,
+    CombinationManager* comboManager,
+    SpecialAction* specialAction,
+    CommandFactory* commandFactory,
+    const KeypadConfig* keypadConfig,
+    const WifiConfig* wifiConfig)
+{
+    this->wifiManager = wifiManager;
+    this->bleController = bleController;
+    this->inputHub = inputHub;
+    this->gyroMouse = gyroMouse;
+    this->comboManager = comboManager;
+    this->specialAction = specialAction;
+    this->commandFactory = commandFactory;
+    this->keypadConfig = keypadConfig;
+    this->wifiConfig = wifiConfig;
 }
 
 // Parse a composite action string and extract commands enclosed in <>
@@ -264,436 +269,16 @@ void MacroManager::pressAction(const std::string &action)
         return;
     }
 
-    String logMessage = "Executing action: " + String(action.c_str());
-
-    if (action.rfind("S_B:", 0) == 0 && bleController.isBleEnabled())
-    {
-        bleController.BLExecutor(action.c_str(), true);
-    }
-    else if (action == "EXECUTE_GESTURE")
-    {
-        if (inputHub.startGestureCapture())
-        {
-            logMessage = "started " + String(action.c_str());
-            is_action_locked = true;
-        }
-        else
-        {
-            logMessage = "failed to start " + String(action.c_str());
-            is_action_locked = false;
-        }
-    }
-    else if (action == "RESET_ALL")
-    {
-        specialAction.resetDevice();
-    }
-    else if (action == "CALIBRATE_SENSOR")
-    {
-        specialAction.calibrateSensor();
-    }
-    else if (action == "MEM_INFO")
-    {
-        specialAction.printMemoryInfo();
-    }
-    else if (action == "HOP_BLE_DEVICE")
-    {
-        specialAction.hopBleDevice();
-    }
-    else if (action == "ENTER_SLEEP")
-
-    {
-        specialAction.enterSleep();
-    }
-    else if (action == "GYROMOUSE_START")
-    {
-        if (!gyroMouse.isRunning())
-        {
-            if (!gyroModeActive)
-            {
-                String currentPrefix = comboManager.getCurrentPrefix();
-                savedComboPrefix = std::string(currentPrefix.c_str());
-                savedComboSetNumber = comboManager.getCurrentSet();
-                hasSavedCombo = true;
-            }
-
-            gyroMouse.start();
-            gyroModeActive = gyroMouse.isRunning();
-
-            if (gyroModeActive)
-            {
-                pendingComboSwitchFlag = true;
-                pendingComboPrefix = "combo_gyromouse";
-                pendingComboSetNumber = 0;
-            }
-            else
-            {
-                Logger::getInstance().log("GyroMouse: failed to start (check configuration)");
-            }
-        }
-    }
-    else if (action == "GYROMOUSE_STOP")
-    {
-        if (gyroMouse.isRunning())
-        {
-            gyroMouse.stop();
-        }
-
-        if (gyroModeActive && hasSavedCombo)
-        {
-            pendingComboSwitchFlag = true;
-            pendingComboPrefix = savedComboPrefix;
-            pendingComboSetNumber = savedComboSetNumber;
-        }
-
-        gyroModeActive = false;
-    }
-    else if (action == "GYROMOUSE_TOGGLE")
-    {
-        if (gyroMouse.isRunning())
-        {
-            gyroMouse.stop();
-
-            if (gyroModeActive && hasSavedCombo)
-            {
-                pendingComboSwitchFlag = true;
-                pendingComboPrefix = savedComboPrefix;
-                pendingComboSetNumber = savedComboSetNumber;
-            }
-            gyroModeActive = false;
-        }
-        else
-        {
-            // Reuse start logic
-            pressAction("GYROMOUSE_START");
-        }
-    }
-    else if (action == "GYROMOUSE_CYCLE_SENSITIVITY")
-    {
-        if (gyroMouse.isRunning())
-        {
-            gyroMouse.cycleSensitivity();
-            Logger::getInstance().log("GyroMouse: Sensitivity -> " + gyroMouse.getSensitivityName());
-        }
-        else
-        {
-            Logger::getInstance().log("GyroMouse: Cycle request ignored (mode inactive)");
-        }
-    }
-    else if (action == "GYROMOUSE_RECENTER")
-    {
-        if (gyroMouse.isRunning())
-        {
-            gyroMouse.recenterNeutral();
-        }
-        else
-        {
-            Logger::getInstance().log("GyroMouse: Recenter request ignored (mode inactive)");
-        }
-    }
-    else if (action.rfind("DELAY_", 0) == 0)
-    {
-        // Estrae il valore del delay in ms
-        std::string delayStr = action.substr(6);
-        int totalDelayMs = std::stoi(delayStr);
-
-        specialAction.actionDelay(totalDelayMs);
+    // Try to create a command from the factory first
+    auto command = commandFactory->create(action);
+    if (command) {
+        Logger::getInstance().log("MacroManager: Pressing command for action: " + String(action.c_str()));
+        _lastExecutedCommand = std::move(command);
+        _lastExecutedCommand->press();
+        return; // Action handled by command pattern
     }
 
-    // IR Remote Control Commands (toggle pattern)
-    else if (action.rfind("SCAN_IR_DEV_", 0) == 0)
-    {
-        // Extract device ID from "SCAN_IR_DEV_X"
-        std::string devStr = action.substr(12); // After "SCAN_IR_DEV_"
-        int deviceId = std::stoi(devStr);
-
-        // Pass the activation combo as exit combo
-        String exitCombo = String(currentActivationCombo.c_str());
-        specialAction.toggleScanIR(deviceId, exitCombo);
-
-        // Clean up state after IR mode exits
-        clearActiveKeys();
-    }
-    else if (action.rfind("SEND_IR_", 0) == 0)
-    {
-        // Hierarchical IR send command handling
-        // Extract the part after "SEND_IR_" (8 characters)
-        std::string remainder = action.substr(8);
-
-        // 1. Check for interactive mode: SEND_IR_DEV_<deviceId>
-        if (remainder.rfind("DEV_", 0) == 0)
-        {
-            // Interactive send mode
-            std::string devStr = remainder.substr(4); // After "DEV_"
-            try
-            {
-                int deviceId = std::stoi(devStr);
-                String exitCombo = String(currentActivationCombo.c_str());
-                specialAction.toggleSendIR(deviceId, exitCombo);
-                clearActiveKeys();
-            }
-            catch (const std::exception &e)
-            {
-                Logger::getInstance().log("Invalid SEND_IR_DEV format: " + String(action.c_str()));
-            }
-        }
-        // 2. Check for numeric direct send: SEND_IR_CMD_<deviceId>_CMD<commandId>
-        else if (remainder.rfind("CMD_", 0) == 0)
-        {
-            std::string numericPart = remainder.substr(4); // After "CMD_"
-            size_t cmdPos = numericPart.find("_CMD");
-
-            if (cmdPos != std::string::npos)
-            {
-                std::string devStr = numericPart.substr(0, cmdPos);
-                std::string cmdStr = numericPart.substr(cmdPos + 4);
-
-                try
-                {
-                    int deviceId = std::stoi(devStr);
-                    int commandId = std::stoi(cmdStr);
-                    String deviceName = String("dev") + String(deviceId);
-                    String commandName = String("cmd") + String(commandId);
-                    specialAction.sendIRCommand(deviceName, commandName);
-                }
-                catch (const std::exception &e)
-                {
-                    Logger::getInstance().log("Invalid SEND_IR_CMD format: " + String(action.c_str()));
-                }
-            }
-        }
-        // 3. Descriptive direct send: SEND_IR_<deviceName>_<commandName>
-        else
-        {
-            size_t underscorePos = remainder.find('_');
-            if (underscorePos != std::string::npos)
-            {
-                String deviceName = String(remainder.substr(0, underscorePos).c_str());
-                String commandName = String(remainder.substr(underscorePos + 1).c_str());
-                specialAction.sendIRCommand(deviceName, commandName);
-            }
-            else
-            {
-                Logger::getInstance().log("Invalid SEND_IR format (missing underscore): " + String(action.c_str()));
-            }
-        }
-    }
-    else if (action == "IR_CHECK")
-    {
-        specialAction.checkIRSignal();
-    }
-
-    // LED RGB Control Commands
-    else if (action.rfind("LED_RGB_", 0) == 0)
-    {
-        // Extract parameters after "LED_RGB_"
-        std::string params = action.substr(8); // Skip "LED_RGB_"
-
-        // Parse the three color components separated by underscores
-        std::vector<std::string> components;
-        size_t start = 0;
-        size_t end = params.find('_');
-
-        // Split by underscores
-        while (end != std::string::npos)
-        {
-            components.push_back(params.substr(start, end - start));
-            start = end + 1;
-            end = params.find('_', start);
-        }
-        // Add last component
-        components.push_back(params.substr(start));
-
-        if (components.size() == 3)
-        {
-            int values[3] = {0, 0, 0};           // Absolute values
-            int deltas[3] = {0, 0, 0};           // Relative adjustments
-            bool hasRelative = false;
-            bool hasAbsolute = false;
-
-            // Parse each component
-            for (int i = 0; i < 3; i++)
-            {
-                std::string comp = components[i];
-
-                // Check for PLUS/MINUS modifiers
-                if (comp == "PLUS_PLUS")
-                {
-                    deltas[i] = specialAction.ledAdjustmentStep * 2;
-                    hasRelative = true;
-                }
-                else if (comp == "PLUS")
-                {
-                    deltas[i] = specialAction.ledAdjustmentStep;
-                    hasRelative = true;
-                }
-                else if (comp == "MINUS_MINUS")
-                {
-                    deltas[i] = -specialAction.ledAdjustmentStep * 2;
-                    hasRelative = true;
-                }
-                else if (comp == "MINUS")
-                {
-                    deltas[i] = -specialAction.ledAdjustmentStep;
-                    hasRelative = true;
-                }
-                else
-                {
-                    // Try to parse as number (absolute value)
-                    try
-                    {
-                        values[i] = std::stoi(comp);
-                        hasAbsolute = true;
-                    }
-                    catch (const std::exception &e)
-                    {
-                        Logger::getInstance().log("Invalid LED component: " + String(comp.c_str()));
-                        return;
-                    }
-                }
-            }
-
-            // Execute the command based on what we parsed
-            if (hasRelative && !hasAbsolute)
-            {
-                // Pure relative adjustment
-                specialAction.adjustLedColor(deltas[0], deltas[1], deltas[2]);
-            }
-            else if (hasAbsolute && !hasRelative)
-            {
-                // Pure absolute set
-                specialAction.setLedColor(values[0], values[1], values[2], false);
-            }
-            else if (hasAbsolute && hasRelative)
-            {
-                // Mixed: first get current color, apply deltas, then set absolutes
-                int currentRed, currentGreen, currentBlue;
-                Led::getInstance().getColor(currentRed, currentGreen, currentBlue);
-
-                // Start with current values
-                int finalRed = currentRed;
-                int finalGreen = currentGreen;
-                int finalBlue = currentBlue;
-
-                // Apply deltas where specified
-                if (deltas[0] != 0) finalRed += deltas[0];
-                else if (values[0] != 0 || components[0] == "0") finalRed = values[0];
-
-                if (deltas[1] != 0) finalGreen += deltas[1];
-                else if (values[1] != 0 || components[1] == "0") finalGreen = values[1];
-
-                if (deltas[2] != 0) finalBlue += deltas[2];
-                else if (values[2] != 0 || components[2] == "0") finalBlue = values[2];
-
-                specialAction.setLedColor(finalRed, finalGreen, finalBlue, false);
-            }
-        }
-        else
-        {
-            Logger::getInstance().log("Invalid LED_RGB format: expected 3 components");
-        }
-    }
-    else if (action == "LED_OFF")
-    {
-        specialAction.turnOffLed();
-    }
-    else if (action == "LED_SAVE")
-    {
-        specialAction.saveLedColor();
-    }
-    else if (action == "LED_RESTORE")
-    {
-        specialAction.restoreLedColor();
-    }
-    else if (action == "LED_INFO")
-    {
-        specialAction.showLedInfo();
-    }
-
-    // LED Brightness Control Commands
-    else if (action.rfind("LED_BRIGHTNESS_", 0) == 0)
-    {
-        // Extract parameter after "LED_BRIGHTNESS_"
-        std::string param = action.substr(15); // Skip "LED_BRIGHTNESS_"
-
-        // Check for PLUS with optional multiplier (PLUS, PLUS2, PLUS3, etc.)
-        if (param.rfind("PLUS", 0) == 0)
-        {
-            int multiplier = 1;
-            if (param.length() > 4) // Has number after PLUS
-            {
-                try
-                {
-                    std::string numStr = param.substr(4);
-                    multiplier = std::stoi(numStr);
-                }
-                catch (const std::exception &e)
-                {
-                    Logger::getInstance().log("Invalid PLUS multiplier: " + String(param.c_str()));
-                    multiplier = 1;
-                }
-            }
-            specialAction.adjustBrightness(specialAction.brightnessAdjustmentStep * multiplier);
-        }
-        // Check for MINUS with optional multiplier (MINUS, MINUS0, MINUS1, MINUS2, etc.)
-        else if (param.rfind("MINUS", 0) == 0)
-        {
-            int multiplier = 1;
-            if (param.length() > 5) // Has number after MINUS
-            {
-                try
-                {
-                    std::string numStr = param.substr(5);
-                    int num = std::stoi(numStr);
-                    // MINUS0 or MINUS1 = same as MINUS (multiplier 1)
-                    multiplier = (num <= 1) ? 1 : num;
-                }
-                catch (const std::exception &e)
-                {
-                    Logger::getInstance().log("Invalid MINUS multiplier: " + String(param.c_str()));
-                    multiplier = 1;
-                }
-            }
-            specialAction.adjustBrightness(-specialAction.brightnessAdjustmentStep * multiplier);
-        }
-        else if (param == "INFO")
-        {
-            specialAction.showBrightnessInfo();
-        }
-        else
-        {
-            // Try to parse as absolute value (0-255)
-            try
-            {
-                int brightness = std::stoi(param);
-                specialAction.setBrightness(brightness);
-            }
-            catch (const std::exception &e)
-            {
-                Logger::getInstance().log("Invalid LED_BRIGHTNESS format: " + String(param.c_str()));
-            }
-        }
-    }
-
-    // Flashlight Command - Toggle white LED full brightness
-    else if (action == "FLASHLIGHT")
-    {
-        specialAction.toggleFlashlight();
-    }
-
-    // Is useless now??
-    else if (action == "AP_MODE")
-    {
-        if (!bleController.isBleEnabled())
-        {
-            wifiManager.toggleAp(wifiConfig->ap_ssid.c_str(), wifiConfig->ap_password.c_str());
-        }
-        else
-        {
-            Logger::getInstance().log("riavvia in WIFImode");
-        }
-    }
-
-    Logger::getInstance().log(logMessage);
+    Logger::getInstance().log("MacroManager: No command found for action: " + String(action.c_str()) + ". Executing legacy action.");
 }
 
 void MacroManager::releaseAction(const std::string &action)
@@ -706,6 +291,14 @@ void MacroManager::releaseAction(const std::string &action)
         return;
     }
 
+    // If a command was stored from pressAction, release it
+    if (_lastExecutedCommand) {
+        Logger::getInstance().log("MacroManager: Releasing command for action: " + String(action.c_str()));
+        _lastExecutedCommand->release();
+        _lastExecutedCommand.reset(); // Release ownership
+        return; // Action handled by command pattern
+    }
+
     String logMessage = "Released action: " + String(action.c_str());
 
     // If action is locked but this is part of our command queue, let it proceed
@@ -713,106 +306,6 @@ void MacroManager::releaseAction(const std::string &action)
     {
         Logger::getInstance().log("Action locked, skipping action: insideRealeaseactionvoid " + String(action.c_str()));
         return;
-    }
-    if (action.rfind("S_B:", 0) == 0 && bleController.isBleEnabled())
-    {
-        bleController.BLExecutor(action.c_str(), false);
-    }
-    else if (action == "EXECUTE_GESTURE")
-    {
-        if (inputHub.stopGestureCapture())
-        {
-            logMessage += " gesture capture stopped";
-        }
-        else
-        {
-            logMessage += " gesture capture already idle";
-        }
-        is_action_locked = false;
-    }
-
-    // IR Remote Control no longer needs release actions (now using toggle pattern)
-    else if (action == "TOGGLE_BLE_WIFI")
-    {
-        specialAction.toggleBleWifi();
-    }
-    else if (action == "TOGGLE_KEY_ORDER")
-    {
-        if (useKeyPressOrder)
-        {
-            setUseKeyPressOrder(false);
-        }
-        else
-        {
-            setUseKeyPressOrder(true);
-        }
-    }
-    else if (action == "REACTIVE_LIGHTING")
-    {
-        const bool newState = !inputHub.isReactiveLightingEnabled();
-        inputHub.setReactiveLightingEnabled(newState);
-    }
-    else if (action == "SAVE_INTERACTIVE_COLORS")
-    {
-        inputHub.saveReactiveLightingColors();
-    }
-    else if (action == "GYROMOUSE_START" ||
-             action == "GYROMOUSE_STOP" ||
-             action == "GYROMOUSE_TOGGLE" ||
-             action == "GYROMOUSE_CYCLE_SENSITIVITY" ||
-             action == "GYROMOUSE_RECENTER")
-    {
-        // No release action required for GyroMouse commands
-    }
-    else if (action.rfind("SWITCH_MY_COMBO_", 0) == 0)
-    {
-        // Extract combo number from "SWITCH_MY_COMBO_X"
-        std::string numStr = action.substr(16); // After "SWITCH_MY_COMBO_"
-        try
-        {
-            int comboNum = std::stoi(numStr);
-            Logger::getInstance().log("Switch to my_combo_" + String(comboNum) + " requested");
-            // Set pending flag instead of executing immediately to avoid stack issues
-            pendingComboSwitchFlag = true;
-            pendingComboPrefix = "my_combo";
-            pendingComboSetNumber = comboNum;
-
-            if (gyroModeActive)
-            {
-                savedComboPrefix = pendingComboPrefix;
-                savedComboSetNumber = pendingComboSetNumber;
-                hasSavedCombo = true;
-            }
-        }
-        catch (const std::exception &e)
-        {
-            Logger::getInstance().log("Invalid SWITCH_MY_COMBO format: " + String(action.c_str()));
-        }
-    }
-    else if (action.rfind("SWITCH_COMBO_", 0) == 0)
-    {
-        // Extract combo number from "SWITCH_COMBO_X"
-        std::string numStr = action.substr(13); // After "SWITCH_COMBO_"
-        try
-        {
-            int comboNum = std::stoi(numStr);
-            Logger::getInstance().log("Switch to combo_" + String(comboNum) + " requested");
-            // Set pending flag instead of executing immediately to avoid stack issues
-            pendingComboSwitchFlag = true;
-            pendingComboPrefix = "combo";
-            pendingComboSetNumber = comboNum;
-
-            if (gyroModeActive)
-            {
-                savedComboPrefix = pendingComboPrefix;
-                savedComboSetNumber = pendingComboSetNumber;
-                hasSavedCombo = true;
-            }
-        }
-        catch (const std::exception &e)
-        {
-            Logger::getInstance().log("Invalid SWITCH_COMBO format: " + String(action.c_str()));
-        }
     }
 
     Logger::getInstance().log(logMessage);
@@ -841,7 +334,7 @@ void MacroManager::handleInputEvent(const InputEvent &event)
         if (event.state)
         {
             // Handle reactive lighting for key press
-            inputHub.handleReactiveLighting(event.value1, false, 0, activeKeysMask);
+            inputHub->handleReactiveLighting(event.value1, false, 0, activeKeysMask);
 
             // Quando un tasto viene premuto, aggiungilo alla lista dell'ordine di pressione
             if (useKeyPressOrder)
@@ -908,7 +401,7 @@ void MacroManager::handleInputEvent(const InputEvent &event)
         if (event.state)
         {
             // Handle reactive lighting for encoder rotation
-            inputHub.handleReactiveLighting(0, true, event.value1, activeKeysMask);
+            inputHub->handleReactiveLighting(0, true, event.value1, activeKeysMask);
 
             // Determina la direzione
             std::string encoderAction = (event.value1 > 0) ? "CW" : "CCW";
@@ -985,7 +478,7 @@ void MacroManager::handleInputEvent(const InputEvent &event)
         if (event.state)
         {
             // Handle reactive lighting for encoder button
-            inputHub.handleReactiveLighting(0, true, 0, activeKeysMask);
+            inputHub->handleReactiveLighting(0, true, 0, activeKeysMask);
 
             lastAction = "BUTTON";
             pendingCombination = getCurrentCombination();
@@ -1393,6 +886,58 @@ void MacroManager::clearPendingComboSwitch()
     pendingComboSetNumber = 0;
 }
 
+void MacroManager::setPendingComboSwitch(const std::string& prefix, int setNumber)
+{
+    pendingComboSwitchFlag = true;
+    pendingComboPrefix = prefix;
+    pendingComboSetNumber = setNumber;
+}
+
+void MacroManager::setGyroModeActive(bool active)
+{
+    gyroModeActive = active;
+}
+
+bool MacroManager::isGyroModeActive() const
+{
+    return gyroModeActive;
+}
+
+void MacroManager::saveCurrentComboForGyro()
+{
+    String currentPrefix = comboManager->getCurrentPrefix();
+    savedComboPrefix = std::string(currentPrefix.c_str());
+    savedComboSetNumber = comboManager->getCurrentSet();
+    hasSavedCombo = true;
+}
+
+void MacroManager::restoreSavedGyroCombo()
+{
+    pendingComboSwitchFlag = true;
+    pendingComboPrefix = savedComboPrefix;
+    pendingComboSetNumber = savedComboSetNumber;
+}
+
+bool MacroManager::hasSavedGyroCombo() const
+{
+    return hasSavedCombo;
+}
+
+const WifiConfig* MacroManager::getWifiConfig() const
+{
+    return wifiConfig;
+}
+
+void MacroManager::setActionLocked(bool locked)
+{
+    is_action_locked = locked;
+}
+
+const std::string& MacroManager::getCurrentActivationCombo() const
+{
+    return currentActivationCombo;
+}
+
 void MacroManager::update()
 {
     unsigned long currentTime = millis();
@@ -1435,7 +980,7 @@ void MacroManager::update()
         encoderReleaseScheduled = false;
     }
 
-    inputHub.updateReactiveLighting();
+    inputHub->updateReactiveLighting();
 
     // Logger::getInstance().processBuffer();
 }

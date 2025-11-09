@@ -39,6 +39,7 @@
 #include "configWebServer.h"
 #include "EventScheduler.h"
 #include "SchedulerStorage.h"
+#include "CommandFactory.h"
 
 WIFIManager wifiManager; // Create an instance of WIFIManager
 
@@ -54,6 +55,7 @@ MacroManager macroManager;
 InputHub inputHub;
 GyroMouse gyroMouse;
 EventScheduler eventScheduler;
+CommandFactory* commandFactory = nullptr;
 
 // Task function prototype
 void mainLoopTask(void *parameter);
@@ -116,7 +118,14 @@ void initMacroManagerAndCombos() {
 
     // Initialize macroManager with keypad config and wifi config
     Logger::getInstance().log("\nESP32 Keypad and Encoder Test");
-    macroManager.init(
+    macroManager.begin(
+        &wifiManager,
+        &bleController,
+        &inputHub,
+        &gyroMouse,
+        &comboManager,
+        &specialAction,
+        commandFactory,
         &configManager.getKeypadConfig(),
         &configManager.getWifiConfig());
 
@@ -323,7 +332,19 @@ void setup()
     initLed();
     initPowerManager();
     initScheduler();
+
+    // Create the factory now that all managers are initialized
+    commandFactory = new CommandFactory(
+        &specialAction,
+        &bleController,
+        &gyroMouse,
+        &inputHub,
+        &wifiManager,
+        &comboManager
+    );
+
     initMacroManagerAndCombos();
+    commandFactory->setMacroManager(&macroManager);
     initPeripherals();
     startMainLoopTask();
 

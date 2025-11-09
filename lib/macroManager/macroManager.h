@@ -1,22 +1,3 @@
-/*
- * ESP32 MacroPad Project
- * Copyright (C) [2025] [Enrico Mori]
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
-
 #ifndef MACRO_MANAGER_H
 #define MACRO_MANAGER_H
 
@@ -24,14 +5,21 @@
 #include <vector>
 #include <map>
 #include <functional>
-
-// #define COMBO_DELAY 100 // Adjust this value as needed (milliseconds)
 #include <string>
+#include <memory>
+#include <ArduinoJson.h>
 #include "inputDevice.h"
 #include "configTypes.h"
-#include "specialAction.h"
-#include "configManager.h"
-extern SpecialAction specialAction;
+
+// Forward declarations for dependency injection
+class WIFIManager;
+class BLEController;
+class InputHub;
+class GyroMouse;
+class CombinationManager;
+class SpecialAction;
+class CommandFactory;
+class Command;
 
 #define GESTURE_HOLD_TIME 200 // Tempo di mantenimento della gesture in ms
 #define COMMAND_DELAY 200 // Delay between chained commands in ms
@@ -40,18 +28,44 @@ class MacroManager
 {
 public:
     MacroManager();
-    void init(const KeypadConfig *config, const WifiConfig *wifiConfig);
-    MacroManager(const KeypadConfig *config, const WifiConfig *wifiConfig);
+    void begin(
+        WIFIManager* wifiManager,
+        BLEController* bleController,
+        InputHub* inputHub,
+        GyroMouse* gyroMouse,
+        CombinationManager* comboManager,
+        SpecialAction* specialAction,
+        CommandFactory* commandFactory,
+        const KeypadConfig* keypadConfig,
+        const WifiConfig* wifiConfig);
     void handleInputEvent(const InputEvent &event);
     void update();
     void clearActiveKeys();
     void setUseKeyPressOrder(bool useOrder);
+    bool getUseKeyPressOrder() const { return useKeyPressOrder; }
     bool reloadCombinationsFromManager(JsonObject newCombos);
 
     // Combo switch request system
     bool hasPendingComboSwitch();
     void getPendingComboSwitch(std::string& outPrefix, int& outSetNumber);
     void clearPendingComboSwitch();
+    void setPendingComboSwitch(const std::string& prefix, int setNumber);
+
+    // GyroMouse mode state management
+    void setGyroModeActive(bool active);
+    bool isGyroModeActive() const;
+    void saveCurrentComboForGyro();
+    void restoreSavedGyroCombo();
+    bool hasSavedGyroCombo() const;
+
+    // Action lock management
+    void setActionLocked(bool locked);
+
+    // Config getters
+    const WifiConfig* getWifiConfig() const;
+
+    // State getters for commands
+    const std::string& getCurrentActivationCombo() const;
 
     // Configurazione delle combinazioni
     std::map<std::string, std::vector<std::string>> combinations;
@@ -59,6 +73,20 @@ public:
     unsigned long encoder_pulse_duration = 150; // Durata dell'impulso dell'encoder in ms
 
 private:
+    // Dependencies
+    WIFIManager* wifiManager;
+    BLEController* bleController;
+    InputHub* inputHub;
+    GyroMouse* gyroMouse;
+    CombinationManager* comboManager;
+    SpecialAction* specialAction;
+    CommandFactory* commandFactory;
+    const KeypadConfig* keypadConfig;
+    const WifiConfig* wifiConfig;
+
+    // Command execution state
+    std::unique_ptr<Command> _lastExecutedCommand;
+
     // Struttura per tenere traccia dell'ordine di pressione dei tasti
     struct KeyPressInfo {
         uint8_t keyIndex;     // Indice del tasto
@@ -81,8 +109,6 @@ private:
     std::string lastExecutedAction;
     std::string currentActivationCombo; // Combo che ha attivato l'azione corrente
     std::string encoderPendingAction; // Azione dell'encoder in attesa di rilascio
-    const KeypadConfig *keypadConfig;
-    const WifiConfig *wifiConfig;
     bool is_action_locked = false;
     bool gestureExecuted = false;
     bool wasPartOfCombo = false;
