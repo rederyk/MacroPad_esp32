@@ -1,5 +1,12 @@
 # TODO e Roadmap - ESP32 MacroPad
 
+**veloci**
+- ble pairing salva il mac del device nel combo associato  e crea un comando per eliminarlo  ,impedisci a altri device di connettersi
+- irscan mode da combo premuta 5 o piu sec in irsend mode invece di due modalita separate per ogni dev
+
+- riformare e aggiornare questo todo
+
+
 ## Legenda Priorità
 - 🔴 **Alta** - Problemi critici o funzionalità molto richieste
 - 🟠 **Media** - Miglioramenti importanti
