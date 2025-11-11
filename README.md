@@ -17,6 +17,8 @@ A powerful, customizable macro pad built on the ESP32 platform, featuring gestur
   </table>
 </div>
 
+> 🖨️ **Want to build your own?** Check out the [3D printable case on Thingiverse](https://www.thingiverse.com/thing:7188015)!
+
 ## 🌟 Features
 
 ### 🎯 Core Functionality
