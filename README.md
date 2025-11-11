@@ -2,6 +2,21 @@
 
 A powerful, customizable macro pad built on the ESP32 platform, featuring gesture recognition, programmable key combinations, IR universal remote, gyroscopic mouse control, event scheduling, and wireless connectivity.
 
+## 🎥 See It In Action
+
+<div align="center">
+  <table>
+    <tr>
+      <td><img src="DOC/images/gyromouse.gif" alt="GyroMouse Control" width="360"/></td>
+      <td><img src="DOC/images/IRremote.gif" alt="IR Universal Remote" width="360"/></td>
+    </tr>
+    <tr>
+      <td align="center"><b>🖱️ GyroMouse Control</b><br/>Air mouse with gesture-based movement</td>
+      <td align="center"><b>📡 IR Universal Remote</b><br/>Learn and send IR commands</td>
+    </tr>
+  </table>
+</div>
+
 ## 🌟 Features
 
 ### 🎯 Core Functionality
