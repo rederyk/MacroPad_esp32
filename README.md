@@ -67,12 +67,12 @@ A powerful, customizable macro pad built on the ESP32 platform, featuring gestur
 
 #### Hardware Components
 - **ESP32 development board** (tested on **LOLIN32 Lite**)
-- **Accelerometer/Gyroscope**: MPU6050 (recommended) or ADXL345
-- **3x3 Keypad** (9 mechanical switches with diodes)
-- **Rotary encoder** (optional but recommended)
-- **RGB LED** (common cathode)
-- **IR Transmitter LED** (with transistor amplification circuit)
-- **IR Receiver** (TSOP38238 or similar)
+- **Accelerometer/Gyroscope**: MPU6050 (recommended) or ADXL345 optional
+- **XxX Keypad** (X*X mechanical switches with diodes) (optional, needing an input but can use the webui)
+- **Rotary encoder** (optional but recommended) optional
+- **RGB LED** (common cathode) optional
+- **IR Transmitter LED** (with transistor amplification circuit) optional
+- **IR Receiver** (TSOP38238 or similar) optional
 - **LiPo Battery** 3.7V (optional, for portable use)
 - Basic soldering equipment
 
@@ -343,18 +343,11 @@ Each profile can have different LED colors configured in `_settings` section!
 - LittleFS for configuration storage
 - Bluetooth Classic release frees ~30KB when using BLE
 - Smart buffer management to prevent fragmentation
-- ⚠️ Gesture samples can fill memory - limit to 3-5 per gesture
 
 ## 🤖 AI Development Note
 
 This project was developed with assistance from various AI models including GPT-4, Claude, Deepseek, Gemini, and Qwen-Coder. While this enabled rapid prototyping and feature development, the codebase may contain unconventional patterns. We're continuously refactoring towards best practices!
 
-## 🐛 Known Issues & Limitations
-
-- **Gesture Memory:** Many gesture samples can exhaust RAM → limit to 3-5 samples per gesture
-- **Case Sensitivity:** Uppercase characters may behave inconsistently in rapid sequences
-- **BLE MAC Changes:** May require "forgetting" device on paired hosts when changing MAC
-- **Layout Support:** Currently optimized for US keyboard layout (ITA/DE/FR support planned)
 
 See [TODO.md](DOC/TODO.md) for detailed roadmap and planned improvements.
 
@@ -420,7 +413,7 @@ This is a hobby project developed with AI assistance. The code may contain error
 
 ## 📜 License
 
-[Add your license here - e.g., MIT, GPL, etc.]
+GNU GENERAL PUBLIC LICENSE Version 3
 
 ## 🔗 Links
 
