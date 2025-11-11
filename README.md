@@ -68,12 +68,12 @@ A powerful, customizable macro pad built on the ESP32 platform, featuring gestur
 #### Hardware Components
 - **ESP32 development board** (tested on **LOLIN32 Lite**)
 - **Accelerometer/Gyroscope**: MPU6050 (recommended) or ADXL345 optional
-- **XxX Keypad** (X*X mechanical switches with diodes) (optional, needing an input but can use the webui)
-- **Rotary encoder** (optional but recommended) optional
-- **RGB LED** (common cathode) optional
+- **XxX Keypad** (X*X mechanical switches with diodes) (optional, needed for an input but can use the webui)
+- **Rotary encoder** (optional but recommended) 
+- **RGB LED**  optional
 - **IR Transmitter LED** (with transistor amplification circuit) optional
 - **IR Receiver** (TSOP38238 or similar) optional
-- **LiPo Battery** 3.7V (optional, for portable use)
+- **LiPo Battery** 3.7V (optional, but recommended for portable use)
 - Basic soldering equipment
 
 #### Software
