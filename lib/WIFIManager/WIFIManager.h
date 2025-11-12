@@ -34,9 +34,9 @@ public:
     void enableAP(const char *ssid = "ESP32-Numpad", const char *password = "password"); // Enable the Access Point
     bool isAPMode();
     void toggleAp(const char *ssid, const char *apass);
-    void connectWiFi(const char *ssid, const char *password);
+    void connectWiFi(const char *ssid, const char *password, const char *hostname = nullptr);
     void stopWiFi();
-    void enableSTA(const char *ssid, const char *password);
+    void enableSTA(const char *ssid, const char *password, const char *hostname = nullptr);
     void disableSTA();
     void toggleSta(const char *ssid, const char *password);
     void updateWiFiMode();

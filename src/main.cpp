@@ -270,7 +270,10 @@ void initConnectivity() {
         {
             Logger::getInstance().log("Starting STA mode...");
 
-            wifiManager.connectWiFi(configManager.getWifiConfig().router_ssid.c_str(), configManager.getWifiConfig().router_password.c_str());
+            wifiManager.connectWiFi(
+                configManager.getWifiConfig().router_ssid.c_str(),
+                configManager.getWifiConfig().router_password.c_str(),
+                configManager.getSystemConfig().BleName.c_str());
 
             // Define the timeout duration (in milliseconds)
             // funziona senza?

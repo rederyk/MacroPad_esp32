@@ -20,7 +20,29 @@
 #include <DNSServer.h>
 #include <esp_wifi.h>
 #include <Logger.h>
-// #include <Led.h>
+#include <stdio.h>
+
+namespace
+{
+String buildUniqueApName(const char *baseName)
+{
+    String ssid = baseName ? baseName : "ESP32";
+    uint8_t mac[6];
+    if (esp_wifi_get_mac(WIFI_IF_STA, mac) == ESP_OK)
+    {
+        char suffix[10];
+        // Use the last 3 bytes to keep the suffix short yet unique
+        snprintf(suffix, sizeof(suffix), "%02X%02X%02X", mac[3], mac[4], mac[5]);
+        ssid += "_";
+        ssid += suffix;
+    }
+    else
+    {
+        Logger::getInstance().log("Unable to read base MAC for unique SSID suffix.");
+    }
+    return ssid;
+}
+} // namespace
 
 WIFIManager::WIFIManager() : apEnabled(false), staEnabled(false), webServer(), webServerRunning(false)
 {
@@ -86,11 +108,13 @@ void WIFIManager::beginAP(const char *apSSID, const char *apPassword)
 
     WiFi.setTxPower(WIFI_POWER_19_5dBm); // Massima potenza per il segnale
 
-    if (WiFi.softAP(apSSID, apPassword, 1))
+    String uniqueSsid = buildUniqueApName(apSSID);
+    if (WiFi.softAP(uniqueSsid.c_str(), apPassword, 1))
     {
         Logger::getInstance().log("✅ AP Mode attivata con successo."
                                   "IP Adress: " +
                                   String(WiFi.softAPIP()));
+        Logger::getInstance().log("   SSID: " + uniqueSsid);
 
         wifi_mode_t mode;
         esp_wifi_get_mode(&mode);
@@ -148,12 +172,12 @@ void WIFIManager::toggleAp(const char *ssid, const char *password)
     }
 }
 
-void WIFIManager::connectWiFi(const char *ssid, const char *password)
+void WIFIManager::connectWiFi(const char *ssid, const char *password, const char *hostname)
 {
-    enableSTA(ssid, password);
+    enableSTA(ssid, password, hostname);
 }
 
-void WIFIManager::enableSTA(const char *ssid, const char *password)
+void WIFIManager::enableSTA(const char *ssid, const char *password, const char *hostname)
 {
     if (staEnabled)
         return;
@@ -164,6 +188,14 @@ void WIFIManager::enableSTA(const char *ssid, const char *password)
 
     //  delay(1000);
 
+    if (hostname && hostname[0])
+    {
+        WiFi.setHostname(hostname);
+    }
+    else
+    {
+        WiFi.setHostname("ESP32"); // ensure consistent fallback
+    }
     WiFi.begin(ssid, password);
     Logger::getInstance().log("🌐 Connessione alla rete WiFi in corso...");
     // Definisci alcuni colori
