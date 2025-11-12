@@ -26,6 +26,26 @@ bool BLEController::isBleEnabled()
 }
 void BLEController::printMacAddress(const uint8_t *mac)
 {
+  Logger::getInstance().log("New MAC address: " + formatMac(mac));
+}
+
+const uint8_t *BLEController::getOriginalMac() const
+{
+  return originalMAC;
+}
+
+const uint8_t *BLEController::getCurrentMac() const
+{
+  return currentMacValid ? currentMAC : nullptr;
+}
+
+String BLEController::formatMac(const uint8_t *mac)
+{
+  if (!mac)
+  {
+    return "<invalid>";
+  }
+
   String macStr = "";
   for (int i = 0; i < 6; i++)
   {
@@ -39,7 +59,8 @@ void BLEController::printMacAddress(const uint8_t *mac)
       macStr += ":";
     }
   }
-  Logger::getInstance().log("New MAC address: " + macStr);
+  macStr.toUpperCase();
+  return macStr;
 }
 
 BLEController::BLEController()
@@ -75,6 +96,8 @@ void BLEController::storeOriginalMAC()
   esp_efuse_mac_get_default(originalMAC);
   Logger::getInstance().log("MAC originale salvato: ", false);
   printMacAddress(originalMAC);
+  memcpy(currentMAC, originalMAC, sizeof(currentMAC));
+  currentMacValid = true;
 }
 
 void BLEController::startBluetooth()
@@ -156,6 +179,8 @@ void BLEController::incrementMacAddress(int increment)
     // Reset al MAC originale.
     esp_base_mac_addr_set(newMac);
     Logger::getInstance().log("MAC address reimpostato al valore originale.");
+    memcpy(currentMAC, newMac, sizeof(currentMAC));
+    currentMacValid = true;
   }
   else
   {
@@ -165,6 +190,8 @@ void BLEController::incrementMacAddress(int increment)
     esp_base_mac_addr_set(newMac);
     Logger::getInstance().log("MAC address incrementato di: " + String(increment));
     printMacAddress(newMac);
+    memcpy(currentMAC, newMac, sizeof(currentMAC));
+    currentMacValid = true;
   }
 }
 

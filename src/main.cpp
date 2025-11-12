@@ -244,10 +244,13 @@ void initConnectivity() {
         Logger::getInstance().log("Free heap after BT Classic release: " + String(ESP.getFreeHeap()) + " bytes");
 
         bleController.storeOriginalMAC();
+        Logger::getInstance().log("BLE base MAC (efuse): " + BLEController::formatMac(bleController.getOriginalMac()));
         //        Keyboard.deviceName = systemConfig.BleName.c_str();
 
         int mac = systemConfig.BleMacAdd;
         bleController.incrementMacAddress(mac);
+        const uint8_t *shiftedMac = bleController.getCurrentMac();
+        Logger::getInstance().log("BLE shifted MAC (offset " + String(mac) + "): " + BLEController::formatMac(shiftedMac));
         vTaskDelay(pdMS_TO_TICKS(50)); // Dai tempo al BLE
         bleController.incrementName(mac);
         vTaskDelay(pdMS_TO_TICKS(50)); // Dai tempo al BLE

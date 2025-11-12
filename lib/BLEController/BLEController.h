@@ -37,6 +37,8 @@ private:
     bool statoPrecedente;
     String originalName;
     uint8_t originalMAC[6];
+    uint8_t currentMAC[6];
+    bool currentMacValid = false;
     char pressed_Char = '\0'; // null character to represent "no character pressed"
 
     // Mouse button state tracking
@@ -54,6 +56,9 @@ public:
 
     // Salva il MAC originale all'avvio.
     void storeOriginalMAC();
+    const uint8_t *getOriginalMac() const;
+    const uint8_t *getCurrentMac() const;
+    static String formatMac(const uint8_t *mac);
 
     // Avvia il Bluetooth (inizializza tastiera e mouse).
     void startBluetooth();
