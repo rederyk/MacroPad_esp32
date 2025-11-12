@@ -4,18 +4,19 @@ A powerful, customizable macro pad built on the ESP32 platform, featuring gestur
 
 ## 🎥 See It In Action
 
-<div align="center">
-  <table>
-    <tr>
-      <td><img src="DOC/images/gyromouse.gif" alt="GyroMouse Control" width="360"/></td>
-      <td><img src="DOC/images/IRremote.gif" alt="IR Universal Remote" width="360"/></td>
-    </tr>
-    <tr>
-      <td align="center"><b>🖱️ GyroMouse Control</b><br/>Air mouse with gesture-based movement</td>
-      <td align="center"><b>📡 IR Universal Remote</b><br/>Learn and send IR commands</td>
-    </tr>
-  </table>
-</div>
+<p align="center">
+  <video src="DOC/images/gyromouse.webm" width="360" autoplay loop muted playsinline></video>
+  <video src="DOC/images/IRremote.webm" width="360" autoplay loop muted playsinline></video>
+</p>
+
+<p align="center">
+  <b>🖱️ GyroMouse Control</b><br/>
+  Air mouse with gesture-based movement
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <b>📡 IR Universal Remote</b><br/>
+  Learn and send IR commands
+</p>
+
 
 > 🖨️ **Want to build your own?** Check out the [3D printable case on Thingiverse](https://www.thingiverse.com/thing:7188015)!
 

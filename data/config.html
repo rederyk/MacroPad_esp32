@@ -69,10 +69,6 @@
           <i class="fas fa-code"></i>
           Gestione Combo
         </button>
-        <button class="tab-button" data-target="panel-wizard">
-          <i class="fas fa-magic"></i>
-          Impostazione Guidata Wi-Fi
-        </button>
       </nav>
 
       <main>
@@ -83,9 +79,6 @@
                 <h2 class="card-title">
                   <i class="fas fa-wifi me-2"></i>Impostazioni Wi-Fi
                 </h2>
-                <button class="secondary-btn" id="fillWizardFromForm">
-                  <i class="fas fa-bolt"></i> Usa nel wizard
-                </button>
               </div>
               <form id="wifiForm">
                 <div class="form-group">
@@ -324,118 +317,6 @@
             </div>
           </div>
         </section>
-
-        <section class="panel" id="panel-wizard">
-          <div class="card wizard-shell">
-            <div class="panel-heading">
-              <h2 class="card-title">
-                <i class="fas fa-magic me-2"></i>Impostazione guidata Wi-Fi
-              </h2>
-              <button class="secondary-btn" id="wizardResetButton">
-                <i class="fas fa-undo"></i> Ricomincia
-              </button>
-            </div>
-
-            <div class="wizard-progress">
-              <div class="step active" data-step="1">1. Modalità</div>
-              <div class="step" data-step="2">2. Credenziali</div>
-              <div class="step" data-step="3">3. Riepilogo</div>
-            </div>
-
-            <div class="wizard-content">
-              <div class="wizard-step active" data-step="1">
-                <p>
-                  Scegli il tipo di connessione da configurare. È sempre
-                  consigliato mantenere l'Access Point attivo per recupero
-                  rapido.
-                </p>
-                <div class="wizard-options">
-                  <label class="wizard-option active" data-mode="dual">
-                    <input
-                      type="radio"
-                      name="wizard_mode"
-                      value="dual"
-                      checked
-                    />
-                    <div>
-                      <strong>Access Point + Router</strong>
-                      <p class="mb-0 text-secondary">
-                        L'ESP32 crea un proprio AP e si collega anche al router
-                        di casa.
-                      </p>
-                    </div>
-                  </label>
-                  <label class="wizard-option" data-mode="ap-only">
-                    <input type="radio" name="wizard_mode" value="ap-only" />
-                    <div>
-                      <strong>Solo Access Point</strong>
-                      <p class="mb-0 text-secondary">
-                        L'ESP32 resta isolato e crea solo la propria rete.
-                      </p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              <div class="wizard-step" data-step="2">
-                <p>
-                  Inserisci le credenziali desiderate. Se scegli solo AP, i
-                  campi router saranno ignorati.
-                </p>
-                <div class="form-group">
-                  <label for="wizard_ap_ssid">Access Point SSID</label>
-                  <input type="text" id="wizard_ap_ssid" autocomplete="off" />
-                </div>
-                <div class="form-group">
-                  <label for="wizard_ap_password">Access Point Password</label>
-                  <input
-                    type="password"
-                    id="wizard_ap_password"
-                    autocomplete="off"
-                  />
-                </div>
-                <div class="form-group wizard-router-fields">
-                  <label for="wizard_router_ssid">Router SSID</label>
-                  <input
-                    type="text"
-                    id="wizard_router_ssid"
-                    autocomplete="off"
-                  />
-                </div>
-                <div class="form-group wizard-router-fields">
-                  <label for="wizard_router_password">Router Password</label>
-                  <input
-                    type="password"
-                    id="wizard_router_password"
-                    autocomplete="off"
-                  />
-                </div>
-              </div>
-
-              <div class="wizard-step" data-step="3">
-                <p>Controlla il riepilogo prima di applicare le modifiche.</p>
-                <div class="summary-card">
-                  <ul id="wizardSummary"></ul>
-                </div>
-              </div>
-            </div>
-
-            <div class="wizard-footer">
-              <div class="form-status" id="wizardStatus"></div>
-              <div class="actions">
-                <button class="secondary-btn" id="wizardBackButton">
-                  <i class="fas fa-arrow-left"></i> Indietro
-                </button>
-                <button class="primary-btn" id="wizardNextButton">
-                  Avanti <i class="fas fa-arrow-right"></i>
-                </button>
-                <button class="primary-btn d-none" id="wizardFinishButton">
-                  <i class="fas fa-check"></i> Applica configurazione
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
       </main>
     </div>
 
@@ -472,16 +353,6 @@
           editor: null,
           errorCount: 0,
           eventSource: null,
-        },
-        wizard: {
-          step: 1,
-          mode: "dual",
-          data: {
-            ap_ssid: "",
-            ap_password: "",
-            router_ssid: "",
-            router_password: "",
-          },
         },
       };
 
@@ -969,7 +840,6 @@
           document.getElementById("router_password").value =
             wifi.router_password || "";
 
-          hydrateWizardFromWifi(wifi);
           updateWifiModeLabel(wifi);
           const now = new Date();
           state.wifi.lastUpdated = now;
@@ -1067,239 +937,49 @@
         }
       }
 
-      function gatherWifiDataFromForm() {
-        return {
-          ap_ssid: document.getElementById("ap_ssid").value.trim(),
-          ap_password: document.getElementById("ap_password").value,
-          router_ssid: document.getElementById("router_ssid").value.trim(),
-          router_password: document.getElementById("router_password").value,
-        };
-      }
+            function gatherWifiDataFromForm() {
 
-      function hydrateWizardFromWifi(wifi) {
-        const payload = {
-          ap_ssid: wifi.ap_ssid || "",
-          ap_password: wifi.ap_password || "",
-          router_ssid: wifi.router_ssid || "",
-          router_password: wifi.router_password || "",
-        };
+              return {
 
-        state.wizard.mode =
-          payload.router_ssid && payload.router_ssid.length > 0
-            ? "dual"
-            : "ap-only";
-        state.wizard.data = payload;
-        updateWizardInputs();
-        renderWizard();
-      }
+                ap_ssid: document.getElementById("ap_ssid").value.trim(),
 
-      function populateWizardSummary() {
-        const summary = document.getElementById("wizardSummary");
-        const data = state.wizard.data;
-        const mode =
-          state.wizard.mode === "dual"
-            ? "Access Point + Router"
-            : "Solo Access Point";
-        summary.innerHTML = `
-          <li><strong>Modalità:</strong> ${mode}</li>
-          <li><strong>AP SSID:</strong> ${data.ap_ssid || "<em>non impostato</em>"}</li>
-          <li><strong>AP Password:</strong> ${
-            data.ap_password ? "••••••" : "<em>non impostata</em>"
-          }</li>
-          ${
-            state.wizard.mode === "dual"
-              ? `<li><strong>Router SSID:</strong> ${
-                  data.router_ssid || "<em>non impostato</em>"
-                }</li>
-                 <li><strong>Router Password:</strong> ${
-                   data.router_password ? "••••••" : "<em>non impostata</em>"
-                 }</li>`
-              : "<li><strong>Router:</strong> disabilitato</li>"
-          }
-        `;
-      }
+                ap_password: document.getElementById("ap_password").value,
 
-      function updateWizardInputs() {
-        document
-          .querySelectorAll(".wizard-option")
-          .forEach((option) =>
-            option.classList.toggle(
-              "active",
-              option.getAttribute("data-mode") === state.wizard.mode
-            )
-          );
-        document
-          .querySelectorAll('input[name="wizard_mode"]')
-          .forEach((input) => {
-            input.checked = input.value === state.wizard.mode;
-          });
+                router_ssid: document.getElementById("router_ssid").value.trim(),
 
-        document.getElementById("wizard_ap_ssid").value =
-          state.wizard.data.ap_ssid || "";
-        document.getElementById("wizard_ap_password").value =
-          state.wizard.data.ap_password || "";
-        document.getElementById("wizard_router_ssid").value =
-          state.wizard.data.router_ssid || "";
-        document.getElementById("wizard_router_password").value =
-          state.wizard.data.router_password || "";
+                router_password: document.getElementById("router_password").value,
 
-        document.querySelectorAll(".wizard-router-fields").forEach((el) => {
-          el.style.display = state.wizard.mode === "dual" ? "flex" : "none";
-        });
-      }
+              };
 
-      function renderWizard() {
-        document.querySelectorAll(".wizard-step").forEach((step) => {
-          step.classList.toggle(
-            "active",
-            parseInt(step.getAttribute("data-step"), 10) === state.wizard.step
-          );
-        });
-        document.querySelectorAll(".wizard-progress .step").forEach((step) => {
-          step.classList.toggle(
-            "active",
-            parseInt(step.getAttribute("data-step"), 10) === state.wizard.step
-          );
-        });
-
-        document
-          .getElementById("wizardBackButton")
-          .classList.toggle("d-none", state.wizard.step === 1);
-
-        document
-          .getElementById("wizardNextButton")
-          .classList.toggle("d-none", state.wizard.step === 3);
-
-        document
-          .getElementById("wizardFinishButton")
-          .classList.toggle("d-none", state.wizard.step !== 3);
-
-        if (state.wizard.step === 3) {
-          populateWizardSummary();
-        }
-      }
-
-      function resetWizard() {
-        state.wizard.step = 1;
-        state.wizard.mode = "dual";
-        state.wizard.data = {
-          ap_ssid: "",
-          ap_password: "",
-          router_ssid: "",
-          router_password: "",
-        };
-        updateWizardInputs();
-        renderWizard();
-        document.getElementById("wizardStatus").textContent =
-          "Wizard ripristinato.";
-      }
-
-      function wizardCollectStepData() {
-        state.wizard.mode = document.querySelector(
-          'input[name="wizard_mode"]:checked'
-        ).value;
-        state.wizard.data.ap_ssid = document
-          .getElementById("wizard_ap_ssid")
-          .value.trim();
-        state.wizard.data.ap_password =
-          document.getElementById("wizard_ap_password").value;
-        state.wizard.data.router_ssid = document
-          .getElementById("wizard_router_ssid")
-          .value.trim();
-        state.wizard.data.router_password =
-          document.getElementById("wizard_router_password").value;
-
-        if (state.wizard.mode !== "dual") {
-          state.wizard.data.router_ssid = "";
-          state.wizard.data.router_password = "";
-        }
-      }
-
-      function setupWizard() {
-        document.querySelectorAll(".wizard-option").forEach((option) => {
-          option.addEventListener("click", () => {
-            state.wizard.mode = option.getAttribute("data-mode");
-            updateWizardInputs();
-          });
-        });
-
-        document
-          .getElementById("wizardNextButton")
-          .addEventListener("click", () => {
-            if (state.wizard.step === 1) {
-              wizardCollectStepData();
-              state.wizard.step = 2;
-              renderWizard();
-              return;
             }
-            if (state.wizard.step === 2) {
-              wizardCollectStepData();
-              state.wizard.step = 3;
-              renderWizard();
+
+      
+
+            function resetWifiForm() {
+
+              const wifi = state.wifi.original.wifi || {};
+
+              document.getElementById("ap_ssid").value = wifi.ap_ssid || "";
+
+              document.getElementById("ap_password").value = wifi.ap_password || "";
+
+              document.getElementById("router_ssid").value =
+
+                wifi.router_ssid || "";
+
+              document.getElementById("router_password").value =
+
+                wifi.router_password || "";
+
+              document.getElementById("wifiFormStatus").textContent =
+
+                "Valori ripristinati.";
+
             }
-          });
 
-        document
-          .getElementById("wizardBackButton")
-          .addEventListener("click", () => {
-            if (state.wizard.step > 1) {
-              state.wizard.step -= 1;
-              renderWizard();
-            }
-          });
+      
 
-        document
-          .getElementById("wizardFinishButton")
-          .addEventListener("click", async () => {
-            wizardCollectStepData();
-            document.getElementById("wizardStatus").textContent =
-              "Invio configurazione...";
-            const payload = {
-              wifi: {
-                ap_ssid: state.wizard.data.ap_ssid,
-                ap_password: state.wizard.data.ap_password,
-                router_ssid: state.wizard.data.router_ssid,
-                router_password: state.wizard.data.router_password,
-              },
-            };
-            await submitWifiConfig(
-              payload,
-              document.getElementById("wizardStatus")
-            );
-            state.wifi.lastUpdated = new Date();
-            updateWifiUpdatedLabel();
-            showToast(
-              "Configurazione inviata. Il dispositivo potrebbe riavviarsi.",
-              "success"
-            );
-          });
-
-        document
-          .getElementById("wizardResetButton")
-          .addEventListener("click", resetWizard);
-      }
-
-      function resetWifiForm() {
-        const wifi = state.wifi.original.wifi || {};
-        document.getElementById("ap_ssid").value = wifi.ap_ssid || "";
-        document.getElementById("ap_password").value = wifi.ap_password || "";
-        document.getElementById("router_ssid").value =
-          wifi.router_ssid || "";
-        document.getElementById("router_password").value =
-          wifi.router_password || "";
-        document.getElementById("wifiFormStatus").textContent =
-          "Valori ripristinati.";
-      }
-
-      function sendFormValuesToWizard() {
-        const wifi = gatherWifiDataFromForm();
-        hydrateWizardFromWifi(wifi);
-        document.getElementById("wizardStatus").textContent =
-          "Valori importati dal form.";
-        showToast("Valori importati nel wizard.", "info");
-      }
-
-      /* Combo editor setup */
+            /* Combo editor setup */
       function computePos(text, index) {
         const lines = text.slice(0, index).split("\n");
         const line = lines.length - 1;
@@ -1762,10 +1442,6 @@
             ]);
           });
 
-        document
-          .getElementById("fillWizardFromForm")
-          .addEventListener("click", sendFormValuesToWizard);
-
         const openDataExplorerBtn = document.getElementById("openDataExplorer");
         if (openDataExplorerBtn) {
           openDataExplorerBtn.addEventListener("click", () =>
@@ -1821,7 +1497,6 @@
 
       async function init() {
         setupTabs();
-        setupWizard();
         initializeEventHandlers();
         setupComboEditor();
         renderConfigDataExplorer();

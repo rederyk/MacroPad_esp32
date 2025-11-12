@@ -1550,6 +1550,16 @@ void configWebServer::setupRoutes()
         }
         request->send(LittleFS, "/config.html", "text/html"); });
 
+    server.on("/config.html", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+        if (!LittleFS.exists("/config.html"))
+        {
+            Logger::getInstance().log("❌ config.html not found");
+            request->send(404, "text/plain", "❌ config.html not found");
+            return;
+        }
+        request->send(LittleFS, "/config.html", "text/html"); });
+
     server.on("/status.json", HTTP_GET, [this](AsyncWebServerRequest *request)
               {
         StaticJsonDocument<256> doc;
