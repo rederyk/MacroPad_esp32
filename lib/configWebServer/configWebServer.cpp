@@ -918,6 +918,30 @@ void configWebServer::setupRoutes()
     server.on("/ir_data.json", HTTP_GET, [](AsyncWebServerRequest *request)
               { request->send(200, "application/json", readIrDataFile()); });
 
+    server.on("/backup/log", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+        String stage = "unknown";
+        const AsyncWebParameter *stageParam = request->getParam("stage", false);
+        if (stageParam)
+        {
+            stage = stageParam->value();
+        }
+        String message = "";
+        const AsyncWebParameter *messageParam = request->getParam("message", false);
+        if (messageParam)
+        {
+            message = messageParam->value();
+        }
+        String logMessage = "📦 Backup ";
+        logMessage += stage.length() > 0 ? stage : "unknown";
+        if (message.length() > 0)
+        {
+            logMessage += ": " + message;
+        }
+        Logger::getInstance().log(logMessage);
+        request->send(200, "application/json", "{\"status\":\"ok\"}");
+              });
+
     server.on("/ir_data.json", HTTP_POST, [](AsyncWebServerRequest *request) {}, nullptr, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
               {
         static String payload;
