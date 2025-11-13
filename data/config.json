@@ -3,7 +3,7 @@
     "ap_ssid": "ESP32_MacroPad",
     "ap_password": "my_cat_name123",
     "router_ssid": "FASTWEB-2",
-    "router_password": "RouterPassword"
+    "router_password": "router_password"
   },
   "system": {
     "ap_autostart": false,
@@ -11,7 +11,7 @@
     "enable_BLE": false,
     "serial_enabled": true,
     "BleMacAdd": 0,
-    "combo_timeout": 100,
+    "combo_timeout": 50,
     "BleName": "Macropad_esp32",
     "sleep_enabled": true,
     
@@ -108,7 +108,7 @@
     "enabled": true,
     "smoothing": 0.15,
     "invertX": true,
-    "invertY": false,
+    "invertY": true,
     "swapAxes": false,
     "defaultSensitivity": 1,
     "orientationAlpha": 0.85,
