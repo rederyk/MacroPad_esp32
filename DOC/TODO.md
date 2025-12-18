@@ -646,7 +646,11 @@ Tutte le feature marcate con priorità media/bassa sono ottime per contributi es
 - **v2.0** - Layout tastiera, pattern LED, ottimizzazioni memoria
 - **v2.5** - Mouse gyro, macro recording
 - **v3.0** - Display OLED, app mobile, ULP sleep
-
+# problemi rilevati
+ - recupero ip dopo setting in AP mode,
+   l utente non vine notificato del nuovo ip prima di riavviare il device ,
+   si deve creare un poupop con l avvenuta connesione con ip in verde e pulsante riavvia,
+   il pulsante diventa connetti invece di salva e raivvia , dopo viene mostrato connessione avvenuta con ip della modalita STA in verde bello grande e pulsante riavvia in STA_only mode  
 ---
 
 **Ultima Revisione:** 2025-01
