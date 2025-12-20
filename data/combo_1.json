@@ -1,30 +1,36 @@
 {
   "1": [
-    "S_B:1"
+    "S_B:SHIFT"
   ],
   "2": [
-    "S_B:2"
+    "S_B:TAB"
   ],
   "3": [
-    "S_B:3"
+    "S_B:ALT"
   ],
   "4": [
-    "S_B:😀"
+    "S_B:CTRL"
   ],
   "5": [
-    "S_B:5"
+    "S_B:UP_ARROW"
   ],
   "6": [
-    "S_B:6"
+    "S_B:TAB"
   ],
   "7": [
-    "S_B:7"
+    "S_B:DOWN_ARROW"
   ],
   "8": [
-    "S_B:8"
+    "S_B:RIGHT_ARROW"
   ],
   "9": [
-    "S_B:9"
+    "S_B:LEFT_ARROW"
+  ],
+  "1+2": [
+    "S_B:CTRL+Z"
+  ],
+  "2+3": [
+    "S_B:CTRL+SHIFT+Z"
   ],
   "G_SHAKE": [
     "S_B:SUPER+TAB"
@@ -35,23 +41,22 @@
   "G_SWIPE_LEFT": [
     "S_B:CTRL+SUPER,RIGHT_ARROW"
   ],
-
   "1+5": [
     "<S_B:SUPER+t><S_B:SUPER+w><S_B:SUPER+c>"
   ],
   "2+8": [
     "S_B:SUPER+q"
   ],
-  "2+5+8": [
+  "4+5+6": [
     "<S_B:SUPER+t><DELAY_500><S_B:btop><DELAY_500><S_B:RETURN>"
   ],
-  "3+5": [
+  "7+8+9": [
     "<S_B:parola 😀 ><S_B:SPAZIO Virgola,, e piu ++ escapeD con ,,,, o ++++ >"
   ],
-  "4+5": [
+  "7+8": [
     "S_B:CTRL+SUPER,LEFT_ARROW"
   ],
-  "5+6": [
+  "8+9": [
     "S_B:CTRL+SUPER,RIGHT_ARROW"
   ],
   "CW": [
